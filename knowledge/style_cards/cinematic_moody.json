@@ -1,0 +1,16 @@
+{
+  "style_id": "cinematic_moody",
+  "style_name": "Cinematic Moody",
+  "suitable_scenes": ["rainy city", "street", "night", "lake", "overcast"],
+  "avoid_scenes": ["bright portrait", "food"],
+  "visual_features": {
+    "contrast": "medium-high",
+    "black_point": "slightly lifted",
+    "highlights": "compressed",
+    "shadows": "cool",
+    "saturation": "muted",
+    "grain": "light"
+  },
+  "recipe_sources": [],
+  "raw_profiles": ["knowledge/raw_profiles/cinematic_moody.pp3"]
+}

@@ -1,0 +1,17 @@
+{
+  "style_id": "soft_portrait",
+  "style_name": "Soft Portrait",
+  "suitable_scenes": ["portrait", "couple", "wedding", "family"],
+  "avoid_scenes": ["architecture", "high contrast street"],
+  "visual_features": {
+    "contrast": "soft-medium",
+    "black_point": "neutral",
+    "highlights": "soft",
+    "shadows": "open",
+    "skin_tone": "protected warm orange",
+    "saturation": "soft",
+    "grain": "none"
+  },
+  "recipe_sources": [],
+  "raw_profiles": ["knowledge/raw_profiles/soft_portrait.pp3"]
+}

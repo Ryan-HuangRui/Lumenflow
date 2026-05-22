@@ -1,0 +1,13 @@
+.DS_Store
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+*.log
+
+# Local photo data and generated artifacts should stay outside the repo.
+runs/
+tmp/
+local/

@@ -1,0 +1,16 @@
+{
+  "style_id": "clean_natural",
+  "style_name": "Clean Natural",
+  "suitable_scenes": ["travel", "family", "food", "daily"],
+  "avoid_scenes": [],
+  "visual_features": {
+    "contrast": "medium",
+    "black_point": "neutral",
+    "highlights": "protected",
+    "shadows": "natural",
+    "saturation": "natural",
+    "grain": "none"
+  },
+  "recipe_sources": [],
+  "raw_profiles": ["knowledge/raw_profiles/clean_natural.pp3"]
+}

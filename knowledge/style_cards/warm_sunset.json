@@ -1,0 +1,16 @@
+{
+  "style_id": "warm_sunset",
+  "style_name": "Warm Sunset",
+  "suitable_scenes": ["sunset", "beach", "golden hour", "summer"],
+  "avoid_scenes": ["neon night", "snow"],
+  "visual_features": {
+    "contrast": "medium",
+    "black_point": "soft",
+    "highlights": "warm",
+    "shadows": "slightly warm",
+    "saturation": "medium-high",
+    "grain": "subtle"
+  },
+  "recipe_sources": [],
+  "raw_profiles": ["knowledge/raw_profiles/warm_sunset.pp3"]
+}

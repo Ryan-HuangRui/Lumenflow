@@ -1,0 +1,17 @@
+{
+  "style_id": "fuji_travel_muted",
+  "style_name": "Fuji Travel Muted",
+  "suitable_scenes": ["city walk", "cafe", "old street", "travel"],
+  "avoid_scenes": ["sports", "product"],
+  "visual_features": {
+    "contrast": "medium",
+    "black_point": "slightly lifted",
+    "highlights": "rolled off",
+    "shadows": "slightly cool",
+    "greens": "desaturated",
+    "saturation": "muted",
+    "grain": "light"
+  },
+  "recipe_sources": [],
+  "raw_profiles": ["knowledge/raw_profiles/fuji_travel_muted.pp3"]
+}
