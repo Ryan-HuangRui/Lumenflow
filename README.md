@@ -13,7 +13,7 @@ Portable photo styling skills for AI agents.
 1. 用户对 agent 说：“帮我处理某个目录里的照片”。
 2. Agent 使用照片处理 skill 扫描 RAW、识别已筛选照片。
 3. Agent 结合风格库和自主判断选择调色方向。
-4. Skill 调用 RawTherapee 或 darktable CLI 导出处理后的图片。
+4. Skill 调用 darktable CLI 或 RawTherapee CLI 导出处理后的图片。
 5. 输出处理记录，方便用户复盘每张图用了什么风格和参数。
 6. 定时任务使用风格库更新 skill，从社交媒体和视频教程里更新风格库。
 
@@ -25,7 +25,7 @@ Portable photo styling skills for AI agents.
 - 内置 5 个手写风格卡，形成最小知识库。
 - 支持扫描指定目录的 RAW，并识别已筛选/标记照片。
 - 让 agent 根据风格库和照片内容选择处理风格。
-- 通过 RawTherapee CLI 渲染导出。
+- 通过 darktable CLI 优先渲染导出；RawTherapee CLI 作为 `.pp3` profile 备选。
 - 输出处理后的图片和 Markdown 处理记录。
 
 ## 项目结构
@@ -76,6 +76,6 @@ skill 按需调用 scripts/
 
 计划依赖的本地工具：
 
-- RawTherapee CLI：第一版主要 RAW 渲染引擎。
-- ExifTool：读取元数据和 XMP 星级。
-- darktable CLI：可选的替代渲染或筛片工作流。
+- darktable CLI：第一版主要 RAW 筛选/标记/渲染闭环。
+- RawTherapee CLI：`.pp3` profile 备选渲染引擎。
+- ExifTool：读取元数据和辅助验证。

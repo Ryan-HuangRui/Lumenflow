@@ -153,15 +153,16 @@ lumenflow/
 - 元数据读取：`exiftool` 13.55。
 - 视频/音频处理：`ffmpeg` / `ffprobe` 8.0.1。
 - 视频获取：`yt-dlp` 2025.12.08 CLI。
+- RAW 渲染：`darktable-cli` 5.4.1 已安装并通过包装脚本进入 `/opt/homebrew/bin/darktable-cli`。
 - Python 基础库：`Pillow`、`pydantic`、`requests`。
 
 当前缺口：
 
-- RAW 渲染：`rawtherapee-cli` 未安装；`darktable-cli` 未安装。
+- RAW 渲染：`rawtherapee-cli` 已在 `/opt/homebrew/bin/rawtherapee-cli`，但当前 macOS 环境下 `rawtherapee-cli -v` 5 秒内不返回，尚未通过自动化运行验收；照片处理 MVP 先走 darktable。
 - JSON 辅助工具：`jq` 未安装。
 - 本地转写：`whisper-cpp` / `whisper-cli` 未安装，也没有 Whisper GGML 模型文件；Python `whisper` / `faster-whisper` 未安装。
 - 模型能力调用：交互式 Codex 或基于 agent host 的定时任务可以直接使用宿主 agent 的视觉/推理能力；只有 headless 脚本独立运行时，才需要 Python `openai` SDK/API key 或其他模型 provider 配置。
-- YouTube 教程入库：Python `youtube-transcript-api`、`google-api-python-client` 未安装。
+- YouTube 教程入库：第一步只需要 Python `youtube-transcript-api` 或 YouTube transcript MCP；当前 Python `youtube-transcript-api` 未安装，`google-api-python-client` 仅作为批量元数据可选依赖。
 - X 社媒接入：已采用标准库脚本调用官方 X API；还没有本机 `X_BEARER_TOKEN`、实际白名单账号配置和增量同步状态文件。
 - Instagram / Bilibili：不作为默认自动抓取依赖；优先走用户提供链接、字幕、转写或官方/授权接口。
 
@@ -198,46 +199,68 @@ python scripts/check_environment.py
 
 ### Phase 1 依赖：本地照片处理闭环
 
-必须安装：
-
-```bash
-brew install --cask rawtherapee
-```
-
-RawTherapee cask 安装的是 macOS App。若 `rawtherapee-cli` 没有自动进入 `PATH`，需要在适配层提供 wrapper 或建立本机链接，例如：
-
-```bash
-ln -sf /Applications/RawTherapee.app/Contents/MacOS/rawtherapee-cli /opt/homebrew/bin/rawtherapee-cli
-```
-
-可选安装：
+优先安装：
 
 ```bash
 brew install --cask darktable
 ```
 
-说明：darktable 只作为备选 RAW 引擎。当前 Homebrew cask 标记了 macOS Gatekeeper 相关 deprecation 风险，因此 MVP 优先 RawTherapee。
+darktable cask 安装的是 macOS App。若 `darktable-cli` 没有自动进入 `PATH`，需要在适配层提供 wrapper，例如：
+
+```bash
+printf '%s\n' '#!/bin/sh' 'exec /Applications/darktable.app/Contents/MacOS/darktable-cli "$@"' > /opt/homebrew/bin/darktable-cli
+chmod +x /opt/homebrew/bin/darktable-cli
+```
+
+可选安装：
+
+```bash
+brew install --cask rawtherapee
+```
+
+说明：darktable 是第一版照片筛选/标记/CLI 导出闭环。RawTherapee 只作为 `.pp3` profile 备选引擎，前提是本机 `rawtherapee-cli` 能通过运行验收。
 
 验收：
 
 ```bash
 exiftool -ver
-rawtherapee-cli -v
-python scripts/render_raw.py --raw /path/to/sample.dng --output-dir /tmp/lumenflow-test --profile knowledge/raw_profiles/clean_natural.pp3 --dry-run
+darktable-cli --help
+python scripts/scan_raws.py /path/to/photos --selected-only --min-rating 1
+python scripts/develop_photos.py /path/to/photos --output-dir /tmp/lumenflow-test --engine darktable --style-id clean_natural --dry-run
 ```
 
 ### Phase 3 依赖：视频教程入库
 
-必须安装：
+第一步采用轻量 transcript provider 抽象：视频教程入库脚本不直接绑定本地转写引擎，而是先把“从 URL 获取 transcript”封装成可替换 provider。默认优先接 YouTube transcript MCP 或 Python `youtube-transcript-api`，让 agent 拿到 transcript 后再抽取调色 recipe。
+
+默认路线：
+
+1. YouTube transcript MCP：适合 Codex / agent host 编排，输入 YouTube URL，返回 transcript / timed transcript / video metadata。
+2. `youtube-transcript-api`：适合 repo 内 Python 脚本轻量调用，优先获取官方字幕或自动字幕。
+3. 用户提供 transcript / 字幕文件：作为最稳定的人工补入口。
+4. 云端 ASR provider：用于没有字幕的视频，后续可接 AssemblyAI / Deepgram / Gladia 等远程转写服务。
+5. 本地 `yt-dlp + ffmpeg + whisper-cpp`：只作为最后 fallback，不作为第一版默认依赖。
+
+第一步必须安装：
 
 ```bash
-brew install ffmpeg yt-dlp whisper-cpp
-python -m pip install youtube-transcript-api google-api-python-client
+python -m pip install youtube-transcript-api
 ```
 
 如果教程入库由 Codex 定时任务或其他 agent 框架 cron 编排，transcript 到 recipe 的结构化提取可以直接使用宿主 agent 的模型能力，不要求项目安装 `openai` SDK。只有把 `scripts/ingest_tutorial.py` 做成无人值守 headless 脚本时，才需要额外安装 `openai` 或其他模型 provider SDK。
 
-Whisper 模型不会随 `whisper-cpp` 自动安装，需要单独下载 GGML 模型文件，并在配置中记录路径。建议从小模型开始：
+可选安装：
+
+```bash
+brew install ffmpeg yt-dlp whisper-cpp
+python -m pip install google-api-python-client
+```
+
+说明：
+
+- `ffmpeg` / `yt-dlp` / `whisper-cpp` 只用于本地 fallback。
+- `google-api-python-client` 只在需要 YouTube Data API 查询频道、播放列表或批量视频元数据时安装。
+- Whisper 模型不会随 `whisper-cpp` 自动安装，需要单独下载 GGML 模型文件，并在配置中记录路径。建议从小模型开始：
 
 ```text
 models/whisper/ggml-base.bin
@@ -245,24 +268,24 @@ models/whisper/ggml-base.bin
 
 教程入库优先级：
 
-1. 官方字幕 / 用户提供字幕。
-2. `yt-dlp` 获取允许下载的字幕。
-3. `ffmpeg` 抽音频 + `whisper-cpp` 本地转写。
-4. 用户手动提供 transcript。
+1. YouTube transcript MCP 或 `youtube-transcript-api` 获取官方字幕 / 自动字幕。
+2. 用户手动提供 transcript / 字幕文件。
+3. 云端 ASR provider 远程转写。
+4. `yt-dlp` 获取允许下载的字幕。
+5. `ffmpeg` 抽音频 + `whisper-cpp` 本地转写。
 
 仓库需要补充：
 
 - `scripts/ingest_tutorial.py`：把视频链接、字幕文件或 transcript 转成 `knowledge/tutorial_recipes/*.json`。
+- `scripts/transcript_providers.py`：封装轻量 provider 接口，第一版至少支持 `youtube_transcript_api`，预留 `mcp_youtube_transcript`、`cloud_asr`、`local_whisper`。
 - `knowledge/source_records/` 中的视频来源记录 schema。
-- Whisper 模型路径配置，不把模型文件提交进仓库。
+- provider 配置示例：默认无密钥；云端 ASR / YouTube Data API / 本地 Whisper 模型路径都作为可选配置，不把模型文件和密钥提交进仓库。
 
 验收：
 
 ```bash
-yt-dlp --version
-ffmpeg -version
-whisper-cli --help
-python -c "import youtube_transcript_api, googleapiclient"
+python -c "import youtube_transcript_api"
+python scripts/ingest_tutorial.py --url "https://www.youtube.com/watch?v=..." --transcript-provider youtube_transcript_api --dry-run
 ```
 
 ### Phase 4 依赖：社交媒体风格更新

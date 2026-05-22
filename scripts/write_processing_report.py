@@ -17,9 +17,12 @@ def render_report(records: list[dict[str, str]]) -> str:
                 "",
                 f"- 输出：{record.get('output', '')}",
                 f"- 风格：{record.get('style_id', '')}",
+                f"- 引擎：{record.get('engine', '')}",
                 f"- Profile：{record.get('profile', '')}",
+                f"- 命令：`{record.get('command', '')}`",
                 f"- 理由：{record.get('reason', '')}",
                 f"- 状态：{record.get('status', '')}",
+                f"- 失败原因：{record.get('failure_reason', '')}",
                 "",
             ]
         )
