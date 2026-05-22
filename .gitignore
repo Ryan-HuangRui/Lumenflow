@@ -11,3 +11,6 @@ __pycache__/
 runs/
 tmp/
 local/
+
+# Local source credentials/config should use example files as templates.
+knowledge/source_records/x_sources.json

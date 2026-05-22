@@ -1,0 +1,17 @@
+{
+  "defaults": {
+    "max_results": 10,
+    "pages": 1,
+    "exclude": ["retweets", "replies"],
+    "only_with_media": true
+  },
+  "accounts": [
+    {
+      "username": "example_photographer",
+      "max_results": 10
+    },
+    "@another_photographer"
+  ],
+  "output_dir": "knowledge/source_records",
+  "sync_state_path": "knowledge/source_records/x_sync_state.json"
+}

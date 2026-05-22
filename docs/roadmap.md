@@ -141,6 +141,195 @@ lumenflow/
 
 不保留产品化 CLI 和 Python package 入口。需要复用的能力沉到 `scripts/`，由 skill 编排调用。平台差异放进 `adapters/`，不要渗透到 `knowledge/` 和通用脚本。
 
+## 环境依赖与安装路线
+
+### 当前环境快照
+
+最近一次检查：2026-05-22，本机 macOS + Homebrew 环境。
+
+已具备：
+
+- 基础环境：Homebrew、Python 3.10、pip、Node.js 22、npm、git、curl、sqlite3。
+- 元数据读取：`exiftool` 13.55。
+- 视频/音频处理：`ffmpeg` / `ffprobe` 8.0.1。
+- 视频获取：`yt-dlp` 2025.12.08 CLI。
+- Python 基础库：`Pillow`、`pydantic`、`requests`。
+
+当前缺口：
+
+- RAW 渲染：`rawtherapee-cli` 未安装；`darktable-cli` 未安装。
+- JSON 辅助工具：`jq` 未安装。
+- 本地转写：`whisper-cpp` / `whisper-cli` 未安装，也没有 Whisper GGML 模型文件；Python `whisper` / `faster-whisper` 未安装。
+- 模型能力调用：交互式 Codex 或基于 agent host 的定时任务可以直接使用宿主 agent 的视觉/推理能力；只有 headless 脚本独立运行时，才需要 Python `openai` SDK/API key 或其他模型 provider 配置。
+- YouTube 教程入库：Python `youtube-transcript-api`、`google-api-python-client` 未安装。
+- X 社媒接入：已采用标准库脚本调用官方 X API；还没有本机 `X_BEARER_TOKEN`、实际白名单账号配置和增量同步状态文件。
+- Instagram / Bilibili：不作为默认自动抓取依赖；优先走用户提供链接、字幕、转写或官方/授权接口。
+
+### Phase 0：依赖预检和项目虚拟环境
+
+目标：在实现功能前，让 agent 能明确判断哪些能力可用、哪些能力只能 dry-run。
+
+安装建议：
+
+```bash
+brew install jq
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+仓库需要补充：
+
+- `requirements.txt` 或 `requirements-dev.txt`，固定脚本运行所需 Python 包。
+- `scripts/check_environment.py`，输出 JSON 形式的依赖状态。
+- 在 `adapters/codex/README.md` 写明 Codex 运行前的环境检查命令。
+
+验收：
+
+```bash
+python scripts/check_environment.py
+```
+
+输出应能区分：
+
+- `available`：当前可执行。
+- `missing_required`：当前 Phase 必须补齐。
+- `missing_optional`：后续 Phase 才需要。
+
+### Phase 1 依赖：本地照片处理闭环
+
+必须安装：
+
+```bash
+brew install --cask rawtherapee
+```
+
+RawTherapee cask 安装的是 macOS App。若 `rawtherapee-cli` 没有自动进入 `PATH`，需要在适配层提供 wrapper 或建立本机链接，例如：
+
+```bash
+ln -sf /Applications/RawTherapee.app/Contents/MacOS/rawtherapee-cli /opt/homebrew/bin/rawtherapee-cli
+```
+
+可选安装：
+
+```bash
+brew install --cask darktable
+```
+
+说明：darktable 只作为备选 RAW 引擎。当前 Homebrew cask 标记了 macOS Gatekeeper 相关 deprecation 风险，因此 MVP 优先 RawTherapee。
+
+验收：
+
+```bash
+exiftool -ver
+rawtherapee-cli -v
+python scripts/render_raw.py --raw /path/to/sample.dng --output-dir /tmp/lumenflow-test --profile knowledge/raw_profiles/clean_natural.pp3 --dry-run
+```
+
+### Phase 3 依赖：视频教程入库
+
+必须安装：
+
+```bash
+brew install ffmpeg yt-dlp whisper-cpp
+python -m pip install youtube-transcript-api google-api-python-client
+```
+
+如果教程入库由 Codex 定时任务或其他 agent 框架 cron 编排，transcript 到 recipe 的结构化提取可以直接使用宿主 agent 的模型能力，不要求项目安装 `openai` SDK。只有把 `scripts/ingest_tutorial.py` 做成无人值守 headless 脚本时，才需要额外安装 `openai` 或其他模型 provider SDK。
+
+Whisper 模型不会随 `whisper-cpp` 自动安装，需要单独下载 GGML 模型文件，并在配置中记录路径。建议从小模型开始：
+
+```text
+models/whisper/ggml-base.bin
+```
+
+教程入库优先级：
+
+1. 官方字幕 / 用户提供字幕。
+2. `yt-dlp` 获取允许下载的字幕。
+3. `ffmpeg` 抽音频 + `whisper-cpp` 本地转写。
+4. 用户手动提供 transcript。
+
+仓库需要补充：
+
+- `scripts/ingest_tutorial.py`：把视频链接、字幕文件或 transcript 转成 `knowledge/tutorial_recipes/*.json`。
+- `knowledge/source_records/` 中的视频来源记录 schema。
+- Whisper 模型路径配置，不把模型文件提交进仓库。
+
+验收：
+
+```bash
+yt-dlp --version
+ffmpeg -version
+whisper-cli --help
+python -c "import youtube_transcript_api, googleapiclient"
+```
+
+### Phase 4 依赖：社交媒体风格更新
+
+X 先行。当前 `scripts/update_x_sources.py` 使用 Python 标准库直接调用官方 X API，脚本本身不强制依赖 `tweepy`。如后续改用 SDK，可选安装：
+
+```bash
+python -m pip install tweepy
+```
+
+如果社媒风格更新由 Codex 定时任务或其他 agent 框架 cron 编排，图片风格摘要、风格卡合并和更新说明可以直接使用宿主 agent 的视觉/推理能力，不要求项目安装 `openai` SDK。只有把社媒更新做成纯脚本后台任务时，才需要配置 `openai` 或其他模型 provider。
+
+当前实现采用官方 X API read-only 路线，基础脚本为：
+
+```bash
+cp knowledge/source_records/x_sources.example.json knowledge/source_records/x_sources.json
+export X_BEARER_TOKEN="..."
+python scripts/update_x_sources.py --config knowledge/source_records/x_sources.json --dry-run
+python scripts/update_x_sources.py --config knowledge/source_records/x_sources.json
+```
+
+说明：`scripts/update_x_sources.py` 只负责白名单账号解析、timeline 增量拉取、媒体元数据展开、source record 写入和 `since_id` 状态维护；风格摘要和 style card 合并由宿主 agent 在 `learn-styles` workflow 中完成。
+
+还需要用户提供：
+
+- X API bearer token 或等价授权方式。
+- 摄影师账号白名单。
+- 增量同步状态文件位置，例如 `knowledge/source_records/x_sync_state.json`。
+
+实现约束：
+
+- 只拉取白名单账号和公开可授权内容。
+- 只保存来源链接、文本、媒体元数据、视觉摘要和抽象风格特征。
+- 不把社媒图片复制为训练集。
+- 每次运行必须幂等：已处理 source id 不重复写入。
+
+Instagram / Bilibili：
+
+- 不作为第一版 cron 自动抓取目标。
+- 优先支持用户提供链接、字幕、截图或 transcript。
+- 如后续接官方/授权接口，接入逻辑放在 `adapters/` 或独立 connector，不污染通用 `knowledge/` 格式。
+
+验收：
+
+```bash
+python scripts/update_x_sources.py --print-config-example
+python scripts/update_x_sources.py --config knowledge/source_records/x_sources.json --dry-run
+```
+
+### Phase 5 依赖：定时自动更新
+
+Codex 适配层需要补充：
+
+- 定时任务如何调用 `learn-styles`。
+- 环境变量和凭据注入方式。
+- cron / automation 日志输出位置。
+- 失败时如何记录到 `knowledge/source_records/`，并避免破坏已有风格库。
+
+验收：
+
+```text
+定时任务运行后：
+1. 生成本次 update summary。
+2. 写入或更新 source_records / tutorial_recipes / style_cards。
+3. 没有凭据或平台限流时，输出失败原因并保持已有知识库不变。
+```
+
 ## 落地阶段
 
 ### Phase 1：照片处理 skill 最小闭环
