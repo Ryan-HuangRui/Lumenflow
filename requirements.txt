@@ -1,0 +1,6 @@
+# Runtime Python dependencies for Lumenflow helper scripts.
+#
+# Current photo and X ingest scripts are mostly standard-library based.
+# These packages cover the near-term tutorial ingest path and common HTTP helpers.
+requests>=2.25,<3
+youtube-transcript-api>=1.2,<2

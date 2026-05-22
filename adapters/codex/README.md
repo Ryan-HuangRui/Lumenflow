@@ -8,6 +8,17 @@ Codex-specific work should stay here:
 - Automation setup for scheduled style-library updates.
 - Credential handling notes for local runs.
 
+## Environment Check
+
+Run this before photo processing or scheduled style-library updates:
+
+```bash
+python scripts/check_environment.py
+```
+
+The output is JSON. `summary.overall_status=ready` means no required dependency
+is missing; optional providers can still be absent until their phase is used.
+
 ## X Style Source Updates
 
 Use Codex automation or an agent-framework cron to run the portable `learn-styles` workflow.

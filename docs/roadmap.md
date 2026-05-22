@@ -20,6 +20,47 @@ Agent host 是主要交互入口，可以是 Codex、Claude、OpenClaw 或其他
 
 风格库更新则由宿主平台的定时任务运行，调用风格库更新 skill，从社交媒体和视频教程里整理风格知识。
 
+## 当前状态
+
+更新时间：2026-05-22。
+
+当前处于：
+
+```text
+Phase 1 照片处理最小闭环已跑通
+→ 下一节点：补齐 darktable 可执行风格库，并把视频教程 transcript provider 抽象落地
+```
+
+已实现：
+
+- `develop-photos` skill 已有基础工作流说明。
+- `learn-styles` skill 已有 X 白名单更新工作流说明。
+- 本地风格知识库已拆成 `knowledge/style_cards/*.json`、`knowledge/raw_profiles/*.pp3`。
+- 照片处理闭环已实现：
+  - `scripts/scan_raws.py` 扫描 RAW。
+  - 识别 darktable `<raw filename>.xmp` 中的星级和颜色标签。
+  - 识别 RawTherapee `<raw filename>.pp3` 中的 rank。
+  - `scripts/render_raw.py` 支持 `darktable-cli` 和 `rawtherapee-cli` 两种后端。
+  - `scripts/develop_photos.py` 串联扫描、筛选、选风格、渲染、记录输出。
+  - 输出 `processing_records.json` 和 `processing_report.md`。
+- `darktable-cli` 5.4.1 已在本机安装并通过真实 DNG 导出验证。
+- 环境预检已实现：
+  - `scripts/check_environment.py` 输出 JSON 形式依赖状态。
+  - `requirements.txt` 固定当前/下一步轻量 Python 依赖。
+- X 白名单来源拉取脚本已实现：
+  - `scripts/update_x_sources.py` 使用官方 X API read-only 拉取白名单账号新帖子。
+  - 支持 `since_id` 增量状态、幂等 source record 写入、dry-run。
+- 自动化测试已覆盖照片处理核心脚本：
+  - `tests/test_photo_pipeline.py` 覆盖 sidecar 解析、筛选逻辑、darktable 命令构造、dry-run 批处理记录。
+
+尚未实现：
+
+- darktable 可执行风格库：当前 style card 主要指向 RawTherapee `.pp3`，还没有沉淀 darktable style / XMP history。
+- Agent 视觉判断到风格选择的自动化细化：当前批处理入口支持显式 `--style-id`，默认选 `clean_natural`。
+- 视频教程入库脚本：`scripts/transcript_providers.py`、`scripts/ingest_tutorial.py` 尚未实现。
+- X source record 到视觉摘要、style card 合并的 agent workflow 尚未落地。
+- Codex / agent host 定时任务尚未配置。
+
 ## 核心组件
 
 ### 1. 照片处理 skill
@@ -30,7 +71,7 @@ Agent host 是主要交互入口，可以是 Codex、Claude、OpenClaw 或其他
 2. 识别用户已经标记/筛选的照片。
 3. 读取风格库。
 4. 让 agent 自主判断每张照片适合什么风格。
-5. 调用 RawTherapee / darktable CLI 执行处理。
+5. 调用 darktable CLI / RawTherapee CLI 执行处理。
 6. 输出处理后的图片到用户指定目录。
 7. 生成处理记录。
 
@@ -49,6 +90,7 @@ Agent host 是主要交互入口，可以是 Codex、Claude、OpenClaw 或其他
 output/
 ├── IMG_001_cinematic.jpg
 ├── IMG_001_clean.jpg
+├── processing_records.json
 └── processing_report.md
 ```
 
@@ -133,9 +175,12 @@ lumenflow/
 │   └── openclaw/
 ├── scripts/
 │   ├── scan_raws.py
-│   ├── read_xmp_rating.py
+│   ├── develop_photos.py
 │   ├── render_raw.py
+│   ├── update_x_sources.py
 │   └── write_processing_report.py
+├── tests/
+│   └── test_photo_pipeline.py
 └── docs/
 ```
 
@@ -181,9 +226,9 @@ python -m pip install --upgrade pip
 
 仓库需要补充：
 
-- `requirements.txt` 或 `requirements-dev.txt`，固定脚本运行所需 Python 包。
-- `scripts/check_environment.py`，输出 JSON 形式的依赖状态。
-- 在 `adapters/codex/README.md` 写明 Codex 运行前的环境检查命令。
+- Done：`requirements.txt` 固定当前/下一步轻量 Python 包。
+- Done：`scripts/check_environment.py` 输出 JSON 形式的依赖状态。
+- Done：在 `adapters/codex/README.md` 写明 Codex 运行前的环境检查命令。
 
 验收：
 
@@ -357,18 +402,28 @@ Codex 适配层需要补充：
 
 ### Phase 1：照片处理 skill 最小闭环
 
+状态：Done / 可继续增强。
+
 目标：用户对任意受支持 agent 说“帮我处理某个目录的照片”，agent 能跑完整流程。
 
-范围：
+已完成：
 
-- 创建 `skills/develop-photos/SKILL.md`
-- 创建 `knowledge/style_cards/` 和 `knowledge/raw_profiles/`
+- 创建 `skills/develop-photos/SKILL.md`。
+- 创建 `knowledge/style_cards/` 和 `knowledge/raw_profiles/`。
 - 脚本支持：
   - 扫描 RAW
-  - 读取已筛选照片
-  - 调用修图 CLI
-  - 写处理报告
-- 先不接社交媒体和视频教程
+  - 读取 darktable `.xmp` 星级 / 颜色标签
+  - 读取 RawTherapee `.pp3` rank
+  - 调用 `darktable-cli` 或 `rawtherapee-cli`
+  - 写 `processing_records.json` 和 `processing_report.md`
+- darktable 路线已通过真实 DNG 副本导出验证。
+- 先不接社交媒体和视频教程。
+
+待增强：
+
+- 把 style card 的抽象风格真正映射成 darktable style / XMP history，而不是只依赖默认 pipeline。
+- 让 agent 根据照片内容自动选择 style id，而不是主要依赖显式 `--style-id` 或默认 `clean_natural`。
+- NAS Photo 目录挂载后，用真实用户 RAW 副本再跑一次端到端验证。
 
 验收：
 
@@ -378,22 +433,30 @@ Agent 行为：
 1. 使用 develop-photos skill
 2. 扫描 RAW
 3. 根据现有风格库选择风格
-4. 调用 RawTherapee / darktable CLI
+4. 调用 darktable CLI / RawTherapee CLI
 5. 输出 JPG
-6. 生成 processing_report.md
+6. 生成 processing_records.json 和 processing_report.md
 ```
 
 ### Phase 2：风格库文件格式稳定
 
+状态：In progress。
+
 目标：让 skill 能长期复用风格知识。
 
-范围：
+已完成：
+
+- `knowledge/style_cards/` 已有 5 个初始风格卡。
+- `knowledge/raw_profiles/` 已有对应 RawTherapee `.pp3` profile。
+- 照片处理脚本已能读取 style card 并解析 `raw_profiles`。
+
+待完成：
 
 - 定义 style card JSON schema
 - 定义 tutorial recipe JSON schema
 - 定义 source record JSON schema
-- 写 5 个初始风格卡
-- 将现有 `metadata/style_library.json` 拆成独立风格卡文件
+- 补充 darktable 可执行风格字段，例如 `darktable_style` 或引用可执行 XMP history。
+- 将 style card 中“抽象风格”和“执行 profile”分层，避免 `.pp3` 绑死 RawTherapee。
 
 验收：
 
@@ -402,15 +465,25 @@ Agent 行为：
 
 ### Phase 3：视频教程入库 skill
 
+状态：Next。
+
 目标：先做教程入库，因为它比社媒图片更容易转成调色步骤。
 
-范围：
+已完成：
 
-- 创建 `skills/learn-styles/SKILL.md`
-- 支持用户提供 YouTube/Bilibili 视频链接或字幕文件
-- Agent 提取教程中的调色步骤
-- 写入 `knowledge/tutorial_recipes/`
-- 可选地更新或生成 style card
+- `skills/learn-styles/SKILL.md` 已存在。
+- roadmap 已明确轻量 transcript provider 抽象路线：
+  - 默认 YouTube transcript MCP / `youtube-transcript-api`
+  - 云端 ASR 和本地 Whisper 作为后置 fallback
+
+待完成：
+
+- 实现 `scripts/transcript_providers.py`。
+- 实现 `scripts/ingest_tutorial.py`。
+- 支持用户提供 YouTube/Bilibili 视频链接或字幕文件。
+- Agent 提取教程中的调色步骤。
+- 写入 `knowledge/tutorial_recipes/`。
+- 可选地更新或生成 style card。
 
 验收：
 
@@ -425,14 +498,30 @@ Agent 行为：
 
 ### Phase 4：社交媒体风格更新
 
+状态：In progress。
+
 目标：从指定摄影师账号定期拉取公开内容，沉淀风格卡。
 
-范围：
+已完成：
 
-- X 先行，Instagram 后置
-- 使用账号白名单，不做任意平台抓取
-- 保存来源链接、文本、图片摘要、视觉风格描述
-- 反推风格特征并合并到 style card
+- X 先行路线已确定：官方 X API read-only，不依赖浏览器登录态。
+- `scripts/update_x_sources.py` 已实现：
+  - 摄影师账号白名单配置
+  - 用户名解析
+  - timeline 增量拉取
+  - media metadata 展开
+  - `x_sync_state.json` 状态维护
+  - 幂等写入 `knowledge/source_records/x_{username}_{post_id}.json`
+  - dry-run 和配置示例输出
+- `knowledge/source_records/x_sources.example.json` 已存在。
+
+待完成：
+
+- 配置本机私有 `knowledge/source_records/x_sources.json`。
+- 配置 `X_BEARER_TOKEN` 并跑通一次真实白名单拉取。
+- Agent 读取 `analysis.status=pending_agent_review` 的 source records，生成视觉摘要。
+- 反推风格特征并合并到 style card。
+- Instagram 后置；不做任意平台抓取。
 
 验收：
 
@@ -445,6 +534,8 @@ Agent 行为：
 ```
 
 ### Phase 5：定时自动更新
+
+状态：Not started。
 
 目标：把风格库更新变成定时任务。
 
@@ -460,6 +551,30 @@ Agent 行为：
 - 定时任务能独立运行
 - 风格库更新有日志和 diff
 - 用户可以在对话里问“最近风格库更新了什么”
+
+## 下一步 TODO
+
+按当前依赖关系，建议下一步这样排：
+
+1. 补 darktable 可执行风格库
+   - 为 5 个现有 style card 增加 `darktable_style` 或可执行 XMP history。
+   - 让 `scripts/develop_photos.py` 不只是调用 darktable default pipeline，而是能真正应用风格。
+
+2. 实现视频教程入库最小闭环
+   - 新增 `scripts/transcript_providers.py`。
+   - 新增 `scripts/ingest_tutorial.py`。
+   - 先支持 `youtube-transcript-api` 和用户提供 transcript。
+   - 输出 `knowledge/tutorial_recipes/*.json`。
+
+3. 跑通 X 真实白名单增量
+   - 配置 `X_BEARER_TOKEN` 和 `x_sources.json`。
+   - 生成一批 `source_records/x_*.json`。
+   - 用 agent 处理 `pending_agent_review`，更新 style cards。
+
+4. 接 Codex / agent host 定时任务
+   - 定期运行 `learn-styles`。
+   - 输出 update summary。
+   - 失败时写明原因，不破坏已有知识库。
 
 ## 非目标
 
