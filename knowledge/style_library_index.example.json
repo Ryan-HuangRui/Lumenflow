@@ -1,0 +1,10 @@
+{
+  "schema_version": "lumenflow.style_library_index.v1",
+  "generated_from": {
+    "style_families_dir": "knowledge/style_families",
+    "tutorial_derived_dir": "knowledge/style_cards/tutorial_derived"
+  },
+  "families": [],
+  "cards": [],
+  "inactive_cards": []
+}

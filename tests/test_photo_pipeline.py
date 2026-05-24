@@ -117,6 +117,23 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertIn("--conf", command)
             self.assertIn("plugins/imageio/format/jpeg/quality=92", command)
 
+    def test_build_command_uses_configured_rawtherapee_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            raw = tmp_path / "IMG_0004.DNG"
+            output = tmp_path / "IMG_0004.jpg"
+            raw.write_bytes(b"fake raw")
+
+            command, _profile = develop_photos.build_command(
+                engine="rawtherapee",
+                raw_item={"path": str(raw)},
+                output=output,
+                style={"style_id": "clean_natural", "raw_profiles": []},
+                local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            )
+
+            self.assertEqual(command[0], "/custom/rawtherapee-cli")
+
     def test_develop_photos_dry_run_writes_records_for_selected_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)
@@ -168,6 +185,36 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertEqual(records[0]["engine"], "darktable")
             self.assertEqual(records[0]["status"], "dry_run")
             self.assertTrue((output_dir / "processing_report.md").exists())
+
+    def test_resolve_engine_auto_prefers_rawtherapee_when_available(self) -> None:
+        calls = []
+
+        def fake_command_is_responsive(command: list[str], timeout: int = 5) -> bool:
+            calls.append(command)
+            return command[0] == "rawtherapee-cli"
+
+        original = develop_photos.command_is_responsive
+        develop_photos.command_is_responsive = fake_command_is_responsive
+        try:
+            engine = develop_photos.resolve_engine("auto")
+        finally:
+            develop_photos.command_is_responsive = original
+
+        self.assertEqual(engine, "rawtherapee")
+        self.assertEqual(calls, [["rawtherapee-cli", "-v"]])
+
+    def test_resolve_engine_auto_falls_back_to_darktable(self) -> None:
+        def fake_command_is_responsive(command: list[str], timeout: int = 5) -> bool:
+            return command[0] == "darktable-cli"
+
+        original = develop_photos.command_is_responsive
+        develop_photos.command_is_responsive = fake_command_is_responsive
+        try:
+            engine = develop_photos.resolve_engine("auto")
+        finally:
+            develop_photos.command_is_responsive = original
+
+        self.assertEqual(engine, "darktable")
 
 
 if __name__ == "__main__":

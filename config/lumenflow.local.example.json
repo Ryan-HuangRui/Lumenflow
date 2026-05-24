@@ -1,0 +1,29 @@
+{
+  "photos": {
+    "output_root": "/absolute/path/to/Lumenflow output"
+  },
+  "bilibili": {
+    "cookie_file": "/absolute/path/to/bilibili-cookie.txt"
+  },
+  "asr": {
+    "python": "python",
+    "output_dir": "knowledge/style_cards/tutorial_recipes/asr_transcripts",
+    "audio_cache_dir": "knowledge/style_cards/tutorial_recipes/audio_cache",
+    "hotwords": "knowledge/source_records/asr_hotwords.txt",
+    "discard_audio": true,
+    "model": "paraformer-zh",
+    "vad_model": "fsmn-vad",
+    "punc_model": "ct-punc"
+  },
+  "tools": {
+    "rawtherapee_cli": "rawtherapee-cli",
+    "darktable_cli": "darktable-cli",
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffprobe",
+    "yt_dlp": "yt-dlp"
+  },
+  "env": {
+    "x_bearer_token": "X_BEARER_TOKEN",
+    "openai_api_key": "OPENAI_API_KEY"
+  }
+}

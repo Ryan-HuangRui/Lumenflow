@@ -1,6 +1,7 @@
 {
   "style_id": "soft_portrait",
   "style_name": "Soft Portrait",
+  "intent": "Prioritize flattering skin, soft contrast, clean highlights, and a gentle emotional tone for people-focused photos.",
   "suitable_scenes": ["portrait", "couple", "wedding", "family"],
   "avoid_scenes": ["architecture", "high contrast street"],
   "visual_features": {
@@ -12,6 +13,20 @@
     "saturation": "soft",
     "grain": "none"
   },
+  "tone_guidance": {
+    "brightness": "slightly bright when it flatters the face",
+    "contrast": "soft-medium, avoid harsh facial shadows",
+    "highlights": "soft and protected on skin",
+    "shadows": "open but still dimensional"
+  },
+  "color_guidance": {
+    "skin": "warm orange and clean, never green or muddy",
+    "reds": "control over-saturated lips or blush",
+    "greens": "reduce background distraction if it competes with skin"
+  },
+  "operation_order": ["white_balance_for_skin", "exposure_for_face", "highlight_recovery", "soft_contrast", "skin_color_cleanup", "gentle_detail"],
+  "parameter_strategy": "Agent must infer concrete values per photo from preview analysis. Use this card as direction, not as a fixed preset.",
   "recipe_sources": [],
-  "raw_profiles": ["knowledge/raw_profiles/soft_portrait.pp3"]
+  "raw_profile_role": "none",
+  "raw_profiles": []
 }

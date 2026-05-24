@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/adjustment_plan.schema.json",
+  "title": "Lumenflow Agent Adjustment Plan",
+  "type": "object",
+  "required": ["schema_version", "source", "variants"],
+  "properties": {
+    "schema_version": {
+      "const": "lumenflow.adjustment_plan.v1"
+    },
+    "source": {
+      "type": "string",
+      "description": "Absolute or workspace-relative RAW file path."
+    },
+    "preview": {
+      "type": "string",
+      "description": "Preview image path analyzed by the agent."
+    },
+    "photo_analysis": {
+      "type": "object",
+      "description": "Agent-readable analysis of subject, light, exposure, color casts, noise, and editing risks.",
+      "additionalProperties": true
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Plan revision number. Initial plans should use 1; revised plans increment this value."
+    },
+    "parent_plan": {
+      "type": "string",
+      "description": "Previous adjustment plan path when this is a revision after agent review."
+    },
+    "review_basis": {
+      "type": "object",
+      "description": "Summary of rendered-output review that caused this revision.",
+      "additionalProperties": true
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["variant_id", "style_id", "rationale", "adjustments"],
+        "properties": {
+          "variant_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "style_id": {
+            "type": "string"
+          },
+          "style_family_id": {
+            "type": "string",
+            "description": "Layer 1 style family selected from knowledge/style_families. Required by convention for style-library-driven plans."
+          },
+          "source_style_card": {
+            "type": "string",
+            "description": "Layer 2 tutorial-derived style card path when a specific video variant was used."
+          },
+          "supporting_style_cards": {
+            "type": "array",
+            "description": "Optional method/workflow cards used as supporting guidance after the visual style was chosen.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "adjustments": {
+            "type": "object",
+            "description": "Concrete per-photo values inferred by the agent. These are converted to a temporary RawTherapee PP3 profile.",
+            "properties": {
+              "exposure_compensation": {
+                "type": "number"
+              },
+              "saturation": {
+                "type": "number"
+              },
+              "black": {
+                "type": "number"
+              },
+              "brightness": {
+                "type": "number"
+              },
+              "contrast": {
+                "type": "number"
+              },
+              "highlight_compression": {
+                "type": "number"
+              },
+              "shadow_compression": {
+                "type": "number"
+              },
+              "temperature": {
+                "type": "number"
+              },
+              "green": {
+                "type": "number"
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "composition": {
+            "type": "object",
+            "description": "Agent composition decision. Pixel crop is executable by render_adjustment_plan.py; other composition ideas are recorded for review.",
+            "properties": {
+              "crop": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "unit": {
+                    "enum": ["pixels", "relative", "recommendation"]
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number"
+                  },
+                  "height": {
+                    "type": "number"
+                  },
+                  "left": {
+                    "type": "number"
+                  },
+                  "top": {
+                    "type": "number"
+                  },
+                  "right": {
+                    "type": "number"
+                  },
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "fixed_ratio": {
+                    "type": "boolean"
+                  },
+                  "ratio": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "straighten_degrees": {
+                "type": "number"
+              },
+              "perspective": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

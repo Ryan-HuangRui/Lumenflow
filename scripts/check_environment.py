@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+import lumenflow_config
+
 
 @dataclass(frozen=True)
 class CommandSpec:
@@ -23,6 +25,7 @@ class CommandSpec:
     required: bool
     command: list[str]
     timeout_seconds: int = 5
+    success_returncodes: tuple[int, ...] = (0, 1)
 
 
 @dataclass(frozen=True)
@@ -43,8 +46,8 @@ DEFAULT_COMMAND_SPECS = [
     CommandSpec("python3", "phase0_environment", True, ["python3", "--version"]),
     CommandSpec("git", "phase0_environment", True, ["git", "--version"]),
     CommandSpec("exiftool", "phase1_photos", True, ["exiftool", "-ver"]),
-    CommandSpec("darktable-cli", "phase1_photos", True, ["darktable-cli", "--help"], 10),
-    CommandSpec("rawtherapee-cli", "phase1_photos", False, ["rawtherapee-cli", "-v"], 5),
+    CommandSpec("rawtherapee-cli", "phase1_photos", True, ["rawtherapee-cli", "-v"], 5, (0, 255)),
+    CommandSpec("darktable-cli", "phase1_photos_fallback", False, ["darktable-cli", "--help"], 10),
     CommandSpec("ffmpeg", "phase3_tutorials", False, ["ffmpeg", "-version"]),
     CommandSpec("ffprobe", "phase3_tutorials", False, ["ffprobe", "-version"]),
     CommandSpec("yt-dlp", "phase3_tutorials", False, ["yt-dlp", "--version"]),
@@ -59,6 +62,14 @@ DEFAULT_MODULE_SPECS = [
     PythonModuleSpec("openai", "headless_model_provider", False),
     PythonModuleSpec("tweepy", "phase4_social_optional_sdk", False),
 ]
+
+TOOL_CONFIG_KEYS = {
+    "rawtherapee-cli": "rawtherapee_cli",
+    "darktable-cli": "darktable_cli",
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffprobe",
+    "yt-dlp": "yt_dlp",
+}
 
 STATUS_ORDER = {
     "available": 0,
@@ -89,6 +100,7 @@ def check_command(
     required: bool,
     command: list[str],
     timeout_seconds: int,
+    success_returncodes: tuple[int, ...] = (0, 1),
     which: Callable[[str], str | None] = shutil.which,
     runner: Callable[[list[str], int], CommandResult] | None = run_subprocess,
 ) -> dict[str, Any]:
@@ -154,7 +166,7 @@ def check_command(
         }
 
     output = (result.stdout or result.stderr).strip()
-    if result.returncode not in (0, 1):
+    if result.returncode not in success_returncodes:
         return {
             "name": name,
             "phase": phase,
@@ -232,6 +244,31 @@ def check_file(path: Path, display_name: str, phase: str, required: bool) -> dic
     }
 
 
+def apply_local_tool_config(
+    command_specs: list[CommandSpec],
+    local_config: dict[str, Any] | None = None,
+) -> list[CommandSpec]:
+    local_config = local_config or {}
+    resolved_specs = []
+    for spec in command_specs:
+        key = TOOL_CONFIG_KEYS.get(spec.name)
+        if key is None:
+            resolved_specs.append(spec)
+            continue
+        executable = lumenflow_config.tool_command(local_config, key, spec.command[0])
+        resolved_specs.append(
+            CommandSpec(
+                executable,
+                spec.phase,
+                spec.required,
+                [executable, *spec.command[1:]],
+                spec.timeout_seconds,
+                spec.success_returncodes,
+            )
+        )
+    return resolved_specs
+
+
 def summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
     counts = {
         "available": 0,
@@ -260,7 +297,9 @@ def collect_environment(
     env: dict[str, str],
     command_specs: list[CommandSpec] = DEFAULT_COMMAND_SPECS,
     module_specs: list[PythonModuleSpec] = DEFAULT_MODULE_SPECS,
+    local_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    command_specs = apply_local_tool_config(command_specs, local_config)
     tools = [
         check_command(
             name=spec.name,
@@ -268,6 +307,7 @@ def collect_environment(
             required=spec.required,
             command=spec.command,
             timeout_seconds=spec.timeout_seconds,
+            success_returncodes=spec.success_returncodes,
         )
         for spec in command_specs
     ]
@@ -315,10 +355,12 @@ def render_environment_json(repo_root: Path, env: dict[str, str]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Check Lumenflow local runtime dependencies.")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--local-config", type=Path, default=lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH)
     parser.add_argument("--fail-on-missing-required", action="store_true")
     args = parser.parse_args()
+    local_config = lumenflow_config.read_local_config(args.local_config)
 
-    payload = collect_environment(repo_root=args.repo_root, env=dict(os.environ))
+    payload = collect_environment(repo_root=args.repo_root, env=dict(os.environ), local_config=local_config)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if args.fail_on_missing_required and payload["summary"]["blocking"]:
         raise SystemExit(1)

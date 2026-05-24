@@ -1,6 +1,7 @@
 {
   "style_id": "fuji_travel_muted",
   "style_name": "Fuji Travel Muted",
+  "intent": "Give travel and city-walk photos a calm film-like color palette with muted saturation, gentle contrast, and nostalgic but clean tones.",
   "suitable_scenes": ["city walk", "cafe", "old street", "travel"],
   "avoid_scenes": ["sports", "product"],
   "visual_features": {
@@ -12,6 +13,20 @@
     "saturation": "muted",
     "grain": "light"
   },
+  "tone_guidance": {
+    "brightness": "natural, with gentle highlight rolloff",
+    "contrast": "medium, avoid harsh digital contrast",
+    "black_point": "slightly lifted only when it improves the film feel",
+    "shadows": "slightly cool and soft"
+  },
+  "color_guidance": {
+    "greens": "desaturate and move away from harsh digital green",
+    "reds_or_oranges": "keep warm subjects pleasant but not punchy",
+    "overall_saturation": "muted, not washed out"
+  },
+  "operation_order": ["white_balance", "exposure", "highlight_rolloff", "black_point", "green_cleanup", "overall_saturation", "subtle_grain"],
+  "parameter_strategy": "Agent must infer concrete values per photo from preview analysis. Use this card as direction, not as a fixed preset.",
   "recipe_sources": [],
-  "raw_profiles": ["knowledge/raw_profiles/fuji_travel_muted.pp3"]
+  "raw_profile_role": "none",
+  "raw_profiles": []
 }

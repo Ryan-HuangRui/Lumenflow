@@ -1,6 +1,7 @@
 {
   "style_id": "warm_sunset",
   "style_name": "Warm Sunset",
+  "intent": "Emphasize golden-hour warmth and atmosphere while keeping highlights controlled and avoiding orange overload.",
   "suitable_scenes": ["sunset", "beach", "golden hour", "summer"],
   "avoid_scenes": ["neon night", "snow"],
   "visual_features": {
@@ -11,6 +12,21 @@
     "saturation": "medium-high",
     "grain": "subtle"
   },
+  "tone_guidance": {
+    "brightness": "warm and luminous, but preserve sky and skin highlights",
+    "contrast": "medium with soft transitions",
+    "highlights": "warm and protected",
+    "shadows": "slightly warm or neutral, not muddy"
+  },
+  "color_guidance": {
+    "white_balance": "warmer than neutral when the light supports it",
+    "orange_yellow": "rich but controlled",
+    "blues": "can stay slightly cool to preserve warm/cool contrast",
+    "skin": "avoid over-orange skin"
+  },
+  "operation_order": ["white_balance", "exposure", "highlight_recovery", "warm_color_balance", "orange_yellow_control", "subtle_contrast"],
+  "parameter_strategy": "Agent must infer concrete values per photo from preview analysis. Use this card as direction, not as a fixed preset.",
   "recipe_sources": [],
-  "raw_profiles": ["knowledge/raw_profiles/warm_sunset.pp3"]
+  "raw_profile_role": "none",
+  "raw_profiles": []
 }

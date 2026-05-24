@@ -1,0 +1,14 @@
+Lightroom
+HSL
+RAW
+RawTherapee
+Photoshop
+Camera Raw
+LUT
+color grading
+white balance
+exposure
+highlights
+shadows
+tone curve
+mask

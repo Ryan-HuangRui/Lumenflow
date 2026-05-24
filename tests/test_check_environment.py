@@ -17,17 +17,17 @@ import check_environment
 class CheckEnvironmentTests(unittest.TestCase):
     def test_command_check_marks_missing_required_tool(self) -> None:
         result = check_environment.check_command(
-            name="darktable-cli",
+            name="rawtherapee-cli",
             phase="phase1_photos",
             required=True,
-            command=["darktable-cli", "--help"],
+            command=["rawtherapee-cli", "-v"],
             timeout_seconds=1,
             which=lambda _name: None,
             runner=None,
         )
 
         self.assertEqual(result["status"], "missing_required")
-        self.assertEqual(result["name"], "darktable-cli")
+        self.assertEqual(result["name"], "rawtherapee-cli")
 
     def test_command_check_marks_available_tool_and_captures_version(self) -> None:
         def fake_which(_name: str) -> str:
@@ -51,6 +51,27 @@ class CheckEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["status"], "available")
         self.assertEqual(result["path"], "/usr/local/bin/darktable-cli")
         self.assertEqual(result["version"], "darktable 5.4.1")
+
+    def test_command_check_accepts_custom_success_returncode(self) -> None:
+        def fake_which(_name: str) -> str:
+            return "/usr/local/bin/rawtherapee-cli"
+
+        def fake_runner(command: list[str], timeout: int) -> check_environment.CommandResult:
+            return check_environment.CommandResult(255, "RawTherapee, version 5.12, command line.\n", "")
+
+        result = check_environment.check_command(
+            name="rawtherapee-cli",
+            phase="phase1_photos",
+            required=False,
+            command=["rawtherapee-cli", "-v"],
+            timeout_seconds=2,
+            success_returncodes=(0, 255),
+            which=fake_which,
+            runner=fake_runner,
+        )
+
+        self.assertEqual(result["status"], "available")
+        self.assertEqual(result["version"], "RawTherapee, version 5.12, command line.")
 
     def test_command_check_marks_unresponsive_tool_as_unavailable(self) -> None:
         def fake_which(_name: str) -> str:
@@ -102,6 +123,24 @@ class CheckEnvironmentTests(unittest.TestCase):
         config_names = {item["name"] for item in checks["config"]}
         self.assertIn("X_BEARER_TOKEN", config_names)
         self.assertIn("knowledge/source_records/x_sources.json", config_names)
+
+    def test_local_tool_config_rewrites_configured_commands(self) -> None:
+        specs = [
+            check_environment.CommandSpec(
+                "rawtherapee-cli",
+                "phase1_photos",
+                True,
+                ["rawtherapee-cli", "-v"],
+            )
+        ]
+
+        resolved = check_environment.apply_local_tool_config(
+            specs,
+            {"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+        )
+
+        self.assertEqual(resolved[0].name, "/custom/rawtherapee-cli")
+        self.assertEqual(resolved[0].command, ["/custom/rawtherapee-cli", "-v"])
 
     def test_main_outputs_json(self) -> None:
         with mock.patch.object(

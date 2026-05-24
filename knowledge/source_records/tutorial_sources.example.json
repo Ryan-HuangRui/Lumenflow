@@ -1,0 +1,20 @@
+{
+  "defaults": {
+    "platform": "bilibili",
+    "preferred_languages": ["zh-CN", "zh-Hans", "zh", "ai-zh", "ai-en"]
+  },
+  "sources": [
+    {
+      "platform": "bilibili_season",
+      "url": "https://space.bilibili.com/000000/lists/000000?type=season",
+      "topic": "User-approved color grading tutorial playlist",
+      "enabled": true
+    },
+    {
+      "platform": "bilibili",
+      "url": "https://www.bilibili.com/video/BVxxxxxxxxxx/",
+      "topic": "Single user-approved color grading tutorial",
+      "enabled": false
+    }
+  ]
+}

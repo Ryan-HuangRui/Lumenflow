@@ -1,6 +1,7 @@
 {
   "style_id": "cinematic_moody",
   "style_name": "Cinematic Moody",
+  "intent": "Create a restrained cinematic mood with controlled contrast, muted color, and enough shadow detail to preserve atmosphere.",
   "suitable_scenes": ["rainy city", "street", "night", "lake", "overcast"],
   "avoid_scenes": ["bright portrait", "food"],
   "visual_features": {
@@ -11,6 +12,21 @@
     "saturation": "muted",
     "grain": "light"
   },
+  "tone_guidance": {
+    "brightness": "slightly darker than neutral when the scene supports mood",
+    "contrast": "medium-high without clipping blacks",
+    "highlights": "roll off bright lamps, sky, or reflections",
+    "shadows": "cool and deep but readable"
+  },
+  "color_guidance": {
+    "white_balance": "cooler or neutral unless warm practical lights are important",
+    "greens": "reduce dirty or distracting saturation",
+    "blues": "can be deepened for atmosphere",
+    "skin": "protect from gray or green casts when people are present"
+  },
+  "operation_order": ["exposure", "highlight_recovery", "black_point", "contrast_curve", "color_muting", "grain_or_texture"],
+  "parameter_strategy": "Agent must infer concrete values per photo from preview analysis. Use this card as direction, not as a fixed preset.",
   "recipe_sources": [],
-  "raw_profiles": ["knowledge/raw_profiles/cinematic_moody.pp3"]
+  "raw_profile_role": "none",
+  "raw_profiles": []
 }

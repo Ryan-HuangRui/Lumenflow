@@ -1,0 +1,12 @@
+# Optional local ASR dependencies for Bilibili tutorial backfill.
+#
+# Install in an isolated environment:
+#   python3 -m venv .venv-asr
+#   ${LUMENFLOW_ASR_PYTHON:-python} -m pip install --upgrade pip
+#   ${LUMENFLOW_ASR_PYTHON:-python} -m pip install -r requirements-asr.txt
+funasr>=1.3,<2
+modelscope>=1.37,<2
+soundfile>=0.12,<1
+torch==2.11.0
+torchaudio==2.11.0
+yt-dlp>=2025.1

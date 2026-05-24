@@ -1,6 +1,7 @@
 {
   "style_id": "clean_natural",
   "style_name": "Clean Natural",
+  "intent": "Keep the photo believable, clean, and close to the original scene while correcting exposure, white balance, and mild color issues.",
   "suitable_scenes": ["travel", "family", "food", "daily"],
   "avoid_scenes": [],
   "visual_features": {
@@ -11,6 +12,20 @@
     "saturation": "natural",
     "grain": "none"
   },
+  "tone_guidance": {
+    "brightness": "match the real scene, lift only when the photo is visibly underexposed",
+    "contrast": "moderate and natural",
+    "highlights": "protect detail instead of making the frame look flat",
+    "shadows": "open enough to show context without losing depth"
+  },
+  "color_guidance": {
+    "white_balance": "neutral to slightly warm when skin or food is present",
+    "skin": "healthy and believable, avoid green or orange casts",
+    "saturation": "small corrections only"
+  },
+  "operation_order": ["white_balance", "exposure", "contrast", "highlight_shadow_recovery", "subtle_color_cleanup", "detail"],
+  "parameter_strategy": "Agent must infer concrete values per photo from preview analysis. Use this card as direction, not as a fixed preset.",
   "recipe_sources": [],
-  "raw_profiles": ["knowledge/raw_profiles/clean_natural.pp3"]
+  "raw_profile_role": "none",
+  "raw_profiles": []
 }
