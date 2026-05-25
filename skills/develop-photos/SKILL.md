@@ -1,6 +1,6 @@
 ---
 name: develop-photos
-description: Develop and style a user-specified directory of RAW photos with agent judgment, the local style knowledge base, and a RAW editing CLI such as RawTherapee or darktable.
+description: Develop and style a user-specified directory of RAW photos with agent judgment, the local style knowledge base, and a RAW editing CLI such as RawTherapee, darktable, or Lightroom.
 ---
 
 # Develop Photos
@@ -21,7 +21,7 @@ into:
 2. A filtered set of selected/marked photos.
 3. JPEG previews that the host agent can inspect visually.
 4. Agent-authored per-photo adjustment plans based on the two-layer style library.
-5. Rendered JPG outputs through RawTherapee CLI.
+5. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
 6. Agent review of rendered outputs, with revised plans when needed.
 7. A processing report explaining what happened.
 
@@ -48,7 +48,7 @@ into:
    - Record the crop reason in `composition.crop.reason`.
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
 9. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
-10. Render each plan with `scripts/render_adjustment_plan.py`, which creates temporary RawTherapee `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present.
+10. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
 11. Review rendered outputs with the host agent's vision/reasoning capability:
     - exposure and highlight clipping
     - blocked shadows
@@ -64,6 +64,7 @@ Typical command:
 ```bash
 python scripts/create_previews.py /path/to/photos
 python scripts/render_adjustment_plan.py /path/to/output/plans/IMG_001.adjustment_plan.json
+python scripts/render_adjustment_plan.py /path/to/output/plans/IMG_001.adjustment_plan.json --engine lightroom
 ```
 
 With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-source/negative_raw/2026五一港珠澳/P1034473.RW2` renders into `/photo-output-root/2026五一港珠澳/`.
@@ -95,10 +96,11 @@ If no Layer 2 card fits, use the Layer 1 family as the style direction and set `
 - Keep Layer 1 selection and Layer 2 evidence auditable in the plan rationale or metadata.
 - Keep every run auditable: source path, preview path, style id, variant id, agent rationale, generated adjustments, composition decision, profile path, CLI command, review outcome, and failure reason.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
-- RawTherapee is the first supported dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented.
+- RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.
 - Do not crop by default. Cropping is an agent decision and must include a reason.
 - Treat first renders as drafts until reviewed. Mark or document the final accepted render after review.
+- Lightroom renders modify the Lightroom catalog state for the target photo before export. Prefer one best variant, or use variant-specific virtual copies outside this script when preserving multiple Lightroom edit states matters.
 
 ## Expected Output
 
@@ -143,6 +145,9 @@ The agent writes concrete values after inspecting the photo and style cards:
         "saturation": -4,
         "temperature": 5400,
         "green": 1.02
+      },
+      "lightroom": {
+        "photo_id": "123"
       },
       "composition": {
         "crop": {

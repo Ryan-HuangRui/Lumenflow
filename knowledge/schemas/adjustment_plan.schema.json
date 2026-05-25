@@ -35,6 +35,17 @@
       "description": "Summary of rendered-output review that caused this revision.",
       "additionalProperties": true
     },
+    "lightroom": {
+      "type": "object",
+      "description": "Optional Lightroom execution metadata shared by all variants.",
+      "properties": {
+        "photo_id": {
+          "type": "string",
+          "description": "Lightroom local photo id used by lightroom-cli develop/export commands."
+        }
+      },
+      "additionalProperties": true
+    },
     "variants": {
       "type": "array",
       "minItems": 1,
@@ -69,7 +80,7 @@
           },
           "adjustments": {
             "type": "object",
-            "description": "Concrete per-photo values inferred by the agent. These are converted to a temporary RawTherapee PP3 profile.",
+            "description": "Concrete per-photo values inferred by the agent. RawTherapee converts these to a temporary PP3 profile; Lightroom maps supported keys to develop settings.",
             "properties": {
               "exposure_compensation": {
                 "type": "number"
@@ -159,6 +170,17 @@
               "perspective": {
                 "type": "object",
                 "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "lightroom": {
+            "type": "object",
+            "description": "Optional Lightroom metadata for this variant, overriding top-level Lightroom metadata.",
+            "properties": {
+              "photo_id": {
+                "type": "string",
+                "description": "Lightroom local photo id used for this variant."
               }
             },
             "additionalProperties": true

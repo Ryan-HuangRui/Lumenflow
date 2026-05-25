@@ -131,16 +131,29 @@ class CheckEnvironmentTests(unittest.TestCase):
                 "phase1_photos",
                 True,
                 ["rawtherapee-cli", "-v"],
-            )
+            ),
+            check_environment.CommandSpec(
+                "lr",
+                "phase1_photos_lightroom_optional",
+                False,
+                ["lr", "--version"],
+            ),
         ]
 
         resolved = check_environment.apply_local_tool_config(
             specs,
-            {"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            {
+                "tools": {
+                    "rawtherapee_cli": "/custom/rawtherapee-cli",
+                    "lightroom_cli": "/custom/lr",
+                }
+            },
         )
 
         self.assertEqual(resolved[0].name, "/custom/rawtherapee-cli")
         self.assertEqual(resolved[0].command, ["/custom/rawtherapee-cli", "-v"])
+        self.assertEqual(resolved[1].name, "/custom/lr")
+        self.assertEqual(resolved[1].command, ["/custom/lr", "--version"])
 
     def test_main_outputs_json(self) -> None:
         with mock.patch.object(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render agent-authored adjustment plans through RawTherapee."""
+"""Render agent-authored adjustment plans through a configured photo engine."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import lumenflow_config
+import render_lightroom
 import render_raw
 import write_processing_report
 
@@ -145,9 +146,22 @@ def run(
     dry_run: bool,
     render_timeout: int,
     local_config: dict[str, Any] | None = None,
+    engine: str = "rawtherapee",
 ) -> dict[str, Any]:
     local_config = local_config or {}
     plan = read_plan(plan_path)
+    if engine == "lightroom":
+        summary = render_lightroom.render_plan(
+            plan=plan,
+            output_dir=output_dir,
+            dry_run=dry_run,
+            render_timeout=render_timeout,
+            local_config=local_config,
+        )
+        summary["plan"] = str(plan_path)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return summary
+
     raw_path = Path(plan["source"])
     output_dir.mkdir(parents=True, exist_ok=True)
     profiles_dir = output_dir / "profiles"
@@ -219,6 +233,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Render a Lumenflow agent adjustment plan.")
     parser.add_argument("plan_path", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--engine", choices=["rawtherapee", "lightroom"], default="rawtherapee")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--render-timeout", type=int, default=300)
     parser.add_argument("--local-config", type=Path, default=lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH)
@@ -240,6 +255,7 @@ def main() -> None:
         dry_run=args.dry_run,
         render_timeout=args.render_timeout,
         local_config=local_config,
+        engine=args.engine,
     )
 
 
