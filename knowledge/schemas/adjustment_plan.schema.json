@@ -51,7 +51,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["variant_id", "style_id", "rationale", "adjustments"],
+        "required": ["variant_id", "style_id", "rationale", "adjustments", "composition", "mask_decision"],
         "properties": {
           "variant_id": {
             "type": "string",
@@ -117,8 +117,22 @@
           },
           "composition": {
             "type": "object",
-            "description": "Agent composition decision. Pixel crop is executable by render_adjustment_plan.py; other composition ideas are recorded for review.",
+            "description": "Per-photo agent composition decision. Batching may execute crops, but the judgment must be per photo.",
+            "required": ["decision", "reason"],
             "properties": {
+              "decision": {
+                "enum": ["preserve_existing_crop", "no_crop", "crop", "manual_recommendation"],
+                "description": "Explicit framing decision for this photo."
+              },
+              "reason": {
+                "type": "string",
+                "description": "Why the framing should be preserved, cropped, or left as a manual recommendation."
+              },
+              "existing_crop": {
+                "type": "object",
+                "description": "Existing editor crop metadata when detected; preserve by default unless the user explicitly asks to change it.",
+                "additionalProperties": true
+              },
               "crop": {
                 "type": "object",
                 "properties": {
@@ -173,6 +187,63 @@
               }
             },
             "additionalProperties": true
+          },
+          "mask_decision": {
+            "type": "object",
+            "description": "Per-photo decision about whether local adjustments are needed. Required even when no executable masks are used.",
+            "required": ["decision", "reason"],
+            "properties": {
+              "decision": {
+                "enum": ["none", "use_masks", "manual_recommendation"],
+                "description": "Whether to execute Lightroom AI masks, skip local edits, or record a manual local-edit recommendation."
+              },
+              "reason": {
+                "type": "string",
+                "description": "Why masks are or are not needed for this photo."
+              },
+              "recommended_masks": {
+                "type": "array",
+                "description": "Non-executable or future local edits that should be recorded for review.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "masks": {
+            "type": "array",
+            "description": "Optional Lightroom AI masks for local adjustments. Executed only by the Lightroom engine.",
+            "items": {
+              "type": "object",
+              "required": ["type", "rationale"],
+              "properties": {
+                "type": {
+                  "enum": ["subject", "sky", "background", "objects", "people", "landscape"],
+                  "description": "Lightroom AI mask selection type."
+                },
+                "rationale": {
+                  "type": "string",
+                  "description": "Why this mask is needed for the variant."
+                },
+                "settings": {
+                  "type": "object",
+                  "description": "Local Lightroom develop settings for the mask.",
+                  "additionalProperties": true
+                },
+                "adjustments": {
+                  "type": "object",
+                  "description": "Alias for settings, accepted by the renderer.",
+                  "additionalProperties": true
+                },
+                "preset": {
+                  "type": "string",
+                  "description": "Named lightroom-cli AI mask preset. Do not combine with settings."
+                }
+              },
+              "additionalProperties": true
+            }
           },
           "lightroom": {
             "type": "object",

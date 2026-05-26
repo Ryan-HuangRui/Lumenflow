@@ -16,6 +16,8 @@ import render_raw
 import write_processing_report
 
 SCHEMA_VERSION = "lumenflow.adjustment_plan.v1"
+COMPOSITION_DECISIONS = {"preserve_existing_crop", "no_crop", "crop", "manual_recommendation"}
+MASK_DECISIONS = {"none", "use_masks", "manual_recommendation"}
 
 
 def read_json(path: Path) -> Any:
@@ -43,7 +45,54 @@ def read_plan(path: Path) -> dict[str, Any]:
             raise SystemExit(f"Variant {index} must include variant_id")
         if not isinstance(variant.get("adjustments"), dict):
             raise SystemExit(f"Variant {variant.get('variant_id')} must include adjustments")
+        validate_variant_decisions(variant)
     return plan
+
+
+def validate_variant_decisions(variant: dict[str, Any]) -> None:
+    variant_id = str(variant.get("variant_id", "<unknown>"))
+
+    composition = variant.get("composition")
+    if not isinstance(composition, dict):
+        raise SystemExit(f"Variant {variant_id} must include composition decision")
+    composition_decision = composition.get("decision")
+    if composition_decision not in COMPOSITION_DECISIONS:
+        allowed = ", ".join(sorted(COMPOSITION_DECISIONS))
+        raise SystemExit(f"Variant {variant_id} composition.decision must be one of: {allowed}")
+    if not str(composition.get("reason", "")).strip():
+        raise SystemExit(f"Variant {variant_id} composition.reason must explain the per-photo framing decision")
+
+    crop = composition.get("crop")
+    crop_enabled = isinstance(crop, dict) and bool(crop.get("enabled"))
+    if composition_decision == "crop":
+        if not crop_enabled:
+            raise SystemExit(f"Variant {variant_id} composition.decision=crop requires crop.enabled=true")
+        if not str(crop.get("reason") or composition.get("reason") or "").strip():
+            raise SystemExit(f"Variant {variant_id} crop requires a reason")
+    elif crop_enabled:
+        raise SystemExit(f"Variant {variant_id} has crop.enabled=true but composition.decision={composition_decision}")
+
+    mask_decision = variant.get("mask_decision")
+    if not isinstance(mask_decision, dict):
+        raise SystemExit(f"Variant {variant_id} must include mask_decision")
+    decision = mask_decision.get("decision")
+    if decision not in MASK_DECISIONS:
+        allowed = ", ".join(sorted(MASK_DECISIONS))
+        raise SystemExit(f"Variant {variant_id} mask_decision.decision must be one of: {allowed}")
+    if not str(mask_decision.get("reason", "")).strip():
+        raise SystemExit(f"Variant {variant_id} mask_decision.reason must explain the per-photo local-edit decision")
+
+    masks = variant.get("masks") or []
+    if decision == "use_masks":
+        if not isinstance(masks, list) or not masks:
+            raise SystemExit(f"Variant {variant_id} mask_decision=use_masks requires at least one executable mask")
+        for index, mask in enumerate(masks):
+            if not isinstance(mask, dict):
+                raise SystemExit(f"Variant {variant_id} mask {index} must be an object")
+            if not str(mask.get("rationale", "")).strip():
+                raise SystemExit(f"Variant {variant_id} mask {index} must include rationale")
+    elif masks:
+        raise SystemExit(f"Variant {variant_id} includes executable masks but mask_decision.decision={decision}")
 
 
 def pp3_value(value: Any) -> str:
@@ -199,6 +248,7 @@ def run(
             "reason": variant.get("rationale", ""),
             "adjustments": variant["adjustments"],
             "composition": composition,
+            "mask_decision": variant.get("mask_decision", {}),
             "status": "dry_run" if dry_run else "pending",
             "failure_reason": "",
         }

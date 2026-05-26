@@ -141,7 +141,17 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
         "exposure_compensation": 0.35,
         "saturation": -4,
         "temperature": 5400
-      }
+      },
+      "masks": [
+        {
+          "type": "sky",
+          "rationale": "Recover bright sky detail without darkening the subject.",
+          "settings": {
+            "highlights": -35,
+            "dehaze": 12
+          }
+        }
+      ]
     }
   ]
 }
@@ -153,4 +163,6 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
 python3 scripts/render_adjustment_plan.py output/plans/IMG_0001.adjustment_plan.json --engine lightroom
 ```
 
-如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行参数映射到 `lr develop apply`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
+如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行全局参数映射到 `lr develop apply`，把 `masks` 映射到 `lr develop ai batch <type> --photos <photo_id>`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
+
+当前自动蒙版只支持 Lightroom AI mask 类型：`subject`、`sky`、`background`、`objects`、`people`、`landscape`。局部画笔、渐变、径向和 people/landscape 的具体 part 选择暂不自动执行，因为现有 `lightroom-cli` 批处理路径不能稳定绑定这些操作到指定 photo id。

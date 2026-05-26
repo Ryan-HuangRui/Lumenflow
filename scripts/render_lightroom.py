@@ -26,6 +26,8 @@ DIRECT_ADJUSTMENT_MAP = {
     "black": "Blacks",
     "clarity": "Clarity",
     "vibrance": "Vibrance",
+    "dehaze": "Dehaze",
+    "texture": "Texture",
 }
 
 RANGED_SETTINGS = {
@@ -39,7 +41,11 @@ RANGED_SETTINGS = {
     "Blacks",
     "Clarity",
     "Vibrance",
+    "Dehaze",
+    "Texture",
 }
+
+AI_MASK_TYPES = {"subject", "sky", "background", "objects", "people", "landscape"}
 
 FORMAT_EXTENSIONS = {
     "JPEG": ".jpg",
@@ -73,6 +79,20 @@ def lightroom_settings_from_adjustments(adjustments: dict[str, Any]) -> dict[str
         elif lightroom_key in RANGED_SETTINGS:
             value = clamp(float(value), -100, 100)
         settings[lightroom_key] = normalized_number(value)
+
+    for source_key, value in adjustments.items():
+        if source_key not in RANGED_SETTINGS and source_key not in {"Exposure", "Temperature"}:
+            continue
+        if source_key in settings or value is None:
+            continue
+        number = normalized_number(value)
+        if source_key == "Exposure":
+            number = clamp(float(number), -5, 5)
+        elif source_key == "Temperature":
+            number = clamp(float(number), 2000, 50000)
+        else:
+            number = clamp(float(number), -100, 100)
+        settings[source_key] = normalized_number(number)
 
     if "highlight_compression" in adjustments and "Highlights" not in settings:
         settings["Highlights"] = normalized_number(clamp(-float(adjustments["highlight_compression"]), -100, 100))
@@ -154,6 +174,92 @@ def export_command(
     return command
 
 
+def ai_mask_settings(mask: dict[str, Any]) -> dict[str, int | float]:
+    raw_settings = mask.get("settings")
+    if raw_settings is None:
+        raw_settings = mask.get("adjustments")
+    if raw_settings is None:
+        return {}
+    if not isinstance(raw_settings, dict):
+        raise ValueError("Lightroom mask settings must be an object")
+    return lightroom_settings_from_adjustments(raw_settings)
+
+
+def lightroom_masks_from_variant(variant: dict[str, Any]) -> list[dict[str, Any]]:
+    masks = variant.get("masks", [])
+    if masks is None:
+        return []
+    if not isinstance(masks, list):
+        raise ValueError("Variant masks must be an array")
+
+    resolved_masks = []
+    for index, mask in enumerate(masks):
+        if not isinstance(mask, dict):
+            raise ValueError(f"Mask {index} must be an object")
+        mask_type = str(mask.get("type") or mask.get("selection_type") or "").lower()
+        if mask_type not in AI_MASK_TYPES:
+            raise ValueError(f"Unsupported Lightroom AI mask type: {mask_type}")
+        if mask.get("part"):
+            raise ValueError("Part-specific AI masks are not supported by the lightroom-cli batch command")
+        if mask.get("tool"):
+            raise ValueError("Local geometric masks are not supported by the photo-id based Lightroom backend")
+
+        preset = mask.get("preset") or mask.get("adjust_preset")
+        settings = ai_mask_settings(mask)
+        if preset and settings:
+            raise ValueError("Lightroom mask cannot use both preset and settings")
+
+        resolved_masks.append(
+            {
+                "type": mask_type,
+                "settings": settings,
+                "preset": preset,
+                "rationale": mask.get("rationale", ""),
+            }
+        )
+    return resolved_masks
+
+
+def ensure_lightroom_composition_supported(variant: dict[str, Any]) -> None:
+    composition = variant.get("composition")
+    if not isinstance(composition, dict):
+        return
+    crop = composition.get("crop")
+    if isinstance(crop, dict) and crop.get("enabled"):
+        raise ValueError(
+            "Lightroom backend does not execute crop parameters yet; use "
+            "composition.decision=preserve_existing_crop, no_crop, or manual_recommendation"
+        )
+
+
+def ai_mask_command(
+    photo_id: str,
+    mask: dict[str, Any],
+    *,
+    executable: str,
+) -> list[str]:
+    resolved = lightroom_masks_from_variant({"masks": [mask]})[0]
+    command = [
+        executable,
+        "develop",
+        "ai",
+        "batch",
+        resolved["type"],
+        "--photos",
+        photo_id,
+    ]
+    if resolved["settings"]:
+        command.extend(
+            [
+                "--adjust",
+                json.dumps(resolved["settings"], ensure_ascii=False, separators=(",", ":")),
+            ]
+        )
+    if resolved["preset"]:
+        command.extend(["--adjust-preset", str(resolved["preset"])])
+    return command
+
+
 def photo_id_from_response(stdout: str) -> str | None:
     try:
         payload = json.loads(stdout)
@@ -225,6 +331,8 @@ def render_plan(
         variant_id = str(variant["variant_id"])
         style_id = str(variant.get("style_id", "agent_selected"))
         settings = lightroom_settings_from_adjustments(variant["adjustments"])
+        ensure_lightroom_composition_supported(variant)
+        masks = lightroom_masks_from_variant(variant)
         output_path = output_dir / output_name(raw_path, variant_id, str(options["format"]))
 
         record = {
@@ -237,7 +345,9 @@ def render_plan(
             "reason": variant.get("rationale", ""),
             "adjustments": variant["adjustments"],
             "composition": variant.get("composition", {}),
+            "mask_decision": variant.get("mask_decision", {}),
             "lightroom_settings": settings,
+            "lightroom_masks": masks,
             "status": "dry_run" if dry_run else "pending",
             "failure_reason": "",
         }
@@ -251,9 +361,14 @@ def render_plan(
                 dry_run=dry_run,
                 render_timeout=render_timeout,
             )
+            mask_commands = [
+                ai_mask_command(photo_id, mask, executable=executable)
+                for mask in (variant.get("masks") or [])
+            ]
             commands = [
                 *resolve_commands,
                 develop_apply_command(photo_id, settings, executable=executable),
+                *mask_commands,
                 export_command(
                     photo_id,
                     output_dir=output_dir,
