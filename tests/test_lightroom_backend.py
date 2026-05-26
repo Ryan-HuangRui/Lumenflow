@@ -41,6 +41,62 @@ class LightroomBackendTests(unittest.TestCase):
             },
         )
 
+    def test_maps_advanced_lightroom_color_adjustments(self) -> None:
+        settings = render_lightroom.lightroom_settings_from_adjustments(
+            {
+                "hsl": {
+                    "orange": {"saturation": -5, "luminance": 8},
+                    "green": {"hue": -10, "saturation": -20},
+                },
+                "color_mixer": {
+                    "blue": {"saturation": -12, "luminance": -8},
+                },
+                "tone_curve": {
+                    "parametric": {
+                        "shadows": -8,
+                        "lights": 6,
+                        "highlight_split": 75,
+                    },
+                    "point": [[0, 0], [64, 58], [128, 132], [255, 255]],
+                    "blue": [[0, 4], [128, 128], [255, 250]],
+                    "curve_refine_saturation": 5,
+                },
+                "color_grading": {
+                    "shadows": {"hue": 210, "saturation": 8},
+                    "highlights": {"hue": 42, "saturation": 10},
+                    "midtones": {"hue": 35, "saturation": 4, "luminance": -2},
+                    "global": {"hue": 38, "saturation": 3},
+                    "blending": 50,
+                    "balance": 5,
+                },
+                "calibration": {
+                    "shadow_tint": 4,
+                    "red": {"hue": 5, "saturation": -3},
+                    "blue": {"hue": -8, "saturation": 12},
+                },
+            }
+        )
+
+        self.assertEqual(settings["SaturationAdjustmentOrange"], -5)
+        self.assertEqual(settings["LuminanceAdjustmentOrange"], 8)
+        self.assertEqual(settings["HueAdjustmentGreen"], -10)
+        self.assertEqual(settings["SaturationAdjustmentBlue"], -12)
+        self.assertEqual(settings["ParametricShadows"], -8)
+        self.assertEqual(settings["ParametricLights"], 6)
+        self.assertEqual(settings["ParametricHighlightSplit"], 75)
+        self.assertEqual(settings["ToneCurvePV2012"], [0, 0, 64, 58, 128, 132, 255, 255])
+        self.assertEqual(settings["ToneCurvePV2012Blue"], [0, 4, 128, 128, 255, 250])
+        self.assertEqual(settings["CurveRefineSaturation"], 5)
+        self.assertEqual(settings["SplitToningShadowHue"], 210)
+        self.assertEqual(settings["SplitToningHighlightSaturation"], 10)
+        self.assertEqual(settings["ColorGradeMidtoneHue"], 35)
+        self.assertEqual(settings["ColorGradeGlobalSat"], 3)
+        self.assertEqual(settings["ColorGradeBlending"], 50)
+        self.assertEqual(settings["SplitToningBalance"], 5)
+        self.assertEqual(settings["ShadowTint"], 4)
+        self.assertEqual(settings["RedHue"], 5)
+        self.assertEqual(settings["BlueSaturation"], 12)
+
     def test_render_plan_lightroom_dry_run_writes_commands_and_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)
@@ -63,6 +119,18 @@ class LightroomBackendTests(unittest.TestCase):
                                     "exposure_compensation": 0.35,
                                     "saturation": -4,
                                     "temperature": 5400,
+                                    "hsl": {
+                                        "green": {"saturation": -20},
+                                    },
+                                    "tone_curve": {
+                                        "point": [[0, 0], [128, 132], [255, 255]],
+                                    },
+                                    "color_grading": {
+                                        "shadows": {"hue": 210, "saturation": 8},
+                                    },
+                                    "calibration": {
+                                        "blue": {"hue": -8, "saturation": 12},
+                                    },
                                 },
                                 "composition": {
                                     "decision": "no_crop",
@@ -98,7 +166,13 @@ class LightroomBackendTests(unittest.TestCase):
             self.assertEqual(records[0]["status"], "dry_run")
             self.assertEqual(records[0]["output"], str(output_dir / "IMG_0001_best.jpg"))
             self.assertEqual(records[0]["lightroom_settings"]["Exposure"], 0.35)
+            self.assertEqual(records[0]["lightroom_settings"]["SaturationAdjustmentGreen"], -20)
+            self.assertEqual(records[0]["lightroom_settings"]["ToneCurvePV2012"], [0, 0, 128, 132, 255, 255])
+            self.assertEqual(records[0]["lightroom_settings"]["SplitToningShadowHue"], 210)
+            self.assertEqual(records[0]["lightroom_settings"]["BlueSaturation"], 12)
             self.assertIn("/custom/lr develop apply --photo-id 123", records[0]["command"])
+            self.assertIn("ToneCurvePV2012", records[0]["command"])
+            self.assertIn("SaturationAdjustmentGreen", records[0]["command"])
             self.assertIn("/custom/lr export photo 123", records[0]["command"])
             self.assertIn("--filename-suffix _best", records[0]["command"])
 

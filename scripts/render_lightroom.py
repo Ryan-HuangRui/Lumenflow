@@ -46,6 +46,93 @@ RANGED_SETTINGS = {
 }
 
 AI_MASK_TYPES = {"subject", "sky", "background", "objects", "people", "landscape"}
+BASIC_LIGHTROOM_SETTING_KEYS = set(DIRECT_ADJUSTMENT_MAP.values()) | RANGED_SETTINGS | {"Exposure", "Temperature"}
+LIGHTROOM_SETTING_KEYS = set(BASIC_LIGHTROOM_SETTING_KEYS)
+
+HSL_COLORS = {
+    "red": "Red",
+    "orange": "Orange",
+    "yellow": "Yellow",
+    "green": "Green",
+    "aqua": "Aqua",
+    "blue": "Blue",
+    "purple": "Purple",
+    "magenta": "Magenta",
+}
+
+HSL_SETTING_PREFIXES = {
+    "hue": "HueAdjustment",
+    "saturation": "SaturationAdjustment",
+    "luminance": "LuminanceAdjustment",
+}
+
+PARAMETRIC_CURVE_MAP = {
+    "darks": "ParametricDarks",
+    "lights": "ParametricLights",
+    "shadows": "ParametricShadows",
+    "highlights": "ParametricHighlights",
+    "shadow_split": "ParametricShadowSplit",
+    "midtone_split": "ParametricMidtoneSplit",
+    "highlight_split": "ParametricHighlightSplit",
+}
+
+POINT_CURVE_MAP = {
+    "point": "ToneCurvePV2012",
+    "rgb": "ToneCurvePV2012",
+    "red": "ToneCurvePV2012Red",
+    "green": "ToneCurvePV2012Green",
+    "blue": "ToneCurvePV2012Blue",
+}
+
+COLOR_GRADING_CHANNELS = {
+    "shadows": {
+        "hue": "SplitToningShadowHue",
+        "saturation": "SplitToningShadowSaturation",
+        "luminance": "ColorGradeShadowLum",
+    },
+    "highlights": {
+        "hue": "SplitToningHighlightHue",
+        "saturation": "SplitToningHighlightSaturation",
+        "luminance": "ColorGradeHighlightLum",
+    },
+    "midtones": {
+        "hue": "ColorGradeMidtoneHue",
+        "saturation": "ColorGradeMidtoneSat",
+        "luminance": "ColorGradeMidtoneLum",
+    },
+    "global": {
+        "hue": "ColorGradeGlobalHue",
+        "saturation": "ColorGradeGlobalSat",
+        "luminance": "ColorGradeGlobalLum",
+    },
+}
+
+COLOR_GRADING_GLOBAL_MAP = {
+    "blending": "ColorGradeBlending",
+    "balance": "SplitToningBalance",
+}
+
+CALIBRATION_CHANNELS = {
+    "red": "Red",
+    "green": "Green",
+    "blue": "Blue",
+}
+
+CALIBRATION_GLOBAL_MAP = {
+    "shadow_tint": "ShadowTint",
+}
+
+ADVANCED_LIGHTROOM_SETTINGS = (
+    set(PARAMETRIC_CURVE_MAP.values())
+    | set(POINT_CURVE_MAP.values())
+    | {"CurveRefineSaturation"}
+    | {f"{prefix}{color}" for prefix in HSL_SETTING_PREFIXES.values() for color in HSL_COLORS.values()}
+    | {setting for channel in COLOR_GRADING_CHANNELS.values() for setting in channel.values()}
+    | set(COLOR_GRADING_GLOBAL_MAP.values())
+    | set(CALIBRATION_GLOBAL_MAP.values())
+    | {f"{channel}{suffix}" for channel in CALIBRATION_CHANNELS.values() for suffix in ("Hue", "Saturation")}
+)
+LIGHTROOM_SETTING_KEYS |= ADVANCED_LIGHTROOM_SETTINGS
 
 FORMAT_EXTENSIONS = {
     "JPEG": ".jpg",
@@ -66,8 +153,117 @@ def normalized_number(value: Any) -> int | float:
     return number
 
 
-def lightroom_settings_from_adjustments(adjustments: dict[str, Any]) -> dict[str, int | float]:
-    settings: dict[str, int | float] = {}
+def normalized_ranged_number(value: Any, low: float = -100, high: float = 100) -> int | float:
+    return normalized_number(clamp(float(value), low, high))
+
+
+def require_object(value: Any, *, field: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"Lightroom {field} adjustments must be an object")
+    return value
+
+
+def add_hsl_settings(settings: dict[str, Any], hsl: Any, *, field: str) -> None:
+    for color_name, channels in require_object(hsl, field=field).items():
+        color = HSL_COLORS.get(str(color_name).lower())
+        if not color:
+            raise ValueError(f"Unsupported Lightroom {field} color: {color_name}")
+        if not isinstance(channels, dict):
+            raise ValueError(f"Lightroom {field}.{color_name} must be an object")
+        for channel_name, value in channels.items():
+            prefix = HSL_SETTING_PREFIXES.get(str(channel_name).lower())
+            if not prefix:
+                raise ValueError(f"Unsupported Lightroom {field} channel: {channel_name}")
+            if value is not None:
+                settings[f"{prefix}{color}"] = normalized_ranged_number(value)
+
+
+def curve_points(value: Any) -> list[int | float]:
+    if not isinstance(value, list):
+        raise ValueError("Lightroom tone curve points must be an array")
+    flattened: list[Any] = []
+    for item in value:
+        if isinstance(item, list):
+            if len(item) != 2:
+                raise ValueError("Lightroom tone curve point arrays must contain exactly two numbers")
+            flattened.extend(item)
+        else:
+            flattened.append(item)
+    if len(flattened) % 2 != 0:
+        raise ValueError("Lightroom tone curve points must contain x/y pairs")
+    return [normalized_ranged_number(point, 0, 255) for point in flattened]
+
+
+def add_tone_curve_settings(settings: dict[str, Any], tone_curve: Any) -> None:
+    tone_curve = require_object(tone_curve, field="tone_curve")
+    parametric = tone_curve.get("parametric")
+    if parametric is not None:
+        for key, value in require_object(parametric, field="tone_curve.parametric").items():
+            setting = PARAMETRIC_CURVE_MAP.get(str(key).lower())
+            if not setting:
+                raise ValueError(f"Unsupported Lightroom parametric curve key: {key}")
+            key_name = str(key).lower()
+            low, high = (0, 100) if key_name in {"shadow_split", "midtone_split", "highlight_split"} else (-100, 100)
+            if value is not None:
+                settings[setting] = normalized_ranged_number(value, low, high)
+
+    for key, setting in POINT_CURVE_MAP.items():
+        if key in tone_curve and tone_curve[key] is not None:
+            settings[setting] = curve_points(tone_curve[key])
+    if tone_curve.get("curve_refine_saturation") is not None:
+        settings["CurveRefineSaturation"] = normalized_ranged_number(tone_curve["curve_refine_saturation"])
+
+
+def add_color_grading_settings(settings: dict[str, Any], color_grading: Any) -> None:
+    color_grading = require_object(color_grading, field="color_grading")
+    for group_name, channel_map in COLOR_GRADING_CHANNELS.items():
+        group = color_grading.get(group_name)
+        if group is None:
+            continue
+        for key, value in require_object(group, field=f"color_grading.{group_name}").items():
+            setting = channel_map.get(str(key).lower())
+            if not setting:
+                raise ValueError(f"Unsupported Lightroom color grading key: {group_name}.{key}")
+            if value is None:
+                continue
+            if str(key).lower() == "hue":
+                settings[setting] = normalized_ranged_number(value, 0, 360)
+            elif str(key).lower() == "saturation":
+                settings[setting] = normalized_ranged_number(value, 0, 100)
+            else:
+                settings[setting] = normalized_ranged_number(value)
+
+    for key, setting in COLOR_GRADING_GLOBAL_MAP.items():
+        if color_grading.get(key) is None:
+            continue
+        low, high = (0, 100) if key == "blending" else (-100, 100)
+        settings[setting] = normalized_ranged_number(color_grading[key], low, high)
+
+
+def add_calibration_settings(settings: dict[str, Any], calibration: Any) -> None:
+    calibration = require_object(calibration, field="calibration")
+    for key, setting in CALIBRATION_GLOBAL_MAP.items():
+        if calibration.get(key) is not None:
+            settings[setting] = normalized_ranged_number(calibration[key])
+
+    for channel_name, prefix in CALIBRATION_CHANNELS.items():
+        channel = calibration.get(channel_name)
+        if channel is None:
+            continue
+        for key, value in require_object(channel, field=f"calibration.{channel_name}").items():
+            suffix = {"hue": "Hue", "saturation": "Saturation"}.get(str(key).lower())
+            if not suffix:
+                raise ValueError(f"Unsupported Lightroom calibration key: {channel_name}.{key}")
+            if value is not None:
+                settings[f"{prefix}{suffix}"] = normalized_ranged_number(value)
+
+
+def lightroom_settings_from_adjustments(
+    adjustments: dict[str, Any],
+    *,
+    include_advanced: bool = True,
+) -> dict[str, Any]:
+    settings: dict[str, Any] = {}
     for source_key, lightroom_key in DIRECT_ADJUSTMENT_MAP.items():
         if source_key not in adjustments or adjustments[source_key] is None:
             continue
@@ -80,24 +276,41 @@ def lightroom_settings_from_adjustments(adjustments: dict[str, Any]) -> dict[str
             value = clamp(float(value), -100, 100)
         settings[lightroom_key] = normalized_number(value)
 
+    valid_setting_keys = LIGHTROOM_SETTING_KEYS if include_advanced else BASIC_LIGHTROOM_SETTING_KEYS
     for source_key, value in adjustments.items():
-        if source_key not in RANGED_SETTINGS and source_key not in {"Exposure", "Temperature"}:
+        if source_key not in valid_setting_keys:
             continue
         if source_key in settings or value is None:
             continue
-        number = normalized_number(value)
-        if source_key == "Exposure":
-            number = clamp(float(number), -5, 5)
-        elif source_key == "Temperature":
-            number = clamp(float(number), 2000, 50000)
+        if source_key in set(POINT_CURVE_MAP.values()):
+            settings[source_key] = curve_points(value)
+            continue
+        if source_key == "Temperature":
+            number = clamp(float(normalized_number(value)), 2000, 50000)
+        elif source_key == "Exposure":
+            number = clamp(float(normalized_number(value)), -5, 5)
         else:
-            number = clamp(float(number), -100, 100)
+            number = clamp(float(normalized_number(value)), -100, 100)
         settings[source_key] = normalized_number(number)
 
     if "highlight_compression" in adjustments and "Highlights" not in settings:
         settings["Highlights"] = normalized_number(clamp(-float(adjustments["highlight_compression"]), -100, 100))
     if "shadow_compression" in adjustments and "Shadows" not in settings:
         settings["Shadows"] = normalized_number(clamp(float(adjustments["shadow_compression"]), -100, 100))
+
+    if not include_advanced:
+        return settings
+
+    if adjustments.get("hsl") is not None:
+        add_hsl_settings(settings, adjustments["hsl"], field="hsl")
+    if adjustments.get("color_mixer") is not None:
+        add_hsl_settings(settings, adjustments["color_mixer"], field="color_mixer")
+    if adjustments.get("tone_curve") is not None:
+        add_tone_curve_settings(settings, adjustments["tone_curve"])
+    if adjustments.get("color_grading") is not None:
+        add_color_grading_settings(settings, adjustments["color_grading"])
+    if adjustments.get("calibration") is not None:
+        add_calibration_settings(settings, adjustments["calibration"])
 
     return settings
 
@@ -128,7 +341,7 @@ def find_photo_command(raw_path: Path, *, executable: str) -> list[str]:
 
 def develop_apply_command(
     photo_id: str,
-    settings: dict[str, int | float],
+    settings: dict[str, Any],
     *,
     executable: str,
 ) -> list[str]:
@@ -174,7 +387,7 @@ def export_command(
     return command
 
 
-def ai_mask_settings(mask: dict[str, Any]) -> dict[str, int | float]:
+def ai_mask_settings(mask: dict[str, Any]) -> dict[str, Any]:
     raw_settings = mask.get("settings")
     if raw_settings is None:
         raw_settings = mask.get("adjustments")
@@ -182,7 +395,7 @@ def ai_mask_settings(mask: dict[str, Any]) -> dict[str, int | float]:
         return {}
     if not isinstance(raw_settings, dict):
         raise ValueError("Lightroom mask settings must be an object")
-    return lightroom_settings_from_adjustments(raw_settings)
+    return lightroom_settings_from_adjustments(raw_settings, include_advanced=False)
 
 
 def lightroom_masks_from_variant(variant: dict[str, Any]) -> list[dict[str, Any]]:

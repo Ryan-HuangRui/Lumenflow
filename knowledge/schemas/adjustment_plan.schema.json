@@ -109,6 +109,61 @@
               "green": {
                 "type": "number"
               },
+              "hsl": {
+                "type": "object",
+                "description": "Lightroom-only HSL adjustments. Color keys: red, orange, yellow, green, aqua, blue, purple, magenta. Channel keys: hue, saturation, luminance.",
+                "additionalProperties": true
+              },
+              "color_mixer": {
+                "type": "object",
+                "description": "Lightroom-only Color Mixer alias for HSL adjustments. Uses the same shape as hsl.",
+                "additionalProperties": true
+              },
+              "tone_curve": {
+                "type": "object",
+                "description": "Lightroom-only tone curve settings. Supports parametric curve keys and point/rgb/red/green/blue point curves.",
+                "properties": {
+                  "parametric": {
+                    "type": "object",
+                    "description": "Keys: darks, lights, shadows, highlights, shadow_split, midtone_split, highlight_split.",
+                    "additionalProperties": true
+                  },
+                  "point": {
+                    "type": "array",
+                    "description": "Main point curve as [[x,y], ...] or flattened [x1,y1,x2,y2,...] values in 0..255."
+                  },
+                  "rgb": {
+                    "type": "array",
+                    "description": "Alias for the main point curve."
+                  },
+                  "red": {
+                    "type": "array",
+                    "description": "Red channel point curve."
+                  },
+                  "green": {
+                    "type": "array",
+                    "description": "Green channel point curve."
+                  },
+                  "blue": {
+                    "type": "array",
+                    "description": "Blue channel point curve."
+                  },
+                  "curve_refine_saturation": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "color_grading": {
+                "type": "object",
+                "description": "Lightroom-only color grading. Supports shadows/highlights/midtones/global hue/saturation/luminance where available, plus blending and balance.",
+                "additionalProperties": true
+              },
+              "calibration": {
+                "type": "object",
+                "description": "Lightroom-only calibration settings. Supports shadow_tint and red/green/blue hue/saturation.",
+                "additionalProperties": true
+              },
               "notes": {
                 "type": "string"
               }
