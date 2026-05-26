@@ -165,6 +165,7 @@ If no Layer 2 card fits, use the Layer 1 family as the style direction and set `
 - Lightroom `masks` are executable only for AI mask types that can be applied by photo id: `subject`, `sky`, `background`, `objects`, `people`, and `landscape`. Do not emit local brush/gradient/radial masks for automatic execution yet; record them as review notes or supporting rationale instead.
 - When using Lightroom `masks`, put global changes in `adjustments` and local changes in each mask's `settings`. Do not duplicate the same correction globally and locally unless that is intentional and explained in the rationale.
 - For Lightroom mask settings, use Lumenflow adjustment keys such as `exposure_compensation`, `highlights`, `shadows`, `contrast`, `clarity`, `dehaze`, `temperature`, and `saturation`; the renderer maps them to Lightroom develop setting names.
+- Lightroom global `adjustments` also support Lightroom-only advanced color controls: `hsl`, `color_mixer`, `tone_curve`, `color_grading`, and `calibration`. These are executable only by the Lightroom engine; RawTherapee currently ignores them except as recorded plan data.
 
 ## Lightroom Plan Contract
 
@@ -212,6 +213,43 @@ The Lightroom execution order is:
 
 Unsupported local edits should be recorded as review notes or in `composition`/`photo_analysis`, not as executable `masks`. This includes brush, gradient, radial, mask intersections/subtractions, and part-specific people/landscape masks.
 
+Lightroom-only global adjustment shapes:
+
+```json
+"adjustments": {
+  "exposure_compensation": 0.35,
+  "temperature": 5400,
+  "hsl": {
+    "orange": {"saturation": -5, "luminance": 8},
+    "green": {"hue": -10, "saturation": -20},
+    "blue": {"saturation": -12, "luminance": -8}
+  },
+  "color_mixer": {
+    "aqua": {"hue": -8, "saturation": -10}
+  },
+  "tone_curve": {
+    "parametric": {"shadows": -8, "lights": 6, "highlights": -10},
+    "point": [[0, 0], [64, 58], [128, 132], [255, 255]],
+    "blue": [[0, 4], [128, 128], [255, 250]]
+  },
+  "color_grading": {
+    "shadows": {"hue": 210, "saturation": 8},
+    "highlights": {"hue": 42, "saturation": 10},
+    "midtones": {"hue": 35, "saturation": 4, "luminance": 0},
+    "global": {"hue": 38, "saturation": 3},
+    "blending": 50,
+    "balance": 5
+  },
+  "calibration": {
+    "shadow_tint": 4,
+    "red": {"hue": 5, "saturation": -3},
+    "blue": {"hue": -8, "saturation": 12}
+  }
+}
+```
+
+Use these only when they materially improve the photo. HSL/Color Mixer is the preferred first tool for selective color cleanup; Color Grading is for deliberate shadow/highlight/midtone color separation; Tone Curve is for contrast shape or RGB channel color separation; Calibration is a global camera-profile-level color move and should be used sparingly.
+
 ## Expected Output
 
 ```text
@@ -254,7 +292,23 @@ The agent writes concrete values after inspecting the photo and style cards:
         "exposure_compensation": 0.35,
         "saturation": -4,
         "temperature": 5400,
-        "green": 1.02
+        "green": 1.02,
+        "hsl": {
+          "orange": {"saturation": -5, "luminance": 8},
+          "green": {"hue": -10, "saturation": -20}
+        },
+        "tone_curve": {
+          "parametric": {"shadows": -8, "lights": 6},
+          "point": [[0, 0], [64, 58], [128, 132], [255, 255]]
+        },
+        "color_grading": {
+          "shadows": {"hue": 210, "saturation": 8},
+          "highlights": {"hue": 42, "saturation": 10},
+          "balance": 5
+        },
+        "calibration": {
+          "blue": {"hue": -8, "saturation": 12}
+        }
       },
       "lightroom": {
         "photo_id": "123"

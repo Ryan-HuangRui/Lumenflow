@@ -140,7 +140,31 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
       "adjustments": {
         "exposure_compensation": 0.35,
         "saturation": -4,
-        "temperature": 5400
+        "temperature": 5400,
+        "hsl": {
+          "orange": {"saturation": -5, "luminance": 8},
+          "green": {"hue": -10, "saturation": -20}
+        },
+        "tone_curve": {
+          "parametric": {"shadows": -8, "lights": 6},
+          "point": [[0, 0], [64, 58], [128, 132], [255, 255]]
+        },
+        "color_grading": {
+          "shadows": {"hue": 210, "saturation": 8},
+          "highlights": {"hue": 42, "saturation": 10},
+          "balance": 5
+        },
+        "calibration": {
+          "blue": {"hue": -8, "saturation": 12}
+        }
+      },
+      "composition": {
+        "decision": "no_crop",
+        "reason": "The source framing is already intentional."
+      },
+      "mask_decision": {
+        "decision": "use_masks",
+        "reason": "The bright sky needs a local recovery pass."
       },
       "masks": [
         {
@@ -164,5 +188,7 @@ python3 scripts/render_adjustment_plan.py output/plans/IMG_0001.adjustment_plan.
 ```
 
 如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行全局参数映射到 `lr develop apply`，把 `masks` 映射到 `lr develop ai batch <type> --photos <photo_id>`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
+
+Lightroom 路径的全局参数支持基础曝光/色温/质感参数，也支持 Lightroom-only 的 `hsl`、`color_mixer`、`tone_curve`、`color_grading`、`calibration`。这些高级参数会写入 Lightroom catalog，便于后续在 Lightroom 里继续调整；RawTherapee 路径目前不执行这些高级 Lightroom 字段。
 
 当前自动蒙版只支持 Lightroom AI mask 类型：`subject`、`sky`、`background`、`objects`、`people`、`landscape`。局部画笔、渐变、径向和 people/landscape 的具体 part 选择暂不自动执行，因为现有 `lightroom-cli` 批处理路径不能稳定绑定这些操作到指定 photo id。
