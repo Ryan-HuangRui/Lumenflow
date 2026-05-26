@@ -48,6 +48,7 @@ DEFAULT_COMMAND_SPECS = [
     CommandSpec("exiftool", "phase1_photos", True, ["exiftool", "-ver"]),
     CommandSpec("rawtherapee-cli", "phase1_photos", True, ["rawtherapee-cli", "-v"], 5, (0, 255)),
     CommandSpec("darktable-cli", "phase1_photos_fallback", False, ["darktable-cli", "--help"], 10),
+    CommandSpec("lr", "phase1_photos_lightroom_optional", False, ["lr", "--version"]),
     CommandSpec("ffmpeg", "phase3_tutorials", False, ["ffmpeg", "-version"]),
     CommandSpec("ffprobe", "phase3_tutorials", False, ["ffprobe", "-version"]),
     CommandSpec("yt-dlp", "phase3_tutorials", False, ["yt-dlp", "--version"]),
@@ -66,6 +67,7 @@ DEFAULT_MODULE_SPECS = [
 TOOL_CONFIG_KEYS = {
     "rawtherapee-cli": "rawtherapee_cli",
     "darktable-cli": "darktable_cli",
+    "lr": "lightroom_cli",
     "ffmpeg": "ffmpeg",
     "ffprobe": "ffprobe",
     "yt-dlp": "yt_dlp",

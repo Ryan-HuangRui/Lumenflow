@@ -102,6 +102,8 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
                                     "green": 1.02,
                                 },
                                 "composition": {
+                                    "decision": "crop",
+                                    "reason": "Remove distracting edge clutter.",
                                     "crop": {
                                         "enabled": True,
                                         "unit": "pixels",
@@ -114,6 +116,10 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
                                         "reason": "Remove distracting edge clutter.",
                                     }
                                 },
+                                "mask_decision": {
+                                    "decision": "none",
+                                    "reason": "Global tone and crop are sufficient for this RawTherapee render.",
+                                },
                             },
                             {
                                 "variant_id": "warm",
@@ -122,6 +128,14 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
                                 "adjustments": {
                                     "exposure_compensation": 0.2,
                                     "saturation": 8,
+                                },
+                                "composition": {
+                                    "decision": "no_crop",
+                                    "reason": "The alternate variant keeps the original framing for comparison.",
+                                },
+                                "mask_decision": {
+                                    "decision": "none",
+                                    "reason": "No isolated local correction is needed for this alternate variant.",
                                 },
                             },
                         ],
@@ -161,11 +175,14 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
             self.assertEqual(records[0]["style_id"], "clean_natural")
             self.assertEqual(records[0]["status"], "dry_run")
             self.assertTrue(records[0]["composition"]["crop"]["enabled"])
+            self.assertEqual(records[1]["composition"]["decision"], "no_crop")
+            self.assertEqual(records[0]["mask_decision"]["decision"], "none")
             self.assertIn(str(best_profile), records[0]["command"])
             report = (output_dir / "processing_report.md").read_text(encoding="utf-8")
             self.assertIn("- 变体：best", report)
             self.assertIn("exposure_compensation=0.35", report)
-            self.assertIn("- 构图：crop enabled", report)
+            self.assertIn("- 构图：decision=crop", report)
+            self.assertIn("- 局部调整决策：none", report)
 
     def test_adjustment_plan_requires_variants(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -183,6 +200,31 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
 
             with self.assertRaises(SystemExit):
                 render_adjustment_plan.read_plan(plan_path)
+
+    def test_adjustment_plan_requires_per_photo_decisions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            plan_path = Path(directory) / "bad_plan.json"
+            plan_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "lumenflow.adjustment_plan.v1",
+                        "source": str(Path(directory) / "IMG_0001.DNG"),
+                        "variants": [
+                            {
+                                "variant_id": "best",
+                                "style_id": "clean_natural",
+                                "rationale": "Incomplete plan.",
+                                "adjustments": {"exposure_compensation": 0.2},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SystemExit) as error:
+                render_adjustment_plan.read_plan(plan_path)
+            self.assertIn("composition decision", str(error.exception))
 
 
 if __name__ == "__main__":

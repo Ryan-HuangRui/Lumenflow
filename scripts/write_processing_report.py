@@ -26,6 +26,10 @@ def render_composition(composition: object) -> str:
         return ""
     crop = composition.get("crop")
     parts = []
+    if composition.get("decision"):
+        parts.append(f"decision={composition.get('decision')}")
+    if composition.get("reason"):
+        parts.append(f"reason={composition.get('reason')}")
     if isinstance(crop, dict) and crop.get("enabled"):
         unit = crop.get("unit", "pixels")
         if unit == "pixels":
@@ -46,11 +50,40 @@ def render_composition(composition: object) -> str:
     return ", ".join(parts)
 
 
+def render_lightroom_masks(masks: object) -> str:
+    if not isinstance(masks, list) or not masks:
+        return ""
+    parts = []
+    for mask in masks:
+        if not isinstance(mask, dict):
+            continue
+        settings = render_adjustments(mask.get("settings"))
+        detail = str(mask.get("type", ""))
+        if settings:
+            detail = f"{detail}({settings})"
+        if mask.get("rationale"):
+            detail = f"{detail} reason={mask.get('rationale')}"
+        parts.append(detail)
+    return "; ".join(parts)
+
+
+def render_mask_decision(mask_decision: object) -> str:
+    if not isinstance(mask_decision, dict) or not mask_decision:
+        return ""
+    decision = str(mask_decision.get("decision", ""))
+    reason = str(mask_decision.get("reason", ""))
+    if decision and reason:
+        return f"{decision} reason={reason}"
+    return decision or reason
+
+
 def render_report(records: list[dict[str, object]]) -> str:
     lines = ["# Processing Report", ""]
     for record in records:
         adjustments = render_adjustments(record.get("adjustments"))
         composition = render_composition(record.get("composition"))
+        mask_decision = render_mask_decision(record.get("mask_decision"))
+        lightroom_masks = render_lightroom_masks(record.get("lightroom_masks"))
         lines.extend(
             [
                 f"## {record.get('source', 'unknown')}",
@@ -62,6 +95,8 @@ def render_report(records: list[dict[str, object]]) -> str:
                 f"- Profile：{record.get('profile', '')}",
                 f"- 参数：{adjustments}",
                 f"- 构图：{composition}",
+                f"- 局部调整决策：{mask_decision}",
+                f"- Lightroom 蒙版：{lightroom_masks}",
                 f"- 命令：`{record.get('command', '')}`",
                 f"- 理由：{record.get('reason', '')}",
                 f"- 状态：{record.get('status', '')}",
