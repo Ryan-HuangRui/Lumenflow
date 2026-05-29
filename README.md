@@ -163,19 +163,19 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
         "reason": "The source framing is already intentional."
       },
       "mask_decision": {
-        "decision": "use_masks",
-        "reason": "The bright sky needs a local recovery pass."
-      },
-      "masks": [
-        {
-          "type": "sky",
-          "rationale": "Recover bright sky detail without darkening the subject.",
-          "settings": {
-            "highlights": -35,
-            "dehaze": 12
+        "decision": "manual_recommendation",
+        "reason": "The bright sky may need a local recovery pass, but Lightroom AI masks require overlay verification before execution.",
+        "recommended_masks": [
+          {
+            "type": "sky",
+            "rationale": "Recover bright sky detail without darkening the subject.",
+            "settings": {
+              "highlights": -35,
+              "dehaze": 12
+            }
           }
-        }
-      ]
+        ]
+      }
     }
   ]
 }
@@ -187,8 +187,8 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
 python3 scripts/render_adjustment_plan.py output/plans/IMG_0001.adjustment_plan.json --engine lightroom
 ```
 
-如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行全局参数映射到 `lr develop apply`，把 `masks` 映射到 `lr develop ai batch <type> --photos <photo_id>`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
+如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行全局参数映射到 `lr develop apply`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
 
 Lightroom 路径的全局参数支持基础曝光/色温/质感参数，也支持 Lightroom-only 的 `hsl`、`color_mixer`、`tone_curve`、`color_grading`、`calibration`。这些高级参数会写入 Lightroom catalog，便于后续在 Lightroom 里继续调整；RawTherapee 路径目前不执行这些高级 Lightroom 字段。
 
-当前自动蒙版只支持 Lightroom AI mask 类型：`subject`、`sky`、`background`、`objects`、`people`、`landscape`。局部画笔、渐变、径向和 people/landscape 的具体 part 选择暂不自动执行，因为现有 `lightroom-cli` 批处理路径不能稳定绑定这些操作到指定 photo id。
+当前 Lightroom AI mask 批处理路径默认禁用。现有 `lightroom-cli`/Bridge 的 `develop ai batch <type> --photos <photo_id>` 可能在 Develop/Masking 上下文切换未完成时把 AI 蒙版写到错误照片，且灰天、雾山、白墙建筑等低对比场景的 sky 识别需要人工 overlay 复核。自动流程应把这些局部调整记录为 `mask_decision=manual_recommendation`，或者在逐张人工确认 overlay 后，才通过本地配置显式设置 `"allow_unverified_ai_masks": true` 执行实验性批处理。局部画笔、渐变、径向和 people/landscape 的具体 part 选择仍不自动执行。

@@ -203,7 +203,7 @@ class LightroomBackendTests(unittest.TestCase):
             },
         )
 
-    def test_render_plan_lightroom_dry_run_writes_mask_commands(self) -> None:
+    def test_render_plan_lightroom_rejects_ai_masks_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)
             raw = tmp_path / "IMG_0002.DNG"
@@ -262,6 +262,72 @@ class LightroomBackendTests(unittest.TestCase):
             self.assertEqual(records[0]["lightroom_masks"][0]["type"], "sky")
             self.assertEqual(records[0]["lightroom_masks"][0]["settings"]["Highlights"], -35)
             self.assertEqual(records[0]["mask_decision"]["decision"], "use_masks")
+            self.assertEqual(records[0]["status"], "failed")
+            self.assertIn("AI mask execution is disabled", records[0]["failure_reason"])
+            self.assertNotIn("command", records[0])
+            report = (output_dir / "processing_report.md").read_text(encoding="utf-8")
+            self.assertIn("failed", report)
+
+    def test_render_plan_lightroom_writes_mask_commands_when_explicitly_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            raw = tmp_path / "IMG_0002.DNG"
+            output_dir = tmp_path / "output"
+            plan_path = tmp_path / "adjustment_plan.json"
+            raw.write_bytes(b"fake raw")
+            plan_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "lumenflow.adjustment_plan.v1",
+                        "source": str(raw),
+                        "lightroom": {"photo_id": "123"},
+                        "variants": [
+                            {
+                                "variant_id": "best",
+                                "style_id": "landscape_blue_green_epic",
+                                "rationale": "Darken sky locally after global tone.",
+                                "adjustments": {
+                                    "exposure_compensation": 0.2,
+                                },
+                                "composition": {
+                                    "decision": "no_crop",
+                                    "reason": "Keep the original framing while testing mask execution.",
+                                },
+                                "mask_decision": {
+                                    "decision": "use_masks",
+                                    "reason": "The sky needs local recovery.",
+                                },
+                                "masks": [
+                                    {
+                                        "type": "sky",
+                                        "rationale": "Recover bright sky detail.",
+                                        "settings": {
+                                            "highlights": -35,
+                                            "dehaze": 12,
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            render_adjustment_plan.run(
+                plan_path=plan_path,
+                output_dir=output_dir,
+                dry_run=True,
+                render_timeout=10,
+                local_config={
+                    "tools": {"lightroom_cli": "/custom/lr"},
+                    "lightroom": {"allow_unverified_ai_masks": True},
+                },
+                engine="lightroom",
+            )
+
+            records = json.loads((output_dir / "processing_records.json").read_text(encoding="utf-8"))
+            self.assertEqual(records[0]["status"], "dry_run")
             self.assertIn("/custom/lr develop ai batch sky --photos 123", records[0]["command"])
             self.assertIn("--adjust", records[0]["command"])
             self.assertLess(

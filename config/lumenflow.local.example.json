@@ -28,7 +28,8 @@
     "quality": 95,
     "color_space": "sRGB",
     "resize_long_edge": null,
-    "overwrite": false
+    "overwrite": false,
+    "allow_unverified_ai_masks": false
   },
   "env": {
     "x_bearer_token": "X_BEARER_TOKEN",
