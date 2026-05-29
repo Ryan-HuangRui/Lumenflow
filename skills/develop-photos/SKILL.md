@@ -106,6 +106,23 @@ python scripts/render_adjustment_plan.py /path/to/plan.json --engine lightroom -
 
 Do not silently fall back from Lightroom to RawTherapee when the user explicitly requested Lightroom. Report the bridge/catalog problem instead.
 
+## Lightroom Operational Pitfalls
+
+Use this checklist whenever the request requires editable Lightroom state, not just exported JPGs:
+
+- Treat Lightroom as an interactive catalog backend, not a headless RAW renderer. The final editable result must be written into the Lightroom catalog.
+- If the user wants to continue editing in Lightroom, do not use RawTherapee fallback as the final output. RawTherapee output can be used only as a preview/reference unless the user accepts that the result is no longer Lightroom-editable RAW develop state.
+- Prefer preserving the user's existing Lightroom edits by creating a snapshot or virtual copy before applying a substantial automated edit, especially when the request is exploratory or may need comparison.
+- Verify Bridge health before execution. If `lr system ping` fails, check whether the `Lightroom CLI Bridge` plugin is installed and started; if Lightroom was restarted, the plugin may need to be started again from Lightroom's plugin/menu action before commands work.
+- `lr` may be unavailable even when the Bridge plugin exists. In that case, use the configured Lightroom CLI path or the local Bridge transport supported by the environment; do not assume Lightroom itself is unavailable until Bridge health has been checked.
+- Resolve and record `lightroom.photo_id` before writing develop settings. If catalog lookup fails, report that the source RAW is missing from the catalog or cannot be resolved by path.
+- If export fails with a missing/corrupt original-photo style error, first check the Lightroom catalog file link and source RAW path. Do not interpret that error as proof that develop settings failed.
+- Do not judge success from Library/Grid thumbnails alone. Lightroom Library previews can lag and may still look like the original. Verify in Develop module, by reading back key develop values when possible, and by exporting a fresh verification contact sheet.
+- Prefer applying settings while the target photo is active in Develop module, then read back or export to verify. Batch execution is acceptable for applying already-decided settings, but not for judging composition, masks, or local color moves.
+- If a written edit appears unchanged, inspect the exact selected photo id/name before retrying. A stale selection, stale thumbnail, or wrong active photo can look like a failed edit.
+- Do not trust Lightroom AI mask batch success as proof that the mask is on the right image. The current Bridge batch path can switch selection and immediately call `createNewMask`; Lightroom may still use a stale Develop/Masking context and write a subject or sky mask to the wrong photo.
+- Treat Lightroom AI masks as experimental unless each mask is created while the target photo is active, followed by overlay inspection or reliable mask readback for that exact photo. If that verification is not possible, record the local edit as `mask_decision=manual_recommendation` and keep only global Lightroom settings executable.
+
 ## Per-Photo Judgment Contract
 
 Batching is allowed for execution, not for judgment. The agent may batch scan, preview generation, Lightroom id lookup, grouped global setting writes, and export, but must make these decisions per photo:
@@ -162,7 +179,9 @@ If no Layer 2 card fits, use the Layer 1 family as the style direction and set `
 - Treat first renders as drafts until reviewed. Mark or document the final accepted render after review.
 - Lightroom renders modify the Lightroom catalog state for the target photo before export. Prefer one best variant, or use variant-specific virtual copies outside this script when preserving multiple Lightroom edit states matters.
 - Lightroom crop execution is not supported by the current backend. Use `preserve_existing_crop`, `no_crop`, or `manual_recommendation` for Lightroom plans unless crop support has been implemented and verified.
-- Lightroom `masks` are executable only for AI mask types that can be applied by photo id: `subject`, `sky`, `background`, `objects`, `people`, and `landscape`. Do not emit local brush/gradient/radial masks for automatic execution yet; record them as review notes or supporting rationale instead.
+- Lightroom `masks` through the current batch Bridge are disabled by default because AI masks can be written to the wrong active photo and sky/subject selections can be visibly wrong in low-contrast scenes. Use `mask_decision=manual_recommendation` unless the executor has explicit per-photo active-image validation and overlay review.
+- Experimental Lightroom AI batch execution is allowed only when the local config explicitly sets `lightroom.allow_unverified_ai_masks=true`, and the report must state that the masks still require human overlay verification in Lightroom.
+- Local brush/gradient/radial masks and people/landscape part-specific masks are not executable yet; record them as review notes or supporting rationale instead.
 - When using Lightroom `masks`, put global changes in `adjustments` and local changes in each mask's `settings`. Do not duplicate the same correction globally and locally unless that is intentional and explained in the rationale.
 - For Lightroom mask settings, use Lumenflow adjustment keys such as `exposure_compensation`, `highlights`, `shadows`, `contrast`, `clarity`, `dehaze`, `temperature`, and `saturation`; the renderer maps them to Lightroom develop setting names.
 - Lightroom global `adjustments` also support Lightroom-only advanced color controls: `hsl`, `color_mixer`, `tone_curve`, `color_grading`, and `calibration`. These are executable only by the Lightroom engine; RawTherapee currently ignores them except as recorded plan data.

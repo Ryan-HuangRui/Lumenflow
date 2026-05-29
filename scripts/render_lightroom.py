@@ -335,6 +335,11 @@ def export_options(local_config: dict[str, Any] | None = None) -> dict[str, Any]
     }
 
 
+def allow_unverified_ai_masks(local_config: dict[str, Any] | None = None) -> bool:
+    lightroom_config = (local_config or {}).get("lightroom") or {}
+    return bool(lightroom_config.get("allow_unverified_ai_masks", False))
+
+
 def find_photo_command(raw_path: Path, *, executable: str) -> list[str]:
     return [executable, "-o", "json", "catalog", "find-by-path", str(raw_path)]
 
@@ -538,6 +543,7 @@ def render_plan(
 
     executable = lightroom_cli(local_config)
     options = export_options(local_config)
+    allow_ai_masks = allow_unverified_ai_masks(local_config)
     records = []
 
     for variant in plan["variants"]:
@@ -578,6 +584,13 @@ def render_plan(
                 ai_mask_command(photo_id, mask, executable=executable)
                 for mask in (variant.get("masks") or [])
             ]
+            if mask_commands and not allow_ai_masks:
+                raise ValueError(
+                    "Lightroom AI mask execution is disabled by default because the current "
+                    "batch bridge can bind AI masks to the wrong active photo. Use "
+                    "mask_decision=manual_recommendation, or set "
+                    "lightroom.allow_unverified_ai_masks=true only after manual overlay validation."
+                )
             commands = [
                 *resolve_commands,
                 develop_apply_command(photo_id, settings, executable=executable),
