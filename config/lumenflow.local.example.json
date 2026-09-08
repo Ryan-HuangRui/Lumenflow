@@ -11,6 +11,13 @@
     "audio_cache_dir": "knowledge/style_cards/tutorial_recipes/audio_cache",
     "hotwords": "knowledge/source_records/asr_hotwords.txt",
     "discard_audio": true,
+    "doubao": {
+      "enabled": true,
+      "python": "python3",
+      "script": "$HOME/.codex/skills/doubao-asr/scripts/transcribe_recording_file.py",
+      "config": "$HOME/.config/codex/doubao-asr.env",
+      "artifacts_dir": "knowledge/style_cards/tutorial_recipes/asr_transcripts/doubao"
+    },
     "model": "paraformer-zh",
     "vad_model": "fsmn-vad",
     "punc_model": "ct-punc"

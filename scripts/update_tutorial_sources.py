@@ -26,6 +26,13 @@ DEFAULT_ASR_AUDIO_CACHE_DIR = DEFAULT_OUTPUT_DIR / "audio_cache"
 DEFAULT_ASR_HOTWORDS_PATH = Path("knowledge/source_records/asr_hotwords.txt")
 DEFAULT_ASR_SCRIPT_PATH = Path("scripts/transcribe_bilibili_funasr.py")
 DEFAULT_ASR_PYTHON_PATH = Path("python")
+DEFAULT_DOUBAO_ASR_SCRIPT_PATH = Path("scripts/transcribe_bilibili_doubao.py")
+DEFAULT_DOUBAO_ASR_PYTHON_PATH = Path("python3")
+DEFAULT_DOUBAO_PROVIDER_SCRIPT_PATH = (
+    Path.home() / ".codex" / "skills" / "doubao-asr" / "scripts" / "transcribe_recording_file.py"
+)
+DEFAULT_DOUBAO_CONFIG_PATH = Path.home() / ".config" / "codex" / "doubao-asr.env"
+DEFAULT_DOUBAO_ARTIFACTS_DIR = DEFAULT_ASR_TRANSCRIPT_DIR / "doubao"
 SEASON_URL_RE = re.compile(r"space\.bilibili\.com/(\d+)/lists/(\d+)")
 
 
@@ -269,6 +276,70 @@ def run_asr_backfill(
     return payload
 
 
+def run_doubao_asr_backfill(
+    source: dict[str, Any],
+    *,
+    doubao_asr_python: Path,
+    doubao_asr_script: Path,
+    doubao_provider_python: Path,
+    doubao_provider_script: Path,
+    doubao_config_path: Path,
+    doubao_artifacts_dir: Path,
+    asr_output_dir: Path,
+    asr_audio_cache_dir: Path,
+    asr_discard_audio: bool = False,
+    local_config_path: Path | None = None,
+) -> dict[str, Any]:
+    command = [
+        str(doubao_asr_python),
+        str(doubao_asr_script),
+        str(source["url"]),
+        "--output-dir",
+        str(asr_output_dir),
+        "--audio-cache-dir",
+        str(asr_audio_cache_dir),
+        "--provider-artifacts-dir",
+        str(doubao_artifacts_dir),
+        "--doubao-python",
+        str(doubao_provider_python),
+        "--doubao-script",
+        str(doubao_provider_script),
+        "--doubao-config",
+        str(doubao_config_path),
+    ]
+    if local_config_path is not None:
+        command.extend(["--local-config", str(local_config_path)])
+    if source.get("cookie_file"):
+        command.extend(["--cookie-file", str(source["cookie_file"])])
+    if asr_discard_audio:
+        command.append("--discard-audio")
+
+    try:
+        completed = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Doubao ASR Python not found: {doubao_asr_python}") from error
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout or "").strip()
+        raise RuntimeError(f"Doubao ASR fallback failed: {detail[-1200:]}") from error
+
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    if not lines:
+        raise RuntimeError("Doubao ASR fallback produced no JSON result.")
+    try:
+        payload = json.loads(lines[-1])
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"Doubao ASR fallback returned invalid JSON: {lines[-1][:300]}") from error
+    if payload.get("status") != "ok":
+        raise RuntimeError(str(payload.get("error") or "Doubao ASR fallback failed."))
+    return payload
+
+
 def run_update(
     *,
     config_path: Path = DEFAULT_CONFIG_PATH,
@@ -277,12 +348,19 @@ def run_update(
     dry_run: bool = False,
     force: bool = False,
     asr_fallback: bool = False,
+    doubao_asr: bool = False,
     asr_python: Path = DEFAULT_ASR_PYTHON_PATH,
     asr_script: Path = DEFAULT_ASR_SCRIPT_PATH,
     asr_output_dir: Path = DEFAULT_ASR_TRANSCRIPT_DIR,
     asr_audio_cache_dir: Path = DEFAULT_ASR_AUDIO_CACHE_DIR,
     asr_hotwords_path: Path = DEFAULT_ASR_HOTWORDS_PATH,
     asr_discard_audio: bool = False,
+    doubao_asr_python: Path = DEFAULT_DOUBAO_ASR_PYTHON_PATH,
+    doubao_asr_script: Path = DEFAULT_DOUBAO_ASR_SCRIPT_PATH,
+    doubao_provider_python: Path = DEFAULT_DOUBAO_ASR_PYTHON_PATH,
+    doubao_provider_script: Path = DEFAULT_DOUBAO_PROVIDER_SCRIPT_PATH,
+    doubao_config_path: Path = DEFAULT_DOUBAO_CONFIG_PATH,
+    doubao_artifacts_dir: Path = DEFAULT_DOUBAO_ARTIFACTS_DIR,
     local_config: dict[str, Any] | None = None,
     local_config_path: Path | None = None,
 ) -> dict[str, Any]:
@@ -360,7 +438,7 @@ def run_update(
                 force=True,
             )
         except Exception as error:
-            if not asr_fallback or platform != "bilibili" or not should_try_asr(error):
+            if not (doubao_asr or asr_fallback) or platform != "bilibili" or not should_try_asr(error):
                 summary["failed"] += 1
                 summary["records"].append(
                     {"url": source["url"], "status": "failed", "error": str(error)}
@@ -378,52 +456,93 @@ def run_update(
                 )
                 continue
 
-            try:
-                asr_payload = run_asr_backfill(
-                    source,
-                    asr_python=asr_python,
-                    asr_script=asr_script,
-                    asr_output_dir=asr_output_dir,
-                    asr_audio_cache_dir=asr_audio_cache_dir,
-                    asr_hotwords_path=asr_hotwords_path,
-                    asr_discard_audio=asr_discard_audio,
-                    local_config_path=local_config_path,
+            provider_attempts: list[tuple[str, Any]] = []
+            if doubao_asr:
+                provider_attempts.append(
+                    (
+                        "doubao",
+                        lambda: run_doubao_asr_backfill(
+                            source,
+                            doubao_asr_python=doubao_asr_python,
+                            doubao_asr_script=doubao_asr_script,
+                            doubao_provider_python=doubao_provider_python,
+                            doubao_provider_script=doubao_provider_script,
+                            doubao_config_path=doubao_config_path,
+                            doubao_artifacts_dir=doubao_artifacts_dir,
+                            asr_output_dir=asr_output_dir,
+                            asr_audio_cache_dir=asr_audio_cache_dir,
+                            asr_discard_audio=asr_discard_audio,
+                            local_config_path=local_config_path,
+                        ),
+                    )
                 )
-                recipe = ingest_tutorial.ingest_url(
-                    platform=platform,
-                    url=str(source["url"]),
-                    topic=str(source.get("topic", "")),
-                    title=str(source.get("title", "")),
-                    transcript_file=Path(asr_payload["transcript_path"]),
-                    source_metadata=dict(asr_payload.get("source_metadata") or {}),
-                    output_dir=output_dir,
-                    transcript_dir=transcript_dir,
-                    dry_run=dry_run,
-                    force=True,
+            if asr_fallback:
+                provider_attempts.append(
+                    (
+                        "funasr",
+                        lambda: run_asr_backfill(
+                            source,
+                            asr_python=asr_python,
+                            asr_script=asr_script,
+                            asr_output_dir=asr_output_dir,
+                            asr_audio_cache_dir=asr_audio_cache_dir,
+                            asr_hotwords_path=asr_hotwords_path,
+                            asr_discard_audio=asr_discard_audio,
+                            local_config_path=local_config_path,
+                        ),
+                    )
                 )
+
+            attempt_errors: list[dict[str, str]] = []
+            asr_succeeded = False
+            for provider, invoke in provider_attempts:
+                try:
+                    asr_payload = invoke()
+                    recipe = ingest_tutorial.ingest_url(
+                        platform=platform,
+                        url=str(source["url"]),
+                        topic=str(source.get("topic", "")),
+                        title=str(source.get("title", "")),
+                        transcript_file=Path(asr_payload["transcript_path"]),
+                        source_metadata=dict(asr_payload.get("source_metadata") or {}),
+                        output_dir=output_dir,
+                        transcript_dir=transcript_dir,
+                        dry_run=dry_run,
+                        force=True,
+                    )
+                except Exception as asr_error:
+                    attempt_errors.append({"provider": provider, "error": str(asr_error)})
+                    continue
+
+                record = {
+                    "url": source["url"],
+                    "status": "asr_processed",
+                    "asr_provider": provider,
+                    "recipe_id": recipe["recipe_id"],
+                    "path": str(output_dir / f"{recipe['recipe_id']}.json"),
+                    "asr_transcript": asr_payload["transcript_path"],
+                    "asr_segments": asr_payload.get("segment_count", 0),
+                }
+                if attempt_errors:
+                    record["prior_asr_errors"] = attempt_errors
                 summary["processed"] += 1
-                summary["records"].append(
-                    {
-                        "url": source["url"],
-                        "status": "asr_processed",
-                        "recipe_id": recipe["recipe_id"],
-                        "path": str(output_dir / f"{recipe['recipe_id']}.json"),
-                        "asr_transcript": asr_payload["transcript_path"],
-                        "asr_segments": asr_payload.get("segment_count", 0),
-                    }
-                )
+                summary["records"].append(record)
+                asr_succeeded = True
+                break
+
+            if asr_succeeded:
                 continue
-            except Exception as asr_error:
-                summary["failed"] += 1
-                summary["records"].append(
-                    {
-                        "url": source["url"],
-                        "status": "failed",
-                        "error": str(error),
-                        "asr_error": str(asr_error),
-                    }
-                )
-                continue
+
+            summary["failed"] += 1
+            summary["records"].append(
+                {
+                    "url": source["url"],
+                    "status": "failed",
+                    "error": str(error),
+                    "asr_attempts": attempt_errors,
+                }
+            )
+            continue
 
         summary["processed"] += 1
         summary["records"].append(
@@ -451,12 +570,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Use local FunASR only when an existing subtitle track cannot be fetched.",
     )
+    parser.add_argument(
+        "--doubao-asr",
+        action="store_true",
+        help="Use shared Doubao ASR before local FunASR when subtitles are unavailable.",
+    )
     parser.add_argument("--asr-python", type=Path)
     parser.add_argument("--asr-script", type=Path, default=DEFAULT_ASR_SCRIPT_PATH)
     parser.add_argument("--asr-output-dir", type=Path)
     parser.add_argument("--asr-audio-cache-dir", type=Path)
     parser.add_argument("--asr-hotwords", type=Path)
     parser.add_argument("--asr-discard-audio", action="store_true")
+    parser.add_argument("--doubao-asr-python", type=Path)
+    parser.add_argument("--doubao-asr-script", type=Path, default=DEFAULT_DOUBAO_ASR_SCRIPT_PATH)
+    parser.add_argument("--doubao-provider-python", type=Path)
+    parser.add_argument("--doubao-provider-script", type=Path)
+    parser.add_argument("--doubao-config", type=Path)
+    parser.add_argument("--doubao-artifacts-dir", type=Path)
     return parser.parse_args(argv)
 
 
@@ -494,6 +624,38 @@ def main(argv: list[str] | None = None) -> int:
         "discard_audio",
         default=False,
     )
+    doubao_asr = args.doubao_asr or lumenflow_config.config_bool(
+        local_config,
+        "asr",
+        "doubao",
+        "enabled",
+        default=False,
+    )
+    doubao_asr_python = (
+        args.doubao_asr_python
+        or lumenflow_config.config_path(local_config, "asr", "doubao", "wrapper_python")
+        or DEFAULT_DOUBAO_ASR_PYTHON_PATH
+    )
+    doubao_provider_python = (
+        args.doubao_provider_python
+        or lumenflow_config.config_path(local_config, "asr", "doubao", "python")
+        or DEFAULT_DOUBAO_ASR_PYTHON_PATH
+    )
+    doubao_provider_script = (
+        args.doubao_provider_script
+        or lumenflow_config.config_path(local_config, "asr", "doubao", "script")
+        or DEFAULT_DOUBAO_PROVIDER_SCRIPT_PATH
+    )
+    doubao_config_path = (
+        args.doubao_config
+        or lumenflow_config.config_path(local_config, "asr", "doubao", "config")
+        or DEFAULT_DOUBAO_CONFIG_PATH
+    )
+    doubao_artifacts_dir = (
+        args.doubao_artifacts_dir
+        or lumenflow_config.config_path(local_config, "asr", "doubao", "artifacts_dir")
+        or DEFAULT_DOUBAO_ARTIFACTS_DIR
+    )
 
     try:
         summary = run_update(
@@ -503,12 +665,19 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             force=args.force,
             asr_fallback=args.asr_fallback,
+            doubao_asr=doubao_asr,
             asr_python=asr_python,
             asr_script=args.asr_script,
             asr_output_dir=asr_output_dir,
             asr_audio_cache_dir=asr_audio_cache_dir,
             asr_hotwords_path=asr_hotwords_path,
             asr_discard_audio=asr_discard_audio,
+            doubao_asr_python=doubao_asr_python,
+            doubao_asr_script=args.doubao_asr_script,
+            doubao_provider_python=doubao_provider_python,
+            doubao_provider_script=doubao_provider_script,
+            doubao_config_path=doubao_config_path,
+            doubao_artifacts_dir=doubao_artifacts_dir,
             local_config=local_config,
             local_config_path=args.local_config,
         )

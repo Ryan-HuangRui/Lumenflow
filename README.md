@@ -85,7 +85,7 @@ CLI 只作为调试和脚本复用入口，不是主交互界面。
 cp config/lumenflow.local.example.json config/lumenflow.local.json
 ```
 
-`config/lumenflow.local.json` 已加入 `.gitignore`。当前用于放置照片处理输出根目录、Bilibili cookie 文件路径、FunASR Python 路径、ASR 输出/缓存路径、模型名、本机工具命令名和 Lightroom 导出参数。教程来源白名单使用本地 `knowledge/source_records/tutorial_sources.json`，该文件也被忽略；公开仓库只提交 `knowledge/source_records/tutorial_sources.example.json`。
+`config/lumenflow.local.json` 已加入 `.gitignore`。当前用于放置照片处理输出根目录、Bilibili cookie 文件路径、豆包 ASR skill/私有配置路径、FunASR Python 路径、ASR 输出/缓存路径、模型名、本机工具命令名和 Lightroom 导出参数。ASR 顺序为平台字幕、豆包、FunASR。教程来源白名单使用本地 `knowledge/source_records/tutorial_sources.json`，该文件也被忽略；公开仓库只提交 `knowledge/source_records/tutorial_sources.example.json`。
 
 照片处理默认输出到 `photos.output_root/<原照片所属目录名>/`。例如源文件位于 `negative_raw/2026五一港珠澳/P1034473.RW2` 时，最终图会进入 `photos.output_root/2026五一港珠澳/`。
 

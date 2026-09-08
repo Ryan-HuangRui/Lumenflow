@@ -322,6 +322,156 @@ class TutorialIngestTests(unittest.TestCase):
             mocked_asr.assert_called_once()
             self.assertEqual(mocked_ingest.call_count, 2)
 
+    def test_update_sources_prefers_doubao_before_funasr(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "tutorial_sources.json"
+            output_dir = root / "recipes"
+            transcript = root / "doubao.md"
+            transcript.write_text(SAMPLE_TRANSCRIPT, encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "platform": "bilibili",
+                                "url": "https://www.bilibili.com/video/BV1YtZcBKESW/",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            def ingest(**kwargs: object) -> dict[str, object]:
+                if kwargs.get("transcript_file"):
+                    return {"recipe_id": "bilibili_BV1YtZcBKESW"}
+                raise RuntimeError("no_subtitle_or_cookie_required")
+
+            with mock.patch.object(
+                update_tutorial_sources.ingest_tutorial,
+                "ingest_url",
+                side_effect=ingest,
+            ), mock.patch.object(
+                update_tutorial_sources,
+                "run_doubao_asr_backfill",
+                return_value={
+                    "status": "ok",
+                    "transcript_path": str(transcript),
+                    "segment_count": 3,
+                    "source_metadata": {"transcription_method": "doubao:test"},
+                },
+            ) as mocked_doubao, mock.patch.object(
+                update_tutorial_sources,
+                "run_asr_backfill",
+            ) as mocked_funasr:
+                summary = update_tutorial_sources.run_update(
+                    config_path=config_path,
+                    output_dir=output_dir,
+                    transcript_dir=output_dir / "transcripts",
+                    doubao_asr=True,
+                    asr_fallback=True,
+                )
+
+            self.assertEqual(summary["processed"], 1)
+            self.assertEqual(summary["records"][0]["asr_provider"], "doubao")
+            mocked_doubao.assert_called_once()
+            mocked_funasr.assert_not_called()
+
+    def test_update_sources_falls_back_to_funasr_when_doubao_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "tutorial_sources.json"
+            output_dir = root / "recipes"
+            transcript = root / "funasr.md"
+            transcript.write_text(SAMPLE_TRANSCRIPT, encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "platform": "bilibili",
+                                "url": "https://www.bilibili.com/video/BV1YtZcBKESW/",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            def ingest(**kwargs: object) -> dict[str, object]:
+                if kwargs.get("transcript_file"):
+                    return {"recipe_id": "bilibili_BV1YtZcBKESW"}
+                raise RuntimeError("no_subtitle_or_cookie_required")
+
+            with mock.patch.object(
+                update_tutorial_sources.ingest_tutorial,
+                "ingest_url",
+                side_effect=ingest,
+            ), mock.patch.object(
+                update_tutorial_sources,
+                "run_doubao_asr_backfill",
+                side_effect=RuntimeError("Doubao unavailable"),
+            ), mock.patch.object(
+                update_tutorial_sources,
+                "run_asr_backfill",
+                return_value={
+                    "status": "ok",
+                    "transcript_path": str(transcript),
+                    "segment_count": 3,
+                    "source_metadata": {"transcription_method": "funasr:test"},
+                },
+            ) as mocked_funasr:
+                summary = update_tutorial_sources.run_update(
+                    config_path=config_path,
+                    output_dir=output_dir,
+                    transcript_dir=output_dir / "transcripts",
+                    doubao_asr=True,
+                    asr_fallback=True,
+                )
+
+            self.assertEqual(summary["processed"], 1)
+            self.assertEqual(summary["records"][0]["asr_provider"], "funasr")
+            self.assertEqual(summary["records"][0]["prior_asr_errors"][0]["provider"], "doubao")
+            mocked_funasr.assert_called_once()
+
+    def test_run_doubao_asr_backfill_parses_wrapper_result(self) -> None:
+        payload = {
+            "status": "ok",
+            "transcript_path": "/tmp/doubao.md",
+            "segment_count": 4,
+        }
+        completed = mock.Mock(stdout=json.dumps(payload) + "\n", stderr="")
+        source = {
+            "url": "https://www.bilibili.com/video/BV1YtZcBKESW/",
+            "cookie_file": "/private/bilibili-cookie.txt",
+        }
+
+        with mock.patch.object(
+            update_tutorial_sources.subprocess,
+            "run",
+            return_value=completed,
+        ) as mocked_run:
+            result = update_tutorial_sources.run_doubao_asr_backfill(
+                source,
+                doubao_asr_python=Path("python3"),
+                doubao_asr_script=Path("scripts/transcribe_bilibili_doubao.py"),
+                doubao_provider_python=Path("python3"),
+                doubao_provider_script=Path("/opt/doubao.py"),
+                doubao_config_path=Path("/private/doubao.env"),
+                doubao_artifacts_dir=Path("/tmp/artifacts"),
+                asr_output_dir=Path("/tmp/transcripts"),
+                asr_audio_cache_dir=Path("/tmp/audio"),
+                asr_discard_audio=True,
+                local_config_path=Path("/private/local.json"),
+            )
+
+        command = mocked_run.call_args.args[0]
+        self.assertEqual(result, payload)
+        self.assertIn("--discard-audio", command)
+        self.assertIn("/private/doubao.env", command)
+        self.assertNotIn("VOLC_SPEECH_API_KEY", " ".join(command))
+
     def test_update_sources_dry_run_does_not_execute_asr_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

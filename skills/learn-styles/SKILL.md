@@ -83,7 +83,8 @@ Inputs:
 - Local, gitignored `knowledge/source_records/tutorial_sources.json`, copied from `knowledge/source_records/tutorial_sources.example.json`.
 - Optional gitignored `config/lumenflow.local.json` for local Cookie path, ASR Python path, cache paths, and model names. Copy from `config/lumenflow.local.example.json`.
 - Optional `LUMENFLOW_BILIBILI_COOKIE` or `--cookie-file` for one-off Bilibili subtitle tracks hidden from anonymous requests.
-- Optional `.venv-asr` with `requirements-asr.txt` installed for local FunASR subtitle backfill.
+- Shared Doubao recording-file ASR configured in `~/.config/codex/doubao-asr.env` for the preferred ASR fallback.
+- Optional `.venv-asr` with `requirements-asr.txt` installed for local FunASR as the offline fallback after Doubao.
 - Optional local, gitignored ASR hotword list at `knowledge/source_records/asr_hotwords.txt`, copied from `knowledge/source_records/asr_hotwords.example.txt`.
 - Optional run mode: `--dry-run` before writing recipe records.
 
@@ -101,6 +102,7 @@ Full weekly refresh command:
 ```bash
 python scripts/update_tutorial_sources.py \
   --config knowledge/source_records/tutorial_sources.json \
+  --doubao-asr \
   --asr-fallback \
   --asr-discard-audio
 
@@ -109,7 +111,7 @@ python scripts/build_style_family_layer.py
 python3 -m unittest discover -s tests
 ```
 
-Run subtitle backfill with local FunASR only when explicitly requested:
+Run subtitle backfill with shared Doubao first and local FunASR as a secondary fallback:
 
 ```bash
 ${LUMENFLOW_ASR_PYTHON:-python} scripts/transcribe_bilibili_funasr.py \
@@ -117,6 +119,7 @@ ${LUMENFLOW_ASR_PYTHON:-python} scripts/transcribe_bilibili_funasr.py \
 
 python scripts/update_tutorial_sources.py \
   --config knowledge/source_records/tutorial_sources.json \
+  --doubao-asr \
   --asr-fallback
 ```
 
@@ -133,22 +136,24 @@ Behavior:
 2. Skip disabled sources and skip existing recipes unless `--force` is passed.
 3. For Bilibili collection sources (`platform=bilibili_season`), expand the collection into child video URLs.
 4. For Bilibili video sources, call `scripts/fetch_bilibili_subtitles.py` through `scripts/ingest_tutorial.py`.
-5. If `--asr-fallback` is explicitly passed and no existing subtitle track is available, call `scripts/transcribe_bilibili_funasr.py` with the ASR Python path from local config, then ingest the generated local transcript.
-6. Write transcript files under `knowledge/style_cards/tutorial_recipes/transcripts/`.
-7. Write recipe records as `knowledge/style_cards/tutorial_recipes/<platform>_<stable_id>.json`.
-8. Leave each new recipe with `status=pending_agent_review` and `style_mapping.merge_status=pending_agent_review`.
-9. Run `scripts/generate_tutorial_style_cards.py` to create or refresh one video-level guidance card per tutorial recipe under `knowledge/style_cards/tutorial_derived/`.
-10. Run `scripts/build_style_family_layer.py` to assign each video-level card into the Layer 1 library under `knowledge/style_families/` and refresh `knowledge/style_library_index.json`.
-11. Treat generated cards as `card_role=style_guidance`: they help the develop-photos agent reason about style, scene fit, tone, color, and operation order.
-12. Use Layer 1 for retrieval and scene matching, then inspect Layer 2 tutorial variants for specific color-grading ideas.
-13. Use the host agent's reasoning ability to review extracted steps and merge durable traits into approved `knowledge/style_cards/*.json` guidance cards only after review.
+5. If Doubao is enabled in local config or `--doubao-asr` is passed and no existing subtitle track is available, call `scripts/transcribe_bilibili_doubao.py`, which downloads audio in this repository and sends only the prepared audio to the shared Doubao recording-file ASR skill.
+6. If Doubao fails and `--asr-fallback` is passed, call `scripts/transcribe_bilibili_funasr.py` with the ASR Python path from local config.
+7. Write transcript files under `knowledge/style_cards/tutorial_recipes/transcripts/`.
+8. Write recipe records as `knowledge/style_cards/tutorial_recipes/<platform>_<stable_id>.json`.
+9. Leave each new recipe with `status=pending_agent_review` and `style_mapping.merge_status=pending_agent_review`.
+10. Run `scripts/generate_tutorial_style_cards.py` to create or refresh one video-level guidance card per tutorial recipe under `knowledge/style_cards/tutorial_derived/`.
+11. Run `scripts/build_style_family_layer.py` to assign each video-level card into the Layer 1 library under `knowledge/style_families/` and refresh `knowledge/style_library_index.json`.
+12. Treat generated cards as `card_role=style_guidance`: they help the develop-photos agent reason about style, scene fit, tone, color, and operation order.
+13. Use Layer 1 for retrieval and scene matching, then inspect Layer 2 tutorial variants for specific color-grading ideas.
+14. Use the host agent's reasoning ability to review extracted steps and merge durable traits into approved `knowledge/style_cards/*.json` guidance cards only after review.
 
 Rules:
 
 - Keep source lists explicit and user-approved; do not search or bulk scrape tutorial platforms by default.
 - Do not store Bilibili Cookie values in the repository.
 - Do not store subtitle URLs as durable provenance because they can include temporary `auth_key` values.
-- Do not silently run ASR. If no subtitle track is available, report `no_subtitle_or_cookie_required` unless the user explicitly requested `--asr-fallback`.
+- Do not silently run ASR. Enable Doubao explicitly in gitignored local config or with `--doubao-asr`; enable local FunASR with `--asr-fallback`.
+- Keep Doubao credentials only in `~/.config/codex/doubao-asr.env`; never place API keys in this repository or subprocess arguments.
 - Keep ASR model caches, downloaded audio, and generated wav files out of git. ASR transcripts may be kept when they are needed as recipe provenance.
 - Keep generated tutorial transcripts, recipes, tutorial-derived cards, family indexes, and concrete tutorial source whitelists out of public/plugin distributions.
 - Use `knowledge/source_records/asr_hotwords.txt` for project-specific Chinese color-grading and Lightroom terminology.

@@ -47,7 +47,8 @@ Step contract:
    - Reads machine-local paths from `config/lumenflow.local.json` when present.
    - Skips existing recipe records unless `--force` is passed.
    - Fetches official subtitle tracks first.
-   - Uses local FunASR only when `--asr-fallback` is explicitly passed and no usable subtitle track is available.
+   - Uses the shared Doubao recording-file ASR when enabled and no usable subtitle track is available.
+   - Falls back to local FunASR only when `--asr-fallback` is explicitly passed and Doubao does not complete.
    - Writes recipe records to `knowledge/style_cards/tutorial_recipes/`.
    - Writes transcript provenance under `knowledge/style_cards/tutorial_recipes/transcripts/` or `knowledge/style_cards/tutorial_recipes/asr_transcripts/`.
 2. `scripts/generate_tutorial_style_cards.py`
