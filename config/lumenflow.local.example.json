@@ -1,4 +1,7 @@
 {
+  "workflow": {
+    "task_store": "local/lumenflow_tasks.sqlite3"
+  },
   "photos": {
     "output_root": "/absolute/path/to/Lumenflow output"
   },
@@ -31,6 +34,8 @@
     "yt_dlp": "yt-dlp"
   },
   "lightroom": {
+    "required_cli_version": null,
+    "required_plugin_version": null,
     "export_format": "JPEG",
     "quality": 95,
     "color_space": "sRGB",

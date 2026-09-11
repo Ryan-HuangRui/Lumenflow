@@ -118,14 +118,16 @@ skill 按需调用 scripts/
 
 ## Lightroom 引擎
 
-Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器，运行前需要：
+Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。
+
+运行前需要：
 
 1. Lightroom Classic 已启动。
 2. `Lightroom CLI Bridge` 插件已安装并启动。
 3. `lr system ping` 能返回 `pong: True`。
 4. 要处理的 RAW 已在 Lightroom catalog 中。
 
-`adjustment_plan.json` 可以在顶层或单个 variant 下声明 Lightroom photo id：
+`adjustment_plan.json` 可以在顶层或单个 variant 下声明 Lightroom photo id。真正执行时还必须提供由外层任务状态生成的 `base_state_hash` 和 `operation_id`；下面为了简化只展示修图内容：
 
 ```json
 {
@@ -187,8 +189,10 @@ Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 
 python3 scripts/render_adjustment_plan.py output/plans/IMG_0001.adjustment_plan.json --engine lightroom
 ```
 
-如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎会把可执行全局参数映射到 `lr develop apply`，再调用 `lr export photo` 导出 JPEG；未能安全映射的调色意图只保留在处理记录中，供复核。
+如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎把参数编译为绝对目标值，并通过 `lr develop apply-verified` 的预留安全契约执行，再调用 `lr export photo`。当前 Bridge 会对 `apply-verified` 明确返回 `CAPABILITY_NOT_VERIFIED`，且能力握手保持关闭，因此只能 dry-run；必须通过隔离 catalog 真机探针后才能放开。
+
+任务、用途提案、用户冻结确认、catalog 照片实例、起始状态快照和幂等操作记录由 `scripts/task_store.py` 保存到本地 SQLite，默认路径为被 git 忽略的 `local/lumenflow_tasks.sqlite3`。这些工作流状态不进入单图 `adjustment_plan`。
 
 Lightroom 路径的全局参数支持基础曝光/色温/质感参数，也支持 Lightroom-only 的 `hsl`、`color_mixer`、`tone_curve`、`color_grading`、`calibration`。这些高级参数会写入 Lightroom catalog，便于后续在 Lightroom 里继续调整；RawTherapee 路径目前不执行这些高级 Lightroom 字段。
 
-当前 Lightroom AI mask 批处理路径默认禁用。现有 `lightroom-cli`/Bridge 的 `develop ai batch <type> --photos <photo_id>` 可能在 Develop/Masking 上下文切换未完成时把 AI 蒙版写到错误照片，且灰天、雾山、白墙建筑等低对比场景的 sky 识别需要人工 overlay 复核。自动流程应把这些局部调整记录为 `mask_decision=manual_recommendation`，或者在逐张人工确认 overlay 后，才通过本地配置显式设置 `"allow_unverified_ai_masks": true` 执行实验性批处理。局部画笔、渐变、径向和 people/landscape 的具体 part 选择仍不自动执行。
+当前 Lightroom AI mask 批处理路径默认禁用。现有 `lightroom-cli`/Bridge 的 `develop ai batch <type> --photos <photo_id>` 可能在 Develop/Masking 上下文切换未完成时把 AI 蒙版写到错误照片。能力握手未通过期间，即使本地开启实验性蒙版开关，非 dry-run 仍会被全局安全闸门拒绝。

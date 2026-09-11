@@ -9,11 +9,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import create_previews
-import render_adjustment_plan
+import create_previews  # noqa: E402
+import render_adjustment_plan  # noqa: E402
 
 
 class AgentAdjustmentPipelineTests(unittest.TestCase):
+    def test_adjustment_schema_separates_lightroom_execution_identity(self) -> None:
+        schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "adjustment_plan.schema.json").read_text(encoding="utf-8")
+        )
+
+        lightroom_properties = schema["properties"]["lightroom"]["properties"]
+        self.assertIn("base_state_hash", lightroom_properties)
+        self.assertIn("operation_id", lightroom_properties)
+        adjustments = schema["properties"]["variants"]["items"]["properties"]["adjustments"]
+        self.assertIn("absolute target", adjustments["description"])
+        self.assertIn("Delta semantics are not supported", adjustments["description"])
+
     def test_create_previews_dry_run_writes_manifest_for_selected_raws(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)

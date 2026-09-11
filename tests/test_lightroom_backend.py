@@ -5,15 +5,98 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import render_adjustment_plan
-import render_lightroom
+import driver_adapter  # noqa: E402
+import render_adjustment_plan  # noqa: E402
+import render_lightroom  # noqa: E402
 
 
 class LightroomBackendTests(unittest.TestCase):
+    def test_non_dry_run_refuses_unverified_bridge_before_any_edit(self) -> None:
+        plan = {
+            "source": "/tmp/IMG_0001.DNG",
+            "lightroom": {"photo_id": "123"},
+            "variants": [
+                {
+                    "variant_id": "best",
+                    "adjustments": {"exposure_compensation": 0.25},
+                    "composition": {"decision": "no_crop", "reason": "Keep framing."},
+                    "mask_decision": {"decision": "none", "reason": "No masks."},
+                }
+            ],
+        }
+        unsafe_status = {
+            "connected": True,
+            "bridge_contract": {
+                "protocol_version": "2",
+                "version_match": True,
+                "capabilities": {
+                    "safe_object_develop_write": False,
+                    "verified_export_result": False,
+                },
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("render_lightroom.driver_adapter.read_bridge_status", return_value=unsafe_status):
+                with patch("render_lightroom.run_subprocess") as run_command:
+                    with self.assertRaises(driver_adapter.BridgeSafetyError):
+                        render_lightroom.render_plan(
+                            plan=plan,
+                            output_dir=Path(directory),
+                            dry_run=False,
+                            render_timeout=10,
+                            local_config={"tools": {"lightroom_cli": "/custom/lr"}},
+                        )
+
+        run_command.assert_not_called()
+
+    def test_non_dry_run_requires_frozen_state_and_operation_identity(self) -> None:
+        plan = {
+            "source": "/tmp/IMG_0001.DNG",
+            "lightroom": {"photo_id": "123"},
+            "variants": [
+                {
+                    "variant_id": "best",
+                    "adjustments": {"exposure_compensation": 0.25},
+                    "composition": {"decision": "no_crop", "reason": "Keep framing."},
+                    "mask_decision": {"decision": "none", "reason": "No masks."},
+                }
+            ],
+        }
+        safe_status = {
+            "connected": True,
+            "bridge_contract": {
+                "protocol_version": "2",
+                "version_match": True,
+                "capabilities": {
+                    "safe_object_develop_write": True,
+                    "verified_export_result": True,
+                },
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("render_lightroom.driver_adapter.read_bridge_status", return_value=safe_status):
+                with patch("render_lightroom.run_subprocess") as run_command:
+                    summary = render_lightroom.render_plan(
+                        plan=plan,
+                        output_dir=Path(directory),
+                        dry_run=False,
+                        render_timeout=10,
+                        local_config={"tools": {"lightroom_cli": "/custom/lr"}},
+                    )
+
+            records = json.loads((Path(directory) / "processing_records.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(summary["failed"], 1)
+        self.assertIn("base_state_hash", records[0]["failure_reason"])
+        run_command.assert_not_called()
+
     def test_maps_lumenflow_adjustments_to_lightroom_settings(self) -> None:
         settings = render_lightroom.lightroom_settings_from_adjustments(
             {
@@ -170,7 +253,9 @@ class LightroomBackendTests(unittest.TestCase):
             self.assertEqual(records[0]["lightroom_settings"]["ToneCurvePV2012"], [0, 0, 128, 132, 255, 255])
             self.assertEqual(records[0]["lightroom_settings"]["SplitToningShadowHue"], 210)
             self.assertEqual(records[0]["lightroom_settings"]["BlueSaturation"], 12)
-            self.assertIn("/custom/lr develop apply --photo-id 123", records[0]["command"])
+            self.assertIn("/custom/lr develop apply-verified --photo-id 123", records[0]["command"])
+            self.assertIn("--expected-state-hash REQUIRED_BASE_STATE_HASH", records[0]["command"])
+            self.assertIn("--operation-id REQUIRED_OPERATION_ID", records[0]["command"])
             self.assertIn("ToneCurvePV2012", records[0]["command"])
             self.assertIn("SaturationAdjustmentGreen", records[0]["command"])
             self.assertIn("/custom/lr export photo 123", records[0]["command"])
@@ -202,6 +287,19 @@ class LightroomBackendTests(unittest.TestCase):
                 "Temperature": 4800,
             },
         )
+
+    def test_verified_apply_command_requires_state_and_operation_identity(self) -> None:
+        command = render_lightroom.develop_apply_command(
+            "123",
+            {"Exposure": 0.25},
+            executable="/custom/lr",
+            expected_state_hash="state-abc",
+            operation_id="op-1",
+        )
+
+        self.assertEqual(command[:3], ["/custom/lr", "develop", "apply-verified"])
+        self.assertEqual(command[command.index("--expected-state-hash") + 1], "state-abc")
+        self.assertEqual(command[command.index("--operation-id") + 1], "op-1")
 
     def test_render_plan_lightroom_rejects_ai_masks_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

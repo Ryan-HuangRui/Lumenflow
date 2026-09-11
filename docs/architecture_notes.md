@@ -36,6 +36,27 @@ The scripts are responsible for deterministic work:
 5. Generating local tutorial recipes and derived cards.
 6. Rebuilding local style-family indexes.
 
+## Lightroom Safety Boundary
+
+Lightroom is the intended review and handoff UI, but command availability is not treated as proof that an operation is safe. Before any non-dry-run edit, `scripts/driver_adapter.py` requires a versioned bridge contract with protocol `2`, matching CLI/plugin versions, and verified `safe_object_develop_write` and `verified_export_result` capabilities.
+
+The current bridge advertises these capabilities as false. This deliberately keeps automatic writes disabled while offline work continues. The reserved `develop.applySettingsVerified` contract requires an exact photo instance ID, a frozen starting-state hash, an absolute settings object, and a stable operation ID; its plugin handler fails with `CAPABILITY_NOT_VERIFIED` until a real Lightroom probe proves the implementation.
+
+The legacy `develop.applySettings` command remains available for compatibility in the driver repository, but Lumenflow no longer uses it for automatic editing.
+
+## Workflow State
+
+`adjustment_plan` describes only one photo's absolute edit targets and rationale. Cross-photo and mutable workflow state lives in the local SQLite store implemented by `scripts/task_store.py`:
+
+- task purpose and input scope
+- selection proposal revision
+- immutable user approval snapshot
+- catalog/photo-instance binding
+- develop-state snapshot and completeness
+- idempotent operation intent, result, and unknown outcome
+
+The default database is `local/lumenflow_tasks.sqlite3`, which is ignored by git. Reusing an idempotency key for a different request is rejected. A lost response is recorded as `unknown` and returned on retry rather than being silently reissued.
+
 ## Photo Pipeline
 
 The intended photo-processing flow is:

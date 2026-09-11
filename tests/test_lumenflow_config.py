@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import lumenflow_config
+import lumenflow_config  # noqa: E402
 
 
 class LumenflowConfigTests(unittest.TestCase):
@@ -38,6 +38,20 @@ class LumenflowConfigTests(unittest.TestCase):
         self.assertEqual(
             lumenflow_config.tool_command({}, "rawtherapee_cli", "rawtherapee-cli"),
             "rawtherapee-cli",
+        )
+
+    def test_task_store_path_resolves_relative_to_repo_root(self) -> None:
+        config = {"workflow": {"task_store": "local/tasks.sqlite3"}}
+
+        self.assertEqual(
+            lumenflow_config.task_store_path(config, repo_root=Path("/repo")),
+            Path("/repo/local/tasks.sqlite3"),
+        )
+
+    def test_task_store_path_uses_ignored_local_default(self) -> None:
+        self.assertEqual(
+            lumenflow_config.task_store_path({}, repo_root=Path("/repo")),
+            Path("/repo/local/lumenflow_tasks.sqlite3"),
         )
 
     def test_photo_output_dir_uses_source_parent_directory_name(self) -> None:

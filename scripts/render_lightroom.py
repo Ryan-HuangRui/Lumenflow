@@ -11,6 +11,7 @@ from typing import Any
 
 import lumenflow_config
 import write_processing_report
+import driver_adapter
 
 DIRECT_ADJUSTMENT_MAP = {
     "exposure_compensation": "Exposure",
@@ -349,13 +350,19 @@ def develop_apply_command(
     settings: dict[str, Any],
     *,
     executable: str,
+    expected_state_hash: str,
+    operation_id: str,
 ) -> list[str]:
     return [
         executable,
         "develop",
-        "apply",
+        "apply-verified",
         "--photo-id",
         photo_id,
+        "--expected-state-hash",
+        expected_state_hash,
+        "--operation-id",
+        operation_id,
         "--settings",
         json.dumps(settings, ensure_ascii=False, separators=(",", ":")),
     ]
@@ -546,6 +553,15 @@ def render_plan(
     allow_ai_masks = allow_unverified_ai_masks(local_config)
     records = []
 
+    if not dry_run:
+        lightroom_config = local_config.get("lightroom") if isinstance(local_config.get("lightroom"), dict) else {}
+        status = driver_adapter.read_bridge_status(executable, timeout=min(render_timeout, 10))
+        driver_adapter.require_safe_bridge(
+            status,
+            required_cli_version=lightroom_config.get("required_cli_version"),
+            required_plugin_version=lightroom_config.get("required_plugin_version"),
+        )
+
     for variant in plan["variants"]:
         variant_id = str(variant["variant_id"])
         style_id = str(variant.get("style_id", "agent_selected"))
@@ -580,6 +596,16 @@ def render_plan(
                 dry_run=dry_run,
                 render_timeout=render_timeout,
             )
+            plan_lightroom = plan.get("lightroom") if isinstance(plan.get("lightroom"), dict) else {}
+            variant_lightroom = (
+                variant.get("lightroom") if isinstance(variant.get("lightroom"), dict) else {}
+            )
+            expected_state_hash = variant_lightroom.get("base_state_hash") or plan_lightroom.get("base_state_hash")
+            operation_id = variant_lightroom.get("operation_id") or plan_lightroom.get("operation_id")
+            if not dry_run and not expected_state_hash:
+                raise ValueError("Non-dry-run Lightroom edits require lightroom.base_state_hash")
+            if not dry_run and not operation_id:
+                raise ValueError("Non-dry-run Lightroom edits require lightroom.operation_id")
             mask_commands = [
                 ai_mask_command(photo_id, mask, executable=executable)
                 for mask in (variant.get("masks") or [])
@@ -593,7 +619,13 @@ def render_plan(
                 )
             commands = [
                 *resolve_commands,
-                develop_apply_command(photo_id, settings, executable=executable),
+                develop_apply_command(
+                    photo_id,
+                    settings,
+                    executable=executable,
+                    expected_state_hash=str(expected_state_hash or "REQUIRED_BASE_STATE_HASH"),
+                    operation_id=str(operation_id or "REQUIRED_OPERATION_ID"),
+                ),
                 *mask_commands,
                 export_command(
                     photo_id,

@@ -42,6 +42,14 @@
         "photo_id": {
           "type": "string",
           "description": "Lightroom local photo id used by lightroom-cli develop/export commands."
+        },
+        "base_state_hash": {
+          "type": "string",
+          "description": "Fingerprint of the frozen Lightroom starting state. Required for non-dry-run execution."
+        },
+        "operation_id": {
+          "type": "string",
+          "description": "Stable idempotency identifier allocated by the outer task workflow. Required for non-dry-run execution."
         }
       },
       "additionalProperties": true
@@ -80,7 +88,7 @@
           },
           "adjustments": {
             "type": "object",
-            "description": "Concrete per-photo values inferred by the agent. RawTherapee converts these to a temporary PP3 profile; Lightroom maps supported keys to develop settings.",
+            "description": "Concrete per-photo absolute target values inferred by the agent. Delta semantics are not supported. RawTherapee converts these to a temporary PP3 profile; Lightroom maps supported keys to develop settings.",
             "properties": {
               "exposure_compensation": {
                 "type": "number"
@@ -307,6 +315,14 @@
               "photo_id": {
                 "type": "string",
                 "description": "Lightroom local photo id used for this variant."
+              },
+              "base_state_hash": {
+                "type": "string",
+                "description": "Variant-specific frozen Lightroom starting-state fingerprint."
+              },
+              "operation_id": {
+                "type": "string",
+                "description": "Variant-specific stable idempotency identifier."
               }
             },
             "additionalProperties": true

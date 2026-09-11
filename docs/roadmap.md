@@ -41,7 +41,45 @@ The repository should not expose:
 - generated style-family indexes
 - downloaded audio, ASR cache, or local render outputs
 
-## Phase 1: Local Photo Loop
+## Phase 0: Trusted Lightroom Boundary
+
+Goal: prove that Lumenflow can identify and operate the intended Lightroom edit version before enabling automatic writes.
+
+Implemented offline foundation:
+
+- versioned CLI/plugin capability handshake
+- fail-closed Lumenflow write preflight
+- reserved verified-write command contract with photo identity, state precondition, absolute settings, and operation identity
+- local task, approval, photo-instance, state-snapshot, and idempotency records
+- legacy Lightroom writes no longer used by Lumenflow
+
+Real-Lightroom gate:
+
+- isolated test catalog with sentinel photos
+- UI showing A while a command targets B
+- switching selection and concurrent manual-change fault injection
+- response-loss and rerun recovery
+- independent state/readback/export verification
+- zero wrong-photo edits, lost manual edits, or duplicate virtual copies
+
+Until that gate passes, Lightroom non-dry-run editing remains disabled.
+
+## Phase 1: Single-purpose Lightroom Slice
+
+Goal: one existing Lightroom collection becomes one purpose-specific proposal; the user explicitly freezes the confirmed members; only those photos receive isolated initial edits and are handed back to Lightroom.
+
+Scope after the real-Lightroom gate:
+
+- flat managed collections only
+- one purpose and one proposal revision
+- explicit confirmation separate from collection membership
+- work virtual copies with returned identities
+- Lightroom-origin previews tied to the starting state
+- handoff protection: no automatic in-place edits after the user can take over
+
+Deferred: collection hierarchy, Lightroom navigation, native order synchronization, multiple simultaneous purposes, automatic masks, publishing, and driver migration.
+
+## Existing Local Photo Loop
 
 Goal: process a user-selected RAW folder through an agent-authored adjustment plan.
 
@@ -55,7 +93,7 @@ Implemented foundation:
 - Processing records and Markdown reporting.
 - Local configuration through `config/lumenflow.local.json`.
 
-Next work:
+Maintenance work:
 
 - Expand RawTherapee `.pp3` parameter coverage.
 - Improve render-review notes and revision-loop output.

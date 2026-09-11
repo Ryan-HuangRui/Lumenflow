@@ -9,6 +9,7 @@ from typing import Any
 
 
 DEFAULT_LOCAL_CONFIG_PATH = Path("config/lumenflow.local.json")
+DEFAULT_TASK_STORE_PATH = Path("local/lumenflow_tasks.sqlite3")
 
 
 def read_local_config(path: Path | None = DEFAULT_LOCAL_CONFIG_PATH) -> dict[str, Any]:
@@ -63,6 +64,12 @@ def photo_collection_name(source_path: Path) -> str:
 
 def photo_output_root(config: dict[str, Any]) -> Path | None:
     return config_path(config, "photos", "output_root")
+
+
+def task_store_path(config: dict[str, Any], *, repo_root: Path) -> Path:
+    configured = config_path(config, "workflow", "task_store")
+    path = configured or DEFAULT_TASK_STORE_PATH
+    return path if path.is_absolute() else repo_root / path
 
 
 def photo_output_dir(
