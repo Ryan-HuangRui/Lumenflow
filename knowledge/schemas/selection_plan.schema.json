@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/selection_plan.schema.json",
+  "title": "Lumenflow Selection Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "purpose",
+    "selection",
+    "alternates",
+    "edit_experiments",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.selection_plan.v1"},
+    "purpose": {"type": "string", "minLength": 1},
+    "selection": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order", "asset_id", "role", "reason"],
+        "properties": {
+          "order": {"type": "integer", "minimum": 1},
+          "asset_id": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "alternates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["for_asset_id", "asset_ids", "tradeoff"],
+        "properties": {
+          "for_asset_id": {"type": "string", "minLength": 1},
+          "asset_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "tradeoff": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "edit_experiments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "tests"],
+        "properties": {
+          "asset_id": {"type": "string", "minLength": 1},
+          "tests": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "raw_files_modified"],
+      "properties": {
+        "decision": {
+          "enum": [
+            "agent_recommended_pending_user_confirmation",
+            "user_confirmed"
+          ]
+        },
+        "raw_files_modified": {"const": false}
+      }
+    }
+  }
+}

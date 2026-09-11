@@ -14,6 +14,7 @@ Lumenflow is a portable agent-skill workflow for personal RAW photo development 
 
 The repository should expose:
 
+- `skills/curate-photos/`
 - `skills/develop-photos/`
 - `skills/learn-styles/`
 - `skills/fetch-bilibili-subtitles/`
@@ -86,6 +87,9 @@ Goal: process a user-selected RAW folder through an agent-authored adjustment pl
 Implemented foundation:
 
 - RAW scanning and sidecar metadata reading.
+- Purpose-aware curation workspace with capture-date filtering, embedded previews, and contact sheets.
+- Model-authored selection-plan contract with ordered editorial roles, alternates, edit experiments, and explicit confirmation state.
+- Deterministic plan validation and ordered preview packaging without RAW mutation.
 - Preview generation.
 - RawTherapee and darktable command construction.
 - `adjustment_plan.json` schema.

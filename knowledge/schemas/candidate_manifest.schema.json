@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/candidate_manifest.schema.json",
+  "title": "Lumenflow Candidate Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_dir",
+    "preview_basis",
+    "candidate_count",
+    "candidates",
+    "failures",
+    "raw_files_modified"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.candidate_manifest.v1"},
+    "source_dir": {"type": "string", "minLength": 1},
+    "preview_basis": {"const": "embedded_camera_jpeg"},
+    "date_filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": {"type": ["string", "null"], "format": "date"},
+        "to": {"type": ["string", "null"], "format": "date"}
+      }
+    },
+    "raw_count": {"type": "integer", "minimum": 0},
+    "candidate_count": {"type": "integer", "minimum": 0},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "source", "preview", "capture_time", "camera_model"],
+        "properties": {
+          "asset_id": {"type": "string", "minLength": 1},
+          "source": {"type": "string", "minLength": 1},
+          "preview": {"type": "string", "minLength": 1},
+          "capture_time": {"type": ["string", "null"], "format": "date-time"},
+          "camera_model": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "contact_sheets": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "stage", "error"],
+        "properties": {
+          "asset_id": {"type": "string", "minLength": 1},
+          "stage": {"enum": ["metadata", "date_filter", "preview"]},
+          "error": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "raw_files_modified": {"const": false}
+  }
+}

@@ -6,7 +6,8 @@ Lumenflow is a set of portable agent skills for RAW photo development and privat
 
 The repository is organized around:
 
-- `skills/develop-photos/`: agent instructions for photo selection, preview generation, style matching, adjustment-plan authoring, rendering, and review.
+- `skills/curate-photos/`: agent instructions for purpose-aware visual culling, duplicate comparison, editorial roles, sequencing, and user confirmation.
+- `skills/develop-photos/`: agent instructions for preview generation, style matching, adjustment-plan authoring, rendering, and review of confirmed photos.
 - `skills/learn-styles/`: agent instructions for building a local private style library from user-approved sources.
 - `skills/fetch-bilibili-subtitles/`: a narrow skill for downloading existing Bilibili subtitles.
 - `scripts/`: small reusable tools called by skills.
@@ -22,19 +23,21 @@ The agent host is the orchestrator. It may be Codex, Claude, OpenClaw, or anothe
 The host is responsible for:
 
 1. Reading the skill instructions.
-2. Inspecting preview images and style cards.
-3. Choosing style direction.
-4. Writing per-photo `adjustment_plan.json`.
-5. Reviewing rendered outputs and deciding whether to revise.
+2. Inspecting every in-scope curation preview with native visual reasoning.
+3. Interpreting purpose, choosing photos, and authoring the editorial sequence.
+4. Inspecting confirmed-photo previews and style cards.
+5. Choosing style direction and writing per-photo `adjustment_plan.json`.
+6. Reviewing rendered outputs and deciding whether to revise.
 
 The scripts are responsible for deterministic work:
 
 1. Scanning RAW files and sidecar metadata.
-2. Creating JPEG previews.
-3. Rendering RawTherapee or darktable commands.
-4. Fetching subtitles and normalizing transcripts.
-5. Generating local tutorial recipes and derived cards.
-6. Rebuilding local style-family indexes.
+2. Extracting embedded JPEG previews, generating contact sheets, and validating selection plans.
+3. Creating rendered JPEG previews for development.
+4. Rendering RawTherapee or darktable commands.
+5. Fetching subtitles and normalizing transcripts.
+6. Generating local tutorial recipes and derived cards.
+7. Rebuilding local style-family indexes.
 
 ## Lightroom Safety Boundary
 
@@ -62,13 +65,18 @@ The default database is `local/lumenflow_tasks.sqlite3`, which is ignored by git
 The intended photo-processing flow is:
 
 1. User points the agent at a source photo directory.
-2. `scripts/scan_raws.py` finds RAW files and reads XMP / PP3 selection metadata when present.
-3. `scripts/create_previews.py` renders lightweight previews.
-4. The agent analyzes the previews and reads style guidance.
-5. The agent writes `adjustment_plan.json` using `knowledge/schemas/adjustment_plan.schema.json`.
-6. `scripts/render_adjustment_plan.py` converts the plan into temporary RawTherapee `.pp3` profiles and renders outputs.
-7. The agent reviews outputs and writes a revision plan when needed.
-8. Reports are written for auditability.
+2. `scripts/curate_photos.py prepare` scans RAW files, applies hard scope such as capture dates, extracts camera previews, and builds labeled contact sheets.
+3. The host agent inspects the complete candidate set with native vision, groups near-duplicates, matches the user's purpose, and writes an ordered `selection_plan.json`.
+4. `scripts/curate_photos.py finalize` validates candidate identity, order, roles, reasons, alternates, and the no-RAW-mutation invariant.
+5. The user explicitly confirms membership and order; only the confirmed set crosses into development.
+6. `scripts/create_previews.py` renders development previews when the embedded previews are insufficient.
+7. The agent analyzes confirmed photos and reads style guidance.
+8. The agent writes `adjustment_plan.json` using `knowledge/schemas/adjustment_plan.schema.json`.
+9. `scripts/render_adjustment_plan.py` converts the plan into temporary RawTherapee `.pp3` profiles and renders outputs.
+10. The agent reviews outputs and writes a revision plan when needed.
+11. Reports are written for auditability.
+
+Curation scripts deliberately do not score aesthetics. Purpose interpretation, expression, composition, narrative coverage, and sequence rhythm stay with the model; deterministic code keeps file identity and handoff state auditable.
 
 Style cards are guidance only. Concrete values belong in the per-photo adjustment plan because the same style needs different settings on different images.
 

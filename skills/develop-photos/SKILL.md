@@ -1,6 +1,6 @@
 ---
 name: develop-photos
-description: Develop and style a user-specified directory of RAW photos with agent judgment, the local style knowledge base, and a RAW editing CLI such as RawTherapee, darktable, or Lightroom.
+description: Develop and style user-confirmed or explicitly specified RAW photos with agent judgment, the local style knowledge base, and a RAW editing CLI such as RawTherapee, darktable, or Lightroom.
 ---
 
 # Develop Photos
@@ -17,22 +17,24 @@ Turn a user request like:
 
 into:
 
-1. A scan of candidate RAW files.
-2. A filtered set of selected/marked photos.
-3. JPEG previews that the host agent can inspect visually.
-4. Agent-authored per-photo adjustment plans based on the two-layer style library.
-5. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
-6. Agent review of rendered outputs, with revised plans when needed.
-7. A processing report explaining what happened.
+1. A confirmed selection plan or an explicit user-specified photo set.
+2. JPEG previews that the host agent can inspect visually.
+3. Agent-authored per-photo adjustment plans based on the two-layer style library.
+4. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
+5. Agent review of rendered outputs, with revised plans when needed.
+6. A processing report explaining what happened.
 
 ## Workflow
 
 1. Parse the user's source directory. If the user does not provide an output directory, use `photos.output_root` from `config/lumenflow.local.json` and create `<photos.output_root>/<source directory name>/`.
-2. Scan RAW files with `scripts/scan_raws.py`.
-3. Prefer user-selected/marked files:
+2. Resolve the edit set before scanning:
+   - Prefer a `curate-photos` selection plan with `status.decision=user_confirmed`.
+   - Accept a direct file list or explicit folder-wide instruction from the user.
+   - Do not edit a curation proposal whose status is still `agent_recommended_pending_user_confirmation`.
+3. Scan the confirmed RAW files with `scripts/scan_raws.py`. When the user explicitly chose an existing editor selection, honor:
    - darktable `<raw filename>.xmp` rating/color labels if available.
    - RawTherapee `<raw filename>.pp3` rank if available.
-   - Otherwise ask whether to process all RAWs or only a subset.
+   - If the user wants the agent to choose from an uncurated folder, invoke `curate-photos` first.
 4. Generate previews with `scripts/create_previews.py`.
 5. Inspect the preview images with the host agent's vision/reasoning capability.
 6. Retrieve style guidance from the two-layer style library:

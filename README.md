@@ -5,19 +5,20 @@ Portable photo styling skills for AI agents.
 面向 AI agent 的个人 RAW 照片自动处理与风格学习 skills。
 
 ```text
-两个通用 agent skills + 一个本地风格知识库 + 少量可复用脚本 + 平台适配层
+三个照片工作流 agent skills + 一个本地风格知识库 + 少量可复用脚本 + 平台适配层
 ```
 
 目标工作流：
 
 1. 用户对 agent 说：“帮我处理某个目录里的照片”。
-2. Agent 使用照片处理 skill 扫描 RAW、识别已筛选照片。
-3. Agent 结合风格库、照片预览和自主判断选择调色方向。
-4. Agent 为每张照片生成具体 `adjustment_plan.json` 参数，并判断是否需要裁剪二次构图。
-5. Skill 将调色计划转成修图引擎可执行的参数并导出处理后的图片。
-6. Agent 复核首轮输出，必要时生成修订计划再渲染。
-7. 输出处理记录，方便用户复盘每张图用了什么风格、判断理由、构图决策和参数。
-8. 定时任务使用风格库更新 skill，从社交媒体和视频教程里更新风格库。
+2. `curate-photos` 扫描 RAW、生成联系表，由 agent 使用视觉推理按用途选片并编排顺序。
+3. 用户确认选片方案后，`develop-photos` 只处理确认照片。
+4. Agent 结合风格库、照片预览和自主判断选择调色方向。
+5. Agent 为每张照片生成具体 `adjustment_plan.json` 参数，并判断是否需要裁剪二次构图。
+6. Skill 将调色计划转成修图引擎可执行的参数并导出处理后的图片。
+7. Agent 复核首轮输出，必要时生成修订计划再渲染。
+8. 输出处理记录，方便用户复盘选片、编排、风格、构图和参数决策。
+9. 定时任务使用风格库更新 skill，从社交媒体和视频教程里更新风格库。
 
 ## MVP
 
@@ -25,7 +26,8 @@ Portable photo styling skills for AI agents.
 
 - 暂不接入社交平台。
 - 内置 5 个手写风格卡，形成最小知识库。
-- 支持扫描指定目录的 RAW，并识别已筛选/标记照片。
+- 支持扫描指定目录的 RAW、按拍摄日期限定候选集、生成预览和联系表。
+- 让 agent 使用模型视觉能力按用途去重、选片、分配叙事角色并编排顺序，用户确认后再进入修图。
 - 让 agent 根据风格库、照片预览和照片内容选择处理风格。
 - 让 agent 生成每张照片的动态调色计划，而不是固定套用 profile。
 - 让 agent 在 plan 中记录裁剪判断，并在渲染后复核输出、必要时二次修改。
@@ -38,6 +40,7 @@ Portable photo styling skills for AI agents.
 lumenflow/
 ├── skills/
 │   ├── develop-photos/          # 用户主动要求处理照片时使用
+│   ├── curate-photos/           # 按用途主动选片、去重与编排
 │   └── learn-styles/            # 定时任务或用户主动更新风格库时使用
 ├── knowledge/
 │   ├── style_families/          # Layer 1 风格/方法家族，用于检索
@@ -55,9 +58,10 @@ lumenflow/
 
 ## Skill 设计
 
-计划拆成两个 skill：
+照片工作流拆成三个主要 skill：
 
-- `develop-photos`：扫描指定目录，筛选 RAW，生成预览，由 agent 看图选择风格并生成动态参数，调用修图 CLI，输出图片和处理记录。
+- `curate-photos`：扫描候选 RAW、提取相机内嵌预览、生成联系表，由 agent 直接使用视觉推理理解用途、去除废片/重复片、选择并编排，输出待用户确认的 `selection_plan.json`。
+- `develop-photos`：只处理用户已确认或直接指定的 RAW，由 agent 看图选择风格并生成动态参数，调用修图 CLI，输出图片和处理记录。
 - `learn-styles`：从用户批准的教程来源更新本地私有风格库。
 
 CLI 只作为调试和脚本复用入口，不是主交互界面。
