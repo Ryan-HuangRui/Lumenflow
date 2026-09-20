@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import backend_capabilities
 import lumenflow_config
 import render_lightroom
 import render_raw
@@ -199,6 +200,8 @@ def run(
 ) -> dict[str, Any]:
     local_config = local_config or {}
     plan = read_plan(plan_path)
+    capabilities = backend_capabilities.backend_capabilities_for(engine)
+    capabilities.require("plan.compile.v1")
     if engine == "lightroom":
         summary = render_lightroom.render_plan(
             plan=plan,
@@ -208,6 +211,7 @@ def run(
             local_config=local_config,
         )
         summary["plan"] = str(plan_path)
+        summary["capability_contract_version"] = capabilities.schema_version
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return summary
 
@@ -243,6 +247,7 @@ def run(
             "style_id": style_id,
             "variant_id": variant_id,
             "engine": "rawtherapee",
+            "capability_contract_version": capabilities.schema_version,
             "profile": str(profile_path),
             "command": shlex.join(command),
             "reason": variant.get("rationale", ""),
@@ -270,6 +275,7 @@ def run(
         "source": str(raw_path),
         "output_dir": str(output_dir),
         "engine": "rawtherapee",
+        "capability_contract_version": capabilities.schema_version,
         "rendered": len(records),
         "succeeded": sum(1 for record in records if record["status"] in {"success", "dry_run"}),
         "failed": sum(1 for record in records if record["status"] == "failed"),

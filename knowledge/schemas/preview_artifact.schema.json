@@ -34,11 +34,14 @@
     "provider": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "adapter_version", "executable"],
+      "required": ["id", "adapter_version", "executable", "capability_contract_version"],
       "properties": {
         "id": {"type": "string", "minLength": 1},
         "adapter_version": {"type": "string", "minLength": 1},
-        "executable": {"type": "string", "minLength": 1}
+        "executable": {"type": "string", "minLength": 1},
+        "capability_contract_version": {
+          "const": "lumenflow.backend_capabilities.v1"
+        }
       }
     },
     "source": {"type": "string", "minLength": 1},

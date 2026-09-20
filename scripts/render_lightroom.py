@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import backend_capabilities
 import lumenflow_config
 import write_processing_report
 import driver_adapter
@@ -556,11 +557,12 @@ def render_plan(
     if not dry_run:
         lightroom_config = local_config.get("lightroom") if isinstance(local_config.get("lightroom"), dict) else {}
         status = driver_adapter.read_bridge_status(executable, timeout=min(render_timeout, 10))
-        driver_adapter.require_safe_bridge(
+        capabilities = backend_capabilities.lightroom_capabilities_from_status(
             status,
             required_cli_version=lightroom_config.get("required_cli_version"),
             required_plugin_version=lightroom_config.get("required_plugin_version"),
         )
+        capabilities.require("render")
 
     for variant in plan["variants"]:
         variant_id = str(variant["variant_id"])

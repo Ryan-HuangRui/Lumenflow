@@ -172,6 +172,10 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
             )
 
             self.assertEqual(summary["rendered"], 2)
+            self.assertEqual(
+                summary["capability_contract_version"],
+                "lumenflow.backend_capabilities.v1",
+            )
             best_profile = output_dir / "profiles" / "IMG_0001_best.pp3"
             self.assertTrue(best_profile.exists())
             profile_text = best_profile.read_text(encoding="utf-8")

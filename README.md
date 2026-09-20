@@ -139,6 +139,24 @@ Lightroom 预览当前保持 fail-closed。只有 Bridge 同时声明并验证
 `safe_object_develop_read` 和 `verified_state_bound_preview`，Lumenflow 才会越过预检；
 完整的 Lightroom 状态绑定适配器仍需真机探针后实现。
 
+## 后端能力合同
+
+`scripts/backend_capabilities.py` 输出严格的
+`lumenflow.backend_capabilities.v1` 合同。每项能力只有三种状态：
+`supported`、`unsupported` 或 `unverified`；调用方必须通过 `require()` 显式检查，
+不能把“命令存在”推断成“能力安全可用”。
+
+```bash
+python3 scripts/backend_capabilities.py rawtherapee
+python3 scripts/backend_capabilities.py darktable
+python3 scripts/backend_capabilities.py lightroom
+python3 scripts/backend_capabilities.py lightroom --probe
+```
+
+当前合同明确区分：RawTherapee 的一等预览/渲染能力、darktable 的 legacy-only
+命令路径，以及 Lightroom 必须由运行中 Bridge 证明确切读取、写入、导出和预览能力的
+动态边界。未知能力、明确不支持的能力和尚未验证的能力分别返回不同的结构化错误码。
+
 ## Lightroom 引擎
 
 Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。

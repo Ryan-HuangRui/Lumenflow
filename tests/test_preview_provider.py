@@ -43,6 +43,10 @@ class PreviewProviderTests(unittest.TestCase):
 
             self.assertEqual(artifact["schema_version"], "lumenflow.preview_artifact.v1")
             self.assertEqual(artifact["provider"]["id"], "rawtherapee")
+            self.assertEqual(
+                artifact["provider"]["capability_contract_version"],
+                "lumenflow.backend_capabilities.v1",
+            )
             self.assertEqual(artifact["source_fingerprint"]["sha256"], hashlib.sha256(b"raw-v1").hexdigest())
             self.assertEqual(
                 [item["role"] for item in artifact["starting_state"]["profile_stack"]],

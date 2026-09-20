@@ -10,7 +10,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import driver_adapter  # noqa: E402
+import backend_capabilities  # noqa: E402
 import render_adjustment_plan  # noqa: E402
 import render_lightroom  # noqa: E402
 
@@ -44,7 +44,7 @@ class LightroomBackendTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with patch("render_lightroom.driver_adapter.read_bridge_status", return_value=unsafe_status):
                 with patch("render_lightroom.run_subprocess") as run_command:
-                    with self.assertRaises(driver_adapter.BridgeSafetyError):
+                    with self.assertRaises(backend_capabilities.UnverifiedCapabilityError) as error:
                         render_lightroom.render_plan(
                             plan=plan,
                             output_dir=Path(directory),
@@ -53,6 +53,8 @@ class LightroomBackendTests(unittest.TestCase):
                             local_config={"tools": {"lightroom_cli": "/custom/lr"}},
                         )
 
+        self.assertEqual(error.exception.code, "BACKEND_CAPABILITY_UNVERIFIED")
+        self.assertEqual(error.exception.capability_name, "render")
         run_command.assert_not_called()
 
     def test_non_dry_run_requires_frozen_state_and_operation_identity(self) -> None:
