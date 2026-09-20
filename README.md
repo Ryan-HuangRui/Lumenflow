@@ -239,6 +239,24 @@ python3 scripts/benchmark_eval.py compare candidate-report.json baseline-report.
 私人 RAW 与评测产物放在仓库外或已忽略的 `runs/` 下。语料设计、量表和默认门槛见
 [docs/benchmark.md](docs/benchmark.md)。
 
+## 个人编辑范例库
+
+最终 `accepted` 的编辑可以写入本地 SQLite 范例库，供后续按用途词、场景标签和风格检索。
+入库记录不含 RAW/JPEG 像素、文件路径、授权引用或目录身份；检索结果只作为宿主模型的
+个性化参考，不能跳过新照片的视觉分析，也不能直接复制曝光、白平衡或裁剪。
+
+```bash
+python3 scripts/personal_example_store.py add \
+  review_session.json execution_plan.json execution_receipt.json \
+  --tag bangkok --tag night
+
+python3 scripts/personal_example_store.py search \
+  --purpose "Bangkok night travel" --tag night --limit 5
+```
+
+默认数据库位于已忽略的 `local/personal_edit_examples.sqlite3`，支持列出和显式删除；隐私
+边界、备份限制和完整工作流见 [docs/personal_edit_examples.md](docs/personal_edit_examples.md)。
+
 ## Lightroom 引擎
 
 Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。

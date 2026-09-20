@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/personal_edit_example.schema.json",
+  "title": "Lumenflow personal accepted edit example",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "example_id", "intent_id", "intent_revision", "backend_id",
+    "source_fingerprint", "preview_basis", "output_fingerprint", "purpose", "style",
+    "global_adjustments", "composition", "local_adjustments", "tags", "plan_id",
+    "receipt_id", "session_id", "accepted_review_id", "created_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.personal_edit_example.v1"},
+    "example_id": {"type": "string", "pattern": "^edit_example_[0-9a-f]{32}$"},
+    "intent_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "intent_revision": {"type": "integer", "minimum": 1},
+    "backend_id": {"enum": ["rawtherapee", "darktable", "lightroom"]},
+    "source_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "preview_basis": {"$ref": "edit_intent.schema.json#/properties/preview_basis"},
+    "output_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "purpose": {"$ref": "edit_intent.schema.json#/properties/purpose"},
+    "style": {"$ref": "edit_intent.schema.json#/properties/style"},
+    "global_adjustments": {"$ref": "edit_intent.schema.json#/properties/global_adjustments"},
+    "composition": {"$ref": "edit_intent.schema.json#/properties/composition"},
+    "local_adjustments": {"$ref": "edit_intent.schema.json#/properties/local_adjustments"},
+    "tags": {"type": "array", "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}},
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[0-9a-f]{32}$"},
+    "session_id": {"type": "string", "pattern": "^review_session_[0-9a-f]{32}$"},
+    "accepted_review_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

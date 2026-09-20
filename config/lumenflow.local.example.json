@@ -1,6 +1,7 @@
 {
   "workflow": {
-    "task_store": "local/lumenflow_tasks.sqlite3"
+    "task_store": "local/lumenflow_tasks.sqlite3",
+    "personal_example_store": "local/personal_edit_examples.sqlite3"
   },
   "photos": {
     "output_root": "/absolute/path/to/Lumenflow output"

@@ -111,6 +111,10 @@ Visual review remains a host-model responsibility. The model inspects the render
 
 Benchmark evidence keeps runtime integrity and visual judgment separate. `lumenflow.benchmark_observation.v1` is built from a case, plan, receipt, terminal review session, current output bytes, and a host-model `lumenflow.visual_assessment.v1`. Failed executions receive no visual scores and remain in aggregate denominators. The observation id content-addresses all normalized evidence and scores, so a stale id exposes offline edits during report generation; this is an integrity check, not cryptographic attestation. A report gate requires enough cases, acceptance and score thresholds, explicit visual checks, and zero integrity failures; baseline comparison limits acceptance and score regressions. Passing evaluation is necessary evidence for capability promotion, never an automatic promotion action.
 
+### Personal example boundary
+
+The personal example store admits only the current intent of an accepted, evidence-consistent review session. Its record removes all file paths, pixels, authorization references, and catalog identity while retaining content fingerprints, purpose, style rationale, editable intent fields, and retrieval tags. A local SQLite store provides deterministic purpose/tag/style matching and explicit removal. Retrieved examples are evidence of past acceptance, not presets: the host model must visually evaluate every new photo and may reuse a direction only when the new scene supports it.
+
 ## Style Library
 
 The style library has two layers when tutorial ingestion is used locally:

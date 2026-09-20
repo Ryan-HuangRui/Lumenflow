@@ -54,6 +54,19 @@ class LumenflowConfigTests(unittest.TestCase):
             Path("/repo/local/lumenflow_tasks.sqlite3"),
         )
 
+    def test_personal_example_store_path_is_local_and_configurable(self) -> None:
+        self.assertEqual(
+            lumenflow_config.personal_example_store_path({}, repo_root=Path("/repo")),
+            Path("/repo/local/personal_edit_examples.sqlite3"),
+        )
+        self.assertEqual(
+            lumenflow_config.personal_example_store_path(
+                {"workflow": {"personal_example_store": "/private/examples.sqlite3"}},
+                repo_root=Path("/repo"),
+            ),
+            Path("/private/examples.sqlite3"),
+        )
+
     def test_photo_output_dir_uses_source_parent_directory_name(self) -> None:
         config = {"photos": {"output_root": "/photo-output-root"}}
         raw = Path("/photo-source/negative_raw/2026五一港珠澳/P1034473.RW2")
