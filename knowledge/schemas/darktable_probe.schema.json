@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/darktable_probe.schema.json",
+  "title": "Lumenflow darktable feasibility probe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "probe_id",
+    "backend_id",
+    "executable",
+    "status",
+    "version",
+    "stages",
+    "source_fingerprint_before",
+    "source_fingerprint_after",
+    "source_unchanged",
+    "sidecars_unchanged",
+    "output_fingerprint",
+    "failure_reason",
+    "started_at",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.darktable_probe.v1"},
+    "probe_id": {"type": "string", "pattern": "^darktable_probe_[0-9a-f]{32}$"},
+    "backend_id": {"const": "darktable"},
+    "executable": {"type": "string", "minLength": 1},
+    "status": {"enum": ["passed", "failed", "inconclusive"]},
+    "version": {"type": "string"},
+    "stages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stage"}},
+    "source_fingerprint_before": {"$ref": "#/$defs/nullable_fingerprint"},
+    "source_fingerprint_after": {"$ref": "#/$defs/nullable_fingerprint"},
+    "source_unchanged": {"type": ["boolean", "null"]},
+    "sidecars_unchanged": {"type": ["boolean", "null"]},
+    "output_fingerprint": {"$ref": "#/$defs/nullable_fingerprint"},
+    "failure_reason": {"type": "string"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "command", "returncode", "stdout", "stderr"],
+      "properties": {
+        "name": {"enum": ["version", "preflight", "isolated_export"]},
+        "status": {"enum": ["passed", "failed"]},
+        "command": {"type": "array", "items": {"type": "string"}},
+        "returncode": {"type": ["integer", "null"]},
+        "stdout": {"type": "string"},
+        "stderr": {"type": "string"}
+      }
+    },
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "nullable_fingerprint": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/fingerprint"}
+      ]
+    }
+  }
+}

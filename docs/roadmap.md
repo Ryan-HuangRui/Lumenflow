@@ -94,7 +94,8 @@ Implemented foundation:
 - Versioned, state-bound `PreviewArtifact` manifests for RawTherapee previews.
 - Strict cross-backend capability contracts with fail-closed Lightroom evidence mapping.
 - Vendor-neutral `EditIntent v2` plus RawTherapee `ExecutionPlan` and verified `ExecutionReceipt` contracts.
-- RawTherapee and darktable command construction.
+- RawTherapee and isolated legacy darktable command construction.
+- A versioned darktable real-RAW feasibility probe that fails closed on source, sidecar, or output-integrity violations.
 - `adjustment_plan.json` schema.
 - Rendering from an agent-authored plan.
 - Processing records and Markdown reporting.
@@ -104,6 +105,7 @@ Maintenance work:
 
 - Expand RawTherapee `.pp3` parameter coverage.
 - Add EditIntent v2 compilers only after each backend advertises the required capabilities.
+- Rerun the darktable feasibility probe after a trusted Gatekeeper-compatible installation is available; keep the backend legacy-only until the provider/compiler/receipt gates also pass.
 - Improve render-review notes and revision-loop output.
 - Add more fixture coverage for adjustment-plan edge cases.
 - Improve failure messages when external tools are missing.

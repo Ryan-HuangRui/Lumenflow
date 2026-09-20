@@ -33,6 +33,8 @@ def build_darktable_command(
     jpeg_quality: int = 95,
     configdir: Path | None = None,
     cachedir: Path | None = None,
+    library: str | Path | None = ":memory:",
+    write_sidecars: bool = False,
     executable: str = "darktable-cli",
 ) -> list[str]:
     command = [executable, str(raw)]
@@ -46,6 +48,10 @@ def build_darktable_command(
         command.extend(["--configdir", str(configdir)])
     if cachedir is not None:
         command.extend(["--cachedir", str(cachedir)])
+    if library is not None:
+        command.extend(["--library", str(library)])
+    if not write_sidecars:
+        command.extend(["--conf", "write_sidecar_files=never"])
     command.extend(["--conf", f"plugins/imageio/format/jpeg/quality={jpeg_quality}"])
     return command
 

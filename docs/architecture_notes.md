@@ -90,6 +90,8 @@ Every backend publishes `lumenflow.backend_capabilities.v1` before later compile
 
 Lightroom capabilities are derived from the live versioned bridge contract. Protocol or version mismatch invalidates all runtime evidence even when individual capability flags are true. RawTherapee capabilities are static for the current profile-based adapter. Darktable intentionally advertises only `render.legacy` until the isolated dynamic-module spike succeeds.
 
+The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe.v1`. It runs a real RAW export with a temporary config/cache, an in-memory library, and sidecar writes disabled, then compares RAW and sidecar state and fingerprints the output. A command/version check alone is inconclusive. Probe success is necessary evidence but does not itself promote a capability; the state-bound preview provider, compiler, receipt adapter, and regression fixtures must exist before the static contract changes.
+
 ### Intent, compilation, and execution
 
 The new runtime path separates model judgment from backend mechanics:

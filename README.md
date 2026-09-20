@@ -157,6 +157,19 @@ python3 scripts/backend_capabilities.py lightroom --probe
 命令路径，以及 Lightroom 必须由运行中 Bridge 证明确切读取、写入、导出和预览能力的
 动态边界。未知能力、明确不支持的能力和尚未验证的能力分别返回不同的结构化错误码。
 
+darktable 必须通过独立的真实 RAW 隔离导出探针，不能仅凭命令存在就升级能力：
+
+```bash
+python3 scripts/darktable_probe.py \
+  --raw /photo-source/sentinel.NEF \
+  --output-dir /photo-output/darktable-probe \
+  --report-output /photo-output/darktable-probe/report.json
+```
+
+探针使用临时配置、临时缓存、内存 library，并强制 `write_sidecar_files=never`；只有导出
+成功、RAW 与 sidecar 均未变化、输出可计算指纹时才返回 `passed`。本机实测安装状态及
+后端升级门槛见 [docs/darktable_backend_spike.md](docs/darktable_backend_spike.md)。
+
 ## EditIntent 与执行收据
 
 新主路径使用三个分离合同：
