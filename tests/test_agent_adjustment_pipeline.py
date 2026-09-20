@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import create_previews  # noqa: E402
+import preview_provider  # noqa: E402
 import render_adjustment_plan  # noqa: E402
 
 
@@ -61,6 +62,12 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
             self.assertTrue(manifest[0]["preview"].endswith("keeper_preview.jpg"))
             self.assertIn("rawtherapee-cli", manifest[0]["command"])
             self.assertEqual(manifest[0]["status"], "dry_run")
+            self.assertEqual(manifest[0]["schema_version"], "lumenflow.preview_artifact.v1")
+            self.assertEqual(manifest[0]["provider"]["id"], "rawtherapee")
+            self.assertEqual(
+                manifest[0]["starting_state_hash"],
+                preview_provider.canonical_hash(manifest[0]["starting_state"]),
+            )
 
     def test_create_previews_uses_configured_rawtherapee_command(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

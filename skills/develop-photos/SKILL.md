@@ -36,33 +36,34 @@ into:
    - RawTherapee `<raw filename>.pp3` rank if available.
    - If the user wants the agent to choose from an uncurated folder, invoke `curate-photos` first.
 4. Generate previews with `scripts/create_previews.py`.
-5. Inspect the preview images with the host agent's vision/reasoning capability.
-6. Retrieve style guidance from the two-layer style library:
+5. Read `preview_manifest.json` before visual analysis. Each entry must use `lumenflow.preview_artifact.v1`; retain its `artifact_id`, `source_fingerprint`, `starting_state_hash`, and `state_completeness` with downstream plan/review evidence. A partial starting state is usable for RawTherapee drafting but must not be represented as a complete editor-state snapshot.
+6. Inspect the preview images with the host agent's vision/reasoning capability.
+7. Retrieve style guidance from the two-layer style library:
    - Read `knowledge/style_library_index.json` first.
    - Filter direct candidates to entries with `active_for_photo_matching=true`.
    - Choose a Layer 1 family from `knowledge/style_families/*.json`.
    - Inspect matching Layer 2 video variants from `knowledge/style_cards/tutorial_derived/*.json` only after the Layer 1 direction fits the photo.
    - Use method/workflow cards only as supporting execution guidance, not as the primary visual style.
-7. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
-8. Decide composition before rendering. This is a per-photo judgment, not a batch preset:
+8. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
+9. Decide composition before rendering. This is a per-photo judgment, not a batch preset:
    - Keep original framing when the composition is already intentional.
    - Preserve detected existing crops by default unless the user explicitly asks to change them.
    - Crop only when it removes clear distractions, strengthens the subject, or fixes a weak frame.
    - Record `composition.decision` as `preserve_existing_crop`, `no_crop`, `crop`, or `manual_recommendation`.
    - Record the framing reason in `composition.reason`; crop executions should also include `composition.crop.reason`.
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
-9. Decide local adjustments before rendering. Record `mask_decision.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include executable Lightroom AI `masks`; if no mask is needed, explain why in `mask_decision.reason`.
-10. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
-11. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
-12. Review rendered outputs with the host agent's vision/reasoning capability:
+10. Decide local adjustments before rendering. Record `mask_decision.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include executable Lightroom AI `masks`; if no mask is needed, explain why in `mask_decision.reason`.
+11. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
+12. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
+13. Review rendered outputs with the host agent's vision/reasoning capability:
     - exposure and highlight clipping
     - blocked shadows
     - color cast and skin/subject color
     - style strength
     - crop quality and whether important context was lost
     - obvious rendering artifacts
-13. If review finds a material issue, write a revised plan with `revision` incremented, `parent_plan` pointing to the previous plan, and `review_basis` explaining the change; render again.
-14. Write final `processing_records.json`, `processing_report.md`, and review notes.
+14. If review finds a material issue, write a revised plan with `revision` incremented, `parent_plan` pointing to the previous plan, and `review_basis` explaining the change; render again.
+15. Write final `processing_records.json`, `processing_report.md`, and review notes.
 
 Typical command:
 
@@ -172,6 +173,7 @@ If no Layer 2 card fits, use the Layer 1 family as the style direction and set `
 - Do not select method/workflow/non-style reference cards as the primary visual style.
 - Keep Layer 1 selection and Layer 2 evidence auditable in the plan rationale or metadata.
 - Keep every run auditable: source path, preview path, style id, variant id, agent rationale, generated adjustments, composition decision, profile path, CLI command, review outcome, and failure reason.
+- Do not treat a preview path alone as evidence. Carry the versioned preview artifact id and starting-state hash into downstream workflow state so a stale preview cannot silently justify a new edit.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
 - RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.

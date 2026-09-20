@@ -13,6 +13,10 @@ REQUIRED_WRITE_CAPABILITIES = (
     "safe_object_develop_write",
     "verified_export_result",
 )
+REQUIRED_PREVIEW_CAPABILITIES = (
+    "safe_object_develop_read",
+    "verified_state_bound_preview",
+)
 
 
 class BridgeSafetyError(RuntimeError):
@@ -107,5 +111,19 @@ def preflight_write(
 ) -> BridgeAssessment:
     return require_safe_bridge(
         read_bridge_status(executable, timeout=timeout, runner=runner),
+        **requirements,
+    )
+
+
+def preflight_preview(
+    executable: str,
+    *,
+    timeout: int = 10,
+    runner: Runner = _run,
+    **requirements: Any,
+) -> BridgeAssessment:
+    return require_safe_bridge(
+        read_bridge_status(executable, timeout=timeout, runner=runner),
+        required_capabilities=REQUIRED_PREVIEW_CAPABILITIES,
         **requirements,
     )
