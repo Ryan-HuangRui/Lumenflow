@@ -1,0 +1,69 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "korean_soft_portrait",
+  "style_name": "韩系柔和人像",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "clean_bright_portrait",
+  "active_for_photo_matching": true,
+  "description": "韩系、柔和、小清新人像方向，弱化硬对比，保留细腻肤色和轻盈氛围。",
+  "suitable_scenes": [
+    "女性人像",
+    "儿童摄影",
+    "柔光人像",
+    "浅色户外"
+  ],
+  "avoid_scenes": [
+    "高反差街拍",
+    "暗黑题材",
+    "粗颗粒纪实"
+  ],
+  "visual_features": {
+    "tone": "soft, light, gentle",
+    "color": "delicate skin, fresh greens, low color cast",
+    "contrast": "low",
+    "texture": "smooth but not plastic"
+  },
+  "tone_guidance": {
+    "overall": "soft, light, gentle",
+    "contrast": "low",
+    "texture": "smooth but not plastic"
+  },
+  "color_guidance": {
+    "overall": "delicate skin, fresh greens, low color cast",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "hsl_color_cleanup",
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "detail_and_texture",
+    "color_grading",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "优先控制肤色和面部亮度，避免用过高锐化破坏柔和感。",
+    "如果原片光线很硬，用局部和高光压缩降低攻击性。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 4,
+    "category_counts": {
+      "basic_tone": 56,
+      "color_grading": 6,
+      "hsl_color": 58,
+      "mask_local": 5,
+      "presence_detail": 11,
+      "tone_curve": 24
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

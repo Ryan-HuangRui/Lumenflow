@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "warm_sunset_portrait",
+  "style_name": "暖调日落人像",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "warm_atmosphere",
+  "active_for_photo_matching": true,
+  "description": "日落、黄昏、秋季暖光人像，强调暖色来源、层次和主体肤色。",
+  "suitable_scenes": [
+    "日落人像",
+    "黄昏逆光",
+    "秋季外景",
+    "暖光街景"
+  ],
+  "avoid_scenes": [
+    "冷调夜景",
+    "需要中性还原的产品图"
+  ],
+  "visual_features": {
+    "tone": "warm and atmospheric",
+    "color": "orange-yellow warmth with controlled cyan contrast",
+    "contrast": "medium",
+    "texture": "clean but tactile"
+  },
+  "tone_guidance": {
+    "overall": "warm and atmospheric",
+    "contrast": "medium",
+    "texture": "clean but tactile"
+  },
+  "color_guidance": {
+    "overall": "orange-yellow warmth with controlled cyan contrast",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "color_grading",
+    "detail_and_texture",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先找真实暖光来源，再决定整体暖化幅度。",
+    "暖调不能让肤色过橙，必要时用 HSL 单独保护橙色。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 7,
+    "category_counts": {
+      "basic_tone": 107,
+      "color_grading": 9,
+      "hsl_color": 86,
+      "mask_local": 3,
+      "presence_detail": 6,
+      "tone_curve": 69
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

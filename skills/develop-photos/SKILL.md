@@ -19,7 +19,7 @@ into:
 
 1. A confirmed selection plan or an explicit user-specified photo set.
 2. JPEG previews that the host agent can inspect visually.
-3. Agent-authored per-photo adjustment plans based on the two-layer style library.
+3. Agent-authored per-photo adjustment plans based on reusable style knowledge.
 4. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
 5. Agent review of rendered outputs, with revised plans when needed.
 6. A processing report explaining what happened.
@@ -37,11 +37,11 @@ into:
    - If the user wants the agent to choose from an uncurated folder, invoke `curate-photos` first.
 4. Generate previews with `scripts/create_previews.py`.
 5. Inspect the preview images with the host agent's vision/reasoning capability.
-6. Retrieve style guidance from the two-layer style library:
+6. Retrieve reusable style guidance:
    - Read `knowledge/style_library_index.json` first.
    - Filter direct candidates to entries with `active_for_photo_matching=true`.
-   - Choose a Layer 1 family from `knowledge/style_families/*.json`.
-   - Inspect matching Layer 2 video variants from `knowledge/style_cards/tutorial_derived/*.json` only after the Layer 1 direction fits the photo.
+   - Choose a semantic style from `knowledge/style_families/*.json`.
+   - Do not read private tutorial recipes, transcripts, provenance, or video-level evidence during photo development.
    - Use method/workflow cards only as supporting execution guidance, not as the primary visual style.
 7. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
 8. Decide composition before rendering. This is a per-photo judgment, not a batch preset:
@@ -154,15 +154,12 @@ Use this exact retrieval order:
 
 1. Inspect the target preview and summarize subject, light, scene, exposure issues, color casts, skin/subject color risks, and composition risks.
 2. Read `knowledge/style_library_index.json`.
-3. Exclude `inactive_cards` from direct style selection.
-4. Prefer Layer 1 families where `active_for_photo_matching=true` and `role=visual_style`.
-5. Read the chosen `knowledge/style_families/<style_family_id>.json`.
-6. Inspect representative Layer 2 cards listed in that family. Pick one Layer 2 card only when its scene, color direction, and operation guidance fit the target photo.
-7. Optionally read inactive method cards such as `rgb_curve_method`, `mask_local_retouch_method`, or `reference_color_matching_method` after choosing the visual style.
-8. Write the plan with `style_family_id`, `style_id`, and `source_style_card` when a Layer 2 card is used.
-9. Infer concrete parameters from the target photo. Do not copy tutorial values as fixed presets.
-
-If no Layer 2 card fits, use the Layer 1 family as the style direction and set `style_id` to the family id.
+3. Exclude `inactive_styles` from direct style selection.
+4. Prefer reusable cards where `active_for_photo_matching=true` and `role=visual_style`.
+5. Read the chosen `knowledge/style_families/<style_id>.json` and verify `suitable_scenes`, `avoid_scenes`, and subject-color risks against the target photo.
+6. Optionally read inactive method cards such as `rgb_curve_method`, `mask_local_retouch_method`, or `reference_color_matching_method` after choosing the visual style.
+7. Write the plan with the semantic id in `style_family_id` and `style_id`, and the reusable card path in `source_style_card`.
+8. Infer concrete parameters from the target photo. Do not read or copy private tutorial evidence as a fixed preset.
 
 ## Rules
 
@@ -170,7 +167,7 @@ If no Layer 2 card fits, use the Layer 1 family as the style direction and set `
 - Do not write processed photos into the source directory unless the user explicitly asks.
 - Do not treat style-card `raw_profiles` as fixed presets. Style cards are guidance; concrete values belong in `adjustment_plan.json`.
 - Do not select method/workflow/non-style reference cards as the primary visual style.
-- Keep Layer 1 selection and Layer 2 evidence auditable in the plan rationale or metadata.
+- Keep the reusable style selection and photo-specific reasoning auditable in the plan rationale or metadata.
 - Keep every run auditable: source path, preview path, style id, variant id, agent rationale, generated adjustments, composition decision, profile path, CLI command, review outcome, and failure reason.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
 - RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
