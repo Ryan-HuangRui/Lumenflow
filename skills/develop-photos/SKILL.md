@@ -64,8 +64,9 @@ into:
     - style strength
     - crop quality and whether important context was lost
     - obvious rendering artifacts
-16. If review finds a material issue, write a revised intent with `revision` incremented and review evidence explaining the change; compile and execute a new plan.
-17. Write final execution receipts, processing report, and review notes.
+16. Write `lumenflow.review_result.v1`, binding the current intent revision, plan, receipt, and output fingerprint. Use `accept`, `revise`, or `reject`; a revision may replace only style, global adjustments, composition, or local-adjustment intent.
+17. Advance the persisted session with `scripts/review_loop.py`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
+18. For `revise`, compile and execute the emitted next intent, inspect the new verified output, and repeat. Write final execution receipts, session state, processing report, and review notes when the session reaches a terminal state.
 
 Typical command:
 
@@ -73,6 +74,8 @@ Typical command:
 python scripts/create_previews.py /path/to/photos
 python scripts/edit_intent.py compile /path/to/IMG_001.edit_intent.json --backend rawtherapee --output-dir /path/to/output --plan-output /path/to/output/IMG_001.execution_plan.json
 python scripts/edit_intent.py execute /path/to/output/IMG_001.execution_plan.json --allowed-output-dir /path/to/output --receipt-output /path/to/output/IMG_001.execution_receipt.json
+python scripts/review_loop.py start /path/to/IMG_001.edit_intent.json --state-output /path/to/output/IMG_001.review_session.json
+python scripts/review_loop.py advance /path/to/output/IMG_001.review_session.json /path/to/output/IMG_001.execution_plan.json /path/to/output/IMG_001.execution_receipt.json /path/to/output/IMG_001.review_result.json --state-output /path/to/output/IMG_001.review_session.json --next-intent-output /path/to/output/IMG_001.edit_intent.r2.json
 ```
 
 With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-source/negative_raw/2026五一港珠澳/P1034473.RW2` renders into `/photo-output-root/2026五一港珠澳/`.

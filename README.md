@@ -197,6 +197,26 @@ python3 scripts/edit_intent.py execute /photo-output/bangkok/execution_plan.json
 旧 `lumenflow.adjustment_plan.v1` 和 `scripts/render_adjustment_plan.py` 继续保留，作为兼容路径；
 新功能不再向该合同加入后端特定字段。
 
+## 成片复核与有界修订
+
+宿主模型直接查看实际渲染 JPEG，并写入 `lumenflow.review_result.v1`；确定性代码不做审美
+打分，而是核对 ReviewResult 是否绑定当前 intent revision、plan、成功 receipt 和同一份输出
+字节。默认最多允许两轮修订，拒绝 dry-run 收据、输出漂移、无效修订、重复 review、历史
+intent 循环和对授权/RAW/预览依据/用途的修改。
+
+```bash
+python3 scripts/review_loop.py start intent.json \
+  --max-revisions 2 \
+  --state-output review_session.json
+
+python3 scripts/review_loop.py advance \
+  review_session.json execution_plan.json execution_receipt.json review_result.json \
+  --state-output review_session.json \
+  --next-intent-output intent.r2.json
+```
+
+完整合同和宿主模型职责见 [docs/review_loop.md](docs/review_loop.md)。
+
 ## Lightroom 引擎
 
 Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。

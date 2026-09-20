@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/review_session.schema.json",
+  "title": "Lumenflow bounded review session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "session_id", "intent_id", "initial_revision", "max_revisions",
+    "revisions_used", "status", "current_intent", "seen_review_ids", "seen_intent_hashes", "history"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.review_session.v1"},
+    "session_id": {"type": "string", "pattern": "^review_session_[0-9a-f]{32}$"},
+    "intent_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "initial_revision": {"type": "integer", "minimum": 1},
+    "max_revisions": {"type": "integer", "minimum": 0, "maximum": 5},
+    "revisions_used": {"type": "integer", "minimum": 0, "maximum": 5},
+    "status": {"enum": ["active", "accepted", "rejected", "revision_limit_reached"]},
+    "current_intent": {"$ref": "edit_intent.schema.json"},
+    "seen_review_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"}},
+    "seen_intent_hashes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "history": {"type": "array", "items": {"$ref": "#/$defs/history_entry"}}
+  },
+  "$defs": {
+    "history_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_id", "decision", "intent_revision", "plan_id", "receipt_id", "resulting_intent_hash"],
+      "properties": {
+        "review_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "decision": {"enum": ["accept", "revise", "reject"]},
+        "intent_revision": {"type": "integer", "minimum": 1},
+        "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+        "receipt_id": {"type": "string", "pattern": "^receipt_[0-9a-f]{32}$"},
+        "resulting_intent_hash": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          ]
+        }
+      }
+    }
+  }
+}
