@@ -107,6 +107,10 @@ The first compiler targets RawTherapee. It never invokes a shell, refuses output
 
 Visual review remains a host-model responsibility. The model inspects the rendered JPEG and emits `lumenflow.review_result.v1`; deterministic code binds that judgment to the current intent revision, plan, successful receipt, and still-matching output bytes. A persisted `lumenflow.review_session.v1` permits only editable intent fields to change, defaults to two revisions, and records review ids plus semantic intent hashes to stop replay, no-op revisions, budget resets, and cycles. Accept, reject, and revision-limit outcomes close the session.
 
+### Evaluation boundary
+
+Benchmark evidence keeps runtime integrity and visual judgment separate. `lumenflow.benchmark_observation.v1` is built from a case, plan, receipt, terminal review session, current output bytes, and a host-model `lumenflow.visual_assessment.v1`. Failed executions receive no visual scores and remain in aggregate denominators. The observation id content-addresses all normalized evidence and scores, so a stale id exposes offline edits during report generation; this is an integrity check, not cryptographic attestation. A report gate requires enough cases, acceptance and score thresholds, explicit visual checks, and zero integrity failures; baseline comparison limits acceptance and score regressions. Passing evaluation is necessary evidence for capability promotion, never an automatic promotion action.
+
 ## Style Library
 
 The style library has two layers when tutorial ingestion is used locally:

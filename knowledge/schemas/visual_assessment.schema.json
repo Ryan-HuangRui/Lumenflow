@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/visual_assessment.schema.json",
+  "title": "Lumenflow host-model visual assessment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "assessment_id", "case_id", "output_fingerprint", "rubric_version", "model_id", "scores", "checks", "summary"],
+  "properties": {
+    "schema_version": {"const": "lumenflow.visual_assessment.v1"},
+    "assessment_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "case_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "output_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "rubric_version": {"const": "photo-edit-v1"},
+    "model_id": {"type": "string", "minLength": 1},
+    "scores": {"$ref": "#/$defs/scores"},
+    "checks": {"$ref": "#/$defs/checks"},
+    "summary": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technical_quality", "purpose_fit", "style_coherence", "composition", "naturalness"],
+      "properties": {
+        "technical_quality": {"type": "number", "minimum": 1, "maximum": 5},
+        "purpose_fit": {"type": "number", "minimum": 1, "maximum": 5},
+        "style_coherence": {"type": "number", "minimum": 1, "maximum": 5},
+        "composition": {"type": "number", "minimum": 1, "maximum": 5},
+        "naturalness": {"type": "number", "minimum": 1, "maximum": 5}
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["highlight_detail", "shadow_detail", "color_integrity", "composition_intent", "artifacts_absent"],
+      "properties": {
+        "highlight_detail": {"type": "boolean"},
+        "shadow_detail": {"type": "boolean"},
+        "color_integrity": {"type": "boolean"},
+        "composition_intent": {"type": "boolean"},
+        "artifacts_absent": {"type": "boolean"}
+      }
+    }
+  }
+}

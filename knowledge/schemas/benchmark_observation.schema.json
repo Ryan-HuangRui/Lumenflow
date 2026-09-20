@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/benchmark_observation.schema.json",
+  "title": "Lumenflow benchmark observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "observation_id", "case_id", "backend_id", "plan_id", "receipt_id", "session_id", "assessment_id", "outcome", "integrity_passed", "source_unchanged", "output_fingerprint", "runtime_ms", "revisions_used", "scores", "checks"],
+  "properties": {
+    "schema_version": {"const": "lumenflow.benchmark_observation.v1"},
+    "observation_id": {"type": "string", "pattern": "^observation_[0-9a-f]{32}$"},
+    "case_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "backend_id": {"enum": ["rawtherapee", "darktable", "lightroom"]},
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[0-9a-f]{32}$"},
+    "session_id": {"type": ["string", "null"], "pattern": "^review_session_[0-9a-f]{32}$"},
+    "assessment_id": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9_.-]+$"},
+    "outcome": {"enum": ["accepted", "rejected", "revision_limit_reached", "execution_failed"]},
+    "integrity_passed": {"type": "boolean"},
+    "source_unchanged": {"type": "boolean"},
+    "output_fingerprint": {"oneOf": [{"type": "null"}, {"$ref": "visual_assessment.schema.json#/$defs/fingerprint"}]},
+    "runtime_ms": {"type": "integer", "minimum": 0},
+    "revisions_used": {"type": "integer", "minimum": 0, "maximum": 5},
+    "scores": {"oneOf": [{"type": "null"}, {"$ref": "visual_assessment.schema.json#/$defs/scores"}]},
+    "checks": {"oneOf": [{"type": "null"}, {"$ref": "visual_assessment.schema.json#/$defs/checks"}]}
+  }
+}
