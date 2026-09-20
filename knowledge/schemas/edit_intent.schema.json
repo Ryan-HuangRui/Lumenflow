@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/edit_intent.schema.json",
+  "title": "Lumenflow EditIntent v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intent_id",
+    "revision",
+    "authorization",
+    "source",
+    "preview_basis",
+    "purpose",
+    "style",
+    "global_adjustments",
+    "composition",
+    "local_adjustments"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.edit_intent.v2"},
+    "intent_id": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_.-]+$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference_id"],
+      "properties": {
+        "kind": {"enum": ["user_confirmed_selection", "explicit_user_request"]},
+        "reference_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fingerprint"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "fingerprint": {"$ref": "#/$defs/fingerprint"}
+      }
+    },
+    "preview_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "starting_state_hash", "state_completeness"],
+      "properties": {
+        "artifact_id": {"type": "string", "pattern": "^preview_[0-9a-f]{32}$"},
+        "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "state_completeness": {"enum": ["complete", "partial"]}
+      }
+    },
+    "purpose": {"type": "string", "minLength": 1},
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style_id", "rationale"],
+      "properties": {
+        "style_id": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "global_adjustments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exposure_ev": {"type": "number", "minimum": -5, "maximum": 5},
+        "brightness": {"type": "number", "minimum": -100, "maximum": 100},
+        "contrast": {"type": "number", "minimum": -100, "maximum": 100},
+        "highlight_recovery": {"type": "number", "minimum": 0, "maximum": 100},
+        "shadow_lift": {"type": "number", "minimum": -100, "maximum": 100},
+        "black_point": {"type": "number"},
+        "saturation": {"type": "number", "minimum": -100, "maximum": 100},
+        "temperature_k": {"type": "number", "minimum": 2000, "maximum": 50000},
+        "green_multiplier": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reason"],
+      "properties": {
+        "decision": {"enum": ["preserve_existing_crop", "no_crop", "crop", "manual_recommendation"]},
+        "reason": {"type": "string", "minLength": 1},
+        "crop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit", "x", "y", "width", "height"],
+          "properties": {
+            "unit": {"const": "pixels"},
+            "x": {"type": "integer", "minimum": 0},
+            "y": {"type": "integer", "minimum": 0},
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1},
+            "fixed_ratio": {"type": "boolean"},
+            "ratio": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "local_adjustments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reason", "masks"],
+      "properties": {
+        "decision": {"enum": ["none", "use_masks", "manual_recommendation"]},
+        "reason": {"type": "string", "minLength": 1},
+        "masks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "rationale", "adjustments"],
+            "properties": {
+              "type": {"enum": ["subject", "sky", "background", "objects", "people", "landscape"]},
+              "rationale": {"type": "string", "minLength": 1},
+              "adjustments": {"$ref": "#/properties/global_adjustments"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

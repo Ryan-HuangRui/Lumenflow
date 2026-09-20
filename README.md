@@ -14,8 +14,8 @@ Portable photo styling skills for AI agents.
 2. `curate-photos` 扫描 RAW、生成联系表，由 agent 使用视觉推理按用途选片并编排顺序。
 3. 用户确认选片方案后，`develop-photos` 只处理确认照片。
 4. Agent 结合风格库、照片预览和自主判断选择调色方向。
-5. Agent 为每张照片生成具体 `adjustment_plan.json` 参数，并判断是否需要裁剪二次构图。
-6. Skill 将调色计划转成修图引擎可执行的参数并导出处理后的图片。
+5. Agent 为每张照片生成编辑器无关的 `EditIntent v2`，并判断是否需要裁剪二次构图。
+6. Skill 将意图编译为后端专用 `ExecutionPlan`，执行后输出可验证的 `ExecutionReceipt`。
 7. Agent 复核首轮输出，必要时生成修订计划再渲染。
 8. 输出处理记录，方便用户复盘选片、编排、风格、构图和参数决策。
 9. 定时任务使用风格库更新 skill，从社交媒体和视频教程里更新风格库。
@@ -156,6 +156,33 @@ python3 scripts/backend_capabilities.py lightroom --probe
 当前合同明确区分：RawTherapee 的一等预览/渲染能力、darktable 的 legacy-only
 命令路径，以及 Lightroom 必须由运行中 Bridge 证明确切读取、写入、导出和预览能力的
 动态边界。未知能力、明确不支持的能力和尚未验证的能力分别返回不同的结构化错误码。
+
+## EditIntent 与执行收据
+
+新主路径使用三个分离合同：
+
+- `lumenflow.edit_intent.v2`：模型表达用途、风格、全局调整、构图和局部调整需求，不含编辑器命令。
+- `lumenflow.execution_plan.v1`：编译器根据后端能力生成 profile、输出路径和无 shell 的 argv。
+- `lumenflow.execution_receipt.v1`：执行器记录每个操作状态、RAW 前后指纹、输出指纹和失败原因。
+
+当前首个编译器覆盖 RawTherapee 的全局曝光、亮度、对比度、高光恢复、阴影提升、
+黑位、饱和度、白平衡和像素裁剪。编译阶段不写文件；执行阶段要求调用方显式提供
+允许写入的输出根目录，并再次验证 RAW 指纹、能力合同、profile 内容、路径边界和完整命令。
+
+```bash
+python3 scripts/edit_intent.py compile intent.json \
+  --backend rawtherapee \
+  --output-dir /photo-output/bangkok \
+  --plan-output /photo-output/bangkok/execution_plan.json
+
+python3 scripts/edit_intent.py execute /photo-output/bangkok/execution_plan.json \
+  --allowed-output-dir /photo-output/bangkok \
+  --receipt-output /photo-output/bangkok/execution_receipt.json \
+  --dry-run
+```
+
+旧 `lumenflow.adjustment_plan.v1` 和 `scripts/render_adjustment_plan.py` 继续保留，作为兼容路径；
+新功能不再向该合同加入后端特定字段。
 
 ## Lightroom 引擎
 

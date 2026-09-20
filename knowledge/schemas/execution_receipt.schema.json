@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/execution_receipt.schema.json",
+  "title": "Lumenflow Execution Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "plan_id",
+    "intent_id",
+    "backend_id",
+    "status",
+    "operations",
+    "source_fingerprint_before",
+    "source_fingerprint_after",
+    "source_unchanged",
+    "output_fingerprint",
+    "failure_reason",
+    "started_at",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.execution_receipt.v1"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[0-9a-f]{32}$"},
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+    "intent_id": {"type": "string", "minLength": 1},
+    "backend_id": {"enum": ["rawtherapee", "darktable", "lightroom"]},
+    "status": {"enum": ["dry_run", "success", "failed"]},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation_id", "kind", "status", "error"],
+        "properties": {
+          "operation_id": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["materialize_profile", "render"]},
+          "status": {"enum": ["dry_run", "success", "failed", "skipped"]},
+          "error": {"type": "string"}
+        }
+      }
+    },
+    "source_fingerprint_before": {"$ref": "#/$defs/fingerprint"},
+    "source_fingerprint_after": {"$ref": "#/$defs/fingerprint"},
+    "source_unchanged": {"type": "boolean"},
+    "output_fingerprint": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/fingerprint"}
+      ]
+    },
+    "failure_reason": {"type": "string"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

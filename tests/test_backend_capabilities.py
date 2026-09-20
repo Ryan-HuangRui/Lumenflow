@@ -13,17 +13,15 @@ import backend_capabilities  # noqa: E402
 
 
 class BackendCapabilitiesTests(unittest.TestCase):
-    def test_rawtherapee_contract_supports_current_slice_but_not_intent_v2(self) -> None:
+    def test_rawtherapee_contract_supports_preview_render_and_intent_v2(self) -> None:
         contract = backend_capabilities.backend_capabilities_for("rawtherapee")
 
         self.assertEqual(contract.schema_version, "lumenflow.backend_capabilities.v1")
         self.assertEqual(contract.backend_id, "rawtherapee")
         self.assertEqual(contract.require("preview.state_bound").state, "supported")
         self.assertEqual(contract.require("plan.compile.v1").state, "supported")
+        self.assertEqual(contract.require("intent.compile.v2").state, "supported")
         self.assertEqual(contract.require("render").state, "supported")
-        with self.assertRaises(backend_capabilities.UnsupportedCapabilityError) as error:
-            contract.require("intent.compile.v2")
-        self.assertEqual(error.exception.code, "BACKEND_CAPABILITY_UNSUPPORTED")
 
     def test_unknown_capability_is_a_structured_contract_error(self) -> None:
         contract = backend_capabilities.backend_capabilities_for("rawtherapee")

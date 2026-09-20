@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/execution_plan.schema.json",
+  "title": "Lumenflow Execution Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "intent_id",
+    "intent_revision",
+    "authorization",
+    "backend",
+    "source",
+    "preview_basis",
+    "output_root",
+    "required_capabilities",
+    "artifacts",
+    "operations",
+    "compiler",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.execution_plan.v1"},
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+    "intent_id": {"type": "string", "minLength": 1},
+    "intent_revision": {"type": "integer", "minimum": 1},
+    "authorization": {"$ref": "#/$defs/authorization"},
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "adapter_version", "capability_contract_version"],
+      "properties": {
+        "id": {"enum": ["rawtherapee", "darktable", "lightroom"]},
+        "adapter_version": {"type": "string", "minLength": 1},
+        "capability_contract_version": {"const": "lumenflow.backend_capabilities.v1"}
+      }
+    },
+    "source": {"$ref": "#/$defs/source"},
+    "preview_basis": {"$ref": "#/$defs/preview_basis"},
+    "output_root": {"type": "string", "minLength": 1},
+    "required_capabilities": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "output"],
+      "properties": {
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "format"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "format": {"const": "JPEG"}
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {"$ref": "#/$defs/materialize_profile_operation"},
+        {"$ref": "#/$defs/render_operation"}
+      ],
+      "items": false
+    },
+    "compiler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference_id"],
+      "properties": {
+        "kind": {"enum": ["user_confirmed_selection", "explicit_user_request"]},
+        "reference_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fingerprint"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "fingerprint": {"$ref": "#/$defs/fingerprint"}
+      }
+    },
+    "preview_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "starting_state_hash", "state_completeness"],
+      "properties": {
+        "artifact_id": {"type": "string", "pattern": "^preview_[0-9a-f]{32}$"},
+        "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "state_completeness": {"enum": ["complete", "partial"]}
+      }
+    },
+    "materialize_profile_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "kind", "payload", "command_argv"],
+      "properties": {
+        "operation_id": {"type": "string", "minLength": 1},
+        "kind": {"const": "materialize_profile"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content", "sha256"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "content": {"type": "string", "minLength": 1, "maxLength": 1048576},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "command_argv": {"type": "array", "maxItems": 0}
+      }
+    },
+    "render_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "kind", "payload", "command_argv"],
+      "properties": {
+        "operation_id": {"type": "string", "minLength": 1},
+        "kind": {"const": "render"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["output_path"],
+          "properties": {
+            "output_path": {"type": "string", "minLength": 1}
+          }
+        },
+        "command_argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {"type": "string", "maxLength": 4096}
+        }
+      }
+    }
+  }
+}
