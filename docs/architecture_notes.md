@@ -7,7 +7,7 @@ Lumenflow is a set of portable agent skills for RAW photo development and privat
 The repository is organized around:
 
 - `skills/curate-photos/`: agent instructions for purpose-aware visual culling, duplicate comparison, editorial roles, sequencing, and user confirmation.
-- `skills/develop-photos/`: agent instructions for preview generation, style matching, adjustment-plan authoring, rendering, and review of confirmed photos.
+- `skills/develop-photos/`: agent instructions for preview generation, style matching, EditIntent authoring, capability-gated execution, and review of confirmed photos.
 - `skills/learn-styles/`: agent instructions for building a local private style library from user-approved sources.
 - `skills/fetch-bilibili-subtitles/`: a narrow skill for downloading existing Bilibili subtitles.
 - `scripts/`: small reusable tools called by skills.
@@ -26,18 +26,19 @@ The host is responsible for:
 2. Inspecting every in-scope curation preview with native visual reasoning.
 3. Interpreting purpose, choosing photos, and authoring the editorial sequence.
 4. Inspecting confirmed-photo previews and style cards.
-5. Choosing style direction and writing per-photo `adjustment_plan.json`.
-6. Reviewing rendered outputs and deciding whether to revise.
+5. Choosing style direction and writing a vendor-neutral per-photo `lumenflow.edit_intent.v2` document.
+6. Inspecting the rendered output, writing `lumenflow.review_result.v1`, and deciding whether to accept, revise, or reject it.
 
 The scripts are responsible for deterministic work:
 
 1. Scanning RAW files and sidecar metadata.
 2. Extracting embedded JPEG previews, generating contact sheets, and validating selection plans.
 3. Creating rendered JPEG previews for development and emitting versioned, state-bound preview artifacts.
-4. Rendering RawTherapee or darktable commands.
-5. Fetching subtitles and normalizing transcripts.
-6. Generating private tutorial recipes and evidence cards.
-7. Merging source-clean reusable style knowledge and rebuilding its runtime index.
+4. Publishing backend capability contracts, compiling EditIntent into a backend-specific ExecutionPlan, executing it, and recording an ExecutionReceipt.
+5. Validating evidence-bound review sessions and enforcing the revision limit.
+6. Fetching subtitles and normalizing transcripts.
+7. Generating private tutorial recipes and evidence cards.
+8. Merging source-clean reusable style knowledge and rebuilding its runtime index.
 
 ## Lightroom Safety Boundary
 
@@ -49,7 +50,7 @@ The legacy `develop.applySettings` command remains available for compatibility i
 
 ## Workflow State
 
-`adjustment_plan` describes only one photo's absolute edit targets and rationale. Cross-photo and mutable workflow state lives in the local SQLite store implemented by `scripts/task_store.py`:
+`EditIntent v2` describes one photo's vendor-neutral visual intent and binds it to authorization, source identity, and preview-state evidence. `ExecutionPlan v1` and `ExecutionReceipt v1` capture backend-specific execution and its result. Cross-photo and mutable workflow state lives in the local SQLite store implemented by `scripts/task_store.py`:
 
 - task purpose and input scope
 - selection proposal revision
@@ -62,7 +63,7 @@ The default database is `local/lumenflow_tasks.sqlite3`, which is ignored by git
 
 ## Photo Pipeline
 
-The intended photo-processing flow is:
+The current main photo-processing flow is:
 
 1. User points the agent at a source photo directory.
 2. `scripts/curate_photos.py prepare` scans RAW files, applies hard scope such as capture dates, extracts camera previews, and builds labeled contact sheets.
@@ -70,15 +71,19 @@ The intended photo-processing flow is:
 4. `scripts/curate_photos.py finalize` validates candidate identity, order, roles, reasons, alternates, and the no-RAW-mutation invariant.
 5. The user explicitly confirms membership and order; only the confirmed set crosses into development.
 6. `scripts/create_previews.py` renders development previews when the embedded previews are insufficient. Its `PreviewProvider` emits `lumenflow.preview_artifact.v1`, binding the exact RAW fingerprint, ordered profile/sidecar fingerprints, starting-state hash, command, and output fingerprint.
-7. The agent analyzes confirmed photos and reads style guidance.
-8. The agent writes `adjustment_plan.json` using `knowledge/schemas/adjustment_plan.schema.json`.
-9. `scripts/render_adjustment_plan.py` converts the plan into temporary RawTherapee `.pp3` profiles and renders outputs.
-10. The agent reviews outputs and writes a revision plan when needed.
-11. Reports are written for auditability.
+7. The agent analyzes each confirmed photo, reads reusable style guidance, and makes per-photo composition and local-adjustment decisions.
+8. The agent writes a vendor-neutral `lumenflow.edit_intent.v2` document using `knowledge/schemas/edit_intent.schema.json`, binding the confirmed authorization, RAW fingerprint, preview artifact, and starting-state hash.
+9. `scripts/edit_intent.py compile` checks `lumenflow.backend_capabilities.v1` and emits a backend-specific `lumenflow.execution_plan.v1` without rendering or writing a profile.
+10. `scripts/edit_intent.py execute` receives an explicit allowed output root, revalidates the source and compiled artifacts, renders through the selected verified backend, and writes `lumenflow.execution_receipt.v1`.
+11. The agent inspects the exact rendered output and writes an evidence-bound `lumenflow.review_result.v1` with an `accept`, `revise`, or `reject` decision.
+12. `scripts/review_loop.py` advances the persisted review session. A revision produces a new EditIntent revision and repeats compile, execute, and review; the default limit is two revisions.
+13. The workflow writes reports for auditability and may store the final accepted edit in the local personal example store.
 
 Curation scripts deliberately do not score aesthetics. Purpose interpretation, expression, composition, narrative coverage, and sequence rhythm stay with the model; deterministic code keeps file identity and handoff state auditable.
 
-Style cards are guidance only. Concrete values belong in the per-photo adjustment plan because the same style needs different settings on different images.
+Style cards are guidance only. Concrete values belong in the per-photo EditIntent because the same style needs different settings on different images.
+
+The legacy `lumenflow.adjustment_plan.v1` → `scripts/render_adjustment_plan.py` flow remains only for existing compatibility inputs and the fail-closed Lightroom bridge path. It is not the current RawTherapee main path and must not receive new runtime responsibilities.
 
 ### Preview boundary
 
@@ -94,7 +99,7 @@ The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe
 
 ### Intent, compilation, and execution
 
-The new runtime path separates model judgment from backend mechanics:
+The current runtime path separates model judgment from backend mechanics:
 
 1. `lumenflow.edit_intent.v2` records authorization, exact source and preview-state evidence, purpose, style rationale, vendor-neutral global adjustments, composition, and local-adjustment intent.
 2. A backend compiler checks `lumenflow.backend_capabilities.v1` and emits `lumenflow.execution_plan.v1`. Compilation is side-effect free.

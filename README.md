@@ -1,340 +1,393 @@
 # Lumenflow
 
-Portable photo styling skills for AI agents.
+面向视觉模型的本地优先 RAW 选片、编排与修图工作流。
 
-面向 AI agent 的个人 RAW 照片自动处理与风格学习 skills。
+Lumenflow 把“审美判断”交给具备视觉能力的 agent，把扫描、预览、合同校验、渲染和审计交给确定性代码。它不是另一个照片管理器，也不是一组固定滤镜；它是一套可移植的 agent skills、JSON 合同和本地工具链。
+
+> 当前状态：可用于本地实验和个人工作流。RawTherapee 是目前唯一的一等渲染后端；darktable 与 Lightroom 仍处于受限兼容/验证阶段。项目尚未发布稳定版本。
+
+## 目录
+
+- [为什么做 Lumenflow](#为什么做-lumenflow)
+- [核心能力](#核心能力)
+- [工作流](#工作流)
+- [快速开始](#快速开始)
+- [用 agent 完成一次选片](#用-agent-完成一次选片)
+- [用 agent 完成一次修图](#用-agent-完成一次修图)
+- [后端支持状态](#后端支持状态)
+- [架构与数据合同](#架构与数据合同)
+- [风格知识库](#风格知识库)
+- [隐私与安全边界](#隐私与安全边界)
+- [配置](#配置)
+- [测试](#测试)
+- [常见问题](#常见问题)
+- [项目状态与路线图](#项目状态与路线图)
+- [参与贡献](#参与贡献)
+- [许可证](#许可证)
+
+## 为什么做 Lumenflow
+
+传统批处理通常依赖评分器、预设或固定参数，但真实的摄影工作流需要理解用途和整组照片之间的关系：哪张适合作为开场、哪些是近重复、哪些值得保留为备选、某张图是否应该裁剪，以及一组照片应如何形成节奏。
+
+Lumenflow 的分工是：
+
+- **视觉模型负责判断**：理解用户用途，比较候选照片，识别表达、构图和氛围，选择风格并复核成片。
+- **脚本负责事实与执行**：读取 RAW 元数据、提取预览、生成联系表、校验 JSON 合同、调用 RAW 引擎并记录可验证收据。
+- **用户保留决定权**：agent 的选片结果只是提案；只有用户明确确认后，照片才会进入修图流程。
+
+## 核心能力
+
+- 按日期、用途和数量范围扫描 RAW 候选集。
+- 从 RAW 提取相机内嵌 JPEG，生成带文件标识的联系表。
+- 使用宿主模型的原生视觉能力去废片、比较近重复、分配叙事角色并编排顺序。
+- 通过 `selection_plan.json` 固化提案，并要求用户显式确认。
+- 根据目标照片和本地风格知识生成逐图 `EditIntent v2`，而不是批量套用固定 preset。
+- 将编辑意图编译为后端专用 `ExecutionPlan`，执行后生成带输入/输出指纹的 `ExecutionReceipt`。
+- 绑定实际成片进行复核，默认最多两轮有界修订。
+- 只把最终接受的编辑写入本地个人范例库，供后续个性化检索。
+- 用独立的 benchmark 合同区分执行可靠性与视觉质量。
+- 从批准的教程来源构建本地私有风格证据，再生成可公开、去来源化的语义风格知识。
+
+支持扫描的 RAW 扩展名包括：`.3fr`、`.arw`、`.cr2`、`.cr3`、`.dng`、`.nef`、`.orf`、`.raf`、`.raw` 和 `.rw2`。
+
+## 工作流
 
 ```text
-三个照片工作流 agent skills + 一个本地风格知识库 + 少量可复用脚本 + 平台适配层
+用户描述用途与照片目录
+        ↓
+curate-photos：扫描 → 内嵌预览 → 联系表
+        ↓
+视觉模型：去重、选片、分配角色、编排顺序
+        ↓
+用户确认 selection_plan
+        ↓
+develop-photos：预览证据 → EditIntent → ExecutionPlan
+        ↓
+RawTherapee 渲染 → ExecutionReceipt
+        ↓
+视觉模型复核成片 → 接受或有限修订
+        ↓
+输出成片、报告；可选写入个人范例库
 ```
 
-目标工作流：
+四个可移植 skill 位于 [`skills/`](skills/)：
 
-1. 用户对 agent 说：“帮我处理某个目录里的照片”。
-2. `curate-photos` 扫描 RAW、生成联系表，由 agent 使用视觉推理按用途选片并编排顺序。
-3. 用户确认选片方案后，`develop-photos` 只处理确认照片。
-4. Agent 结合风格库、照片预览和自主判断选择调色方向。
-5. Agent 为每张照片生成编辑器无关的 `EditIntent v2`，并判断是否需要裁剪二次构图。
-6. Skill 将意图编译为后端专用 `ExecutionPlan`，执行后输出可验证的 `ExecutionReceipt`。
-7. Agent 复核首轮输出，必要时生成修订计划再渲染。
-8. 输出处理记录，方便用户复盘选片、编排、风格、构图和参数决策。
-9. 定时任务使用风格库更新 skill，从社交媒体和视频教程里更新风格库。
+| Skill | 职责 |
+| --- | --- |
+| [`curate-photos`](skills/curate-photos/SKILL.md) | 按用途选片、去重、分配叙事角色和编排顺序 |
+| [`develop-photos`](skills/develop-photos/SKILL.md) | 对用户已确认的照片生成逐图编辑意图、渲染并复核 |
+| [`learn-styles`](skills/learn-styles/SKILL.md) | 从用户批准的来源更新本地风格知识库 |
+| [`fetch-bilibili-subtitles`](skills/fetch-bilibili-subtitles/SKILL.md) | 获取已有字幕，供私有教程摄取流程使用 |
 
-## MVP
+CLI 是 skill 调用的确定性工具，不是主要交互界面。审美选择不会由脚本中的固定分数替代。
 
-第一阶段先做 skill 的本地处理闭环：
+## 快速开始
 
-- 暂不接入社交平台。
-- 内置 5 个手写风格卡，形成最小知识库。
-- 支持扫描指定目录的 RAW、按拍摄日期限定候选集、生成预览和联系表。
-- 让 agent 使用模型视觉能力按用途去重、选片、分配叙事角色并编排顺序，用户确认后再进入修图。
-- 让 agent 根据风格库、照片预览和照片内容选择处理风格。
-- 让每张开发预览通过 `PreviewProvider` 生成版本化 `PreviewArtifact`，绑定 RAW 内容、实际起始 profile/sidecar 状态和输出文件指纹。
-- 让 agent 生成每张照片的动态调色计划，而不是固定套用 profile。
-- 让 agent 在 plan 中记录裁剪判断，并在渲染后复核输出、必要时二次修改。
-- 通过 RawTherapee CLI 优先渲染导出；darktable CLI 作为 legacy fallback；Lightroom Classic 可作为可选交互式处理引擎。
-- 输出处理后的图片和 Markdown 处理记录。
+### 1. 获取代码
 
-## 项目结构
-
-```text
-lumenflow/
-├── skills/
-│   ├── develop-photos/          # 用户主动要求处理照片时使用
-│   ├── curate-photos/           # 按用途主动选片、去重与编排
-│   └── learn-styles/            # 定时任务或用户主动更新风格库时使用
-├── knowledge/
-│   ├── style_families/          # 可提交、去来源化的可复用风格知识
-│   ├── style_cards/             # 手写风格卡与私有教程中间产物
-│   │   ├── tutorial_recipes/     # 私有 recipe 与 transcript
-│   │   └── tutorial_derived/     # 私有视频级证据卡，不参与运行时检索
-│   ├── private_provenance/      # 私有来源映射，Git 忽略
-│   ├── style_library_index.json # 风格库检索入口
-│   ├── source_records/           # 社媒/教程来源记录
-│   ├── raw_profiles/            # legacy/fallback RawTherapee profile
-│   └── schemas/                 # adjustment_plan 等 JSON 合同
-├── adapters/                     # Codex / Claude / OpenClaw 等平台适配说明
-├── scripts/                      # skill 可调用的小工具脚本
-└── docs/                         # 设计说明、roadmap 和 architecture notes
+```bash
+git clone https://github.com/Ryan-HuangRui/Lumenflow.git
+cd Lumenflow
 ```
 
-## Skill 设计
+### 2. 创建 Python 环境
 
-照片工作流拆成三个主要 skill：
+需要 Python 3.11 或更高版本。
 
-- `curate-photos`：扫描候选 RAW、提取相机内嵌预览、生成联系表，由 agent 直接使用视觉推理理解用途、去除废片/重复片、选择并编排，输出待用户确认的 `selection_plan.json`。
-- `develop-photos`：只处理用户已确认或直接指定的 RAW，由 agent 看图选择风格并生成动态参数，调用修图 CLI，输出图片和处理记录。
-- `learn-styles`：从用户批准的教程来源更新本地私有风格库。
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-CLI 只作为调试和脚本复用入口，不是主交互界面。
+教程 ASR 是可选能力；只有需要本地语音识别时才安装：
 
-## 风格知识结构
+```bash
+python -m pip install -r requirements-asr.txt
+```
 
-教程来源进入风格库后分成公开知识层和私有证据层：
+### 3. 安装外部工具
 
-- 可复用知识：`knowledge/style_families/*.json`，按语义家族合并，供检索、场景匹配和调色推理；不含视频 ID、标题、URL、转写原句或时间戳。
-- 检索入口：`knowledge/style_library_index.json`，只索引可复用知识，可随代码提交。
-- 私有中间证据：`knowledge/style_cards/tutorial_recipes/` 与 `knowledge/style_cards/tutorial_derived/`，保留转写、分类和审计所需信息，但不参与照片处理时的运行时检索。
-- 私有溯源：`knowledge/private_provenance/style_source_map.json`，把语义知识映射回来源，仅用于本地审计并由 Git 忽略。
+当前完整照片主路径需要：
 
-公开知识只保留跨照片可复用的视觉特征、适用/避用场景、操作顺序、参数推理策略和聚合计数。第三方教程的 transcript、recipe、视频级证据卡和来源映射继续由 `.gitignore` 排除。
+- [ExifTool](https://exiftool.org/)：读取元数据并提取 RAW 内嵌预览。
+- [RawTherapee](https://rawtherapee.com/)：提供 `rawtherapee-cli`，用于状态绑定预览和一等 RAW 渲染。
 
-照片处理时，agent 根据目标照片直接选择一张可复用语义知识卡。具体参数始终由 agent 看目标照片后写入 `adjustment_plan.json`，不读取私有视频证据，也不把教程参数当作固定 preset。
+可选工具包括 `darktable-cli`、Lightroom CLI Bridge、`ffmpeg`、`ffprobe` 和 `yt-dlp`。只有启用对应功能时才需要安装。
 
-更新和检索的固定流程见 `docs/style_library_workflows.md`。
-
-## 本机配置
-
-机器相关路径不写进可提交配置。复制模板后在本机填写：
+### 4. 创建本机配置
 
 ```bash
 cp config/lumenflow.local.example.json config/lumenflow.local.json
 ```
 
-`config/lumenflow.local.json` 已加入 `.gitignore`。当前用于放置照片处理输出根目录、Bilibili cookie 文件路径、豆包 ASR skill/私有配置路径、FunASR Python 路径、ASR 输出/缓存路径、模型名、本机工具命令名和 Lightroom 导出参数。ASR 顺序为平台字幕、豆包、FunASR。教程来源白名单使用本地 `knowledge/source_records/tutorial_sources.json`，该文件也被忽略；公开仓库只提交 `knowledge/source_records/tutorial_sources.example.json`。
+至少把 `photos.output_root` 改为本机的绝对输出目录。`config/lumenflow.local.json` 已被 Git 忽略。
 
-照片处理默认输出到 `photos.output_root/<原照片所属目录名>/`。例如源文件位于 `negative_raw/2026五一港珠澳/P1034473.RW2` 时，最终图会进入 `photos.output_root/2026五一港珠澳/`。
+### 5. 检查环境
 
-## 脚本定位
+```bash
+python scripts/check_environment.py --fail-on-missing-required
+```
 
-`scripts/` 下的脚本只作为 skill 的工具函数，不是主交互界面。
+输出是 JSON；`summary.overall_status` 为 `ready` 表示当前必需依赖可用。可选工具缺失不会阻止不依赖它们的流程。
 
-典型调用会由 agent host 编排：
+### 6. 让 agent 使用仓库
+
+当前尚未提供一键安装包。请让支持本地文件和视觉输入的 agent host 读取本仓库的 `skills/`、`knowledge/` 与 `scripts/`。各宿主的适配说明位于 [`adapters/`](adapters/)；Codex 可直接从仓库运行这些 skill。
+
+可以直接对 agent 说：
 
 ```text
-用户请求
-↓
-Agent host 选择 skill
-↓
-skill 读取 knowledge/
-↓
-skill 按需调用 scripts/
-↓
-输出图片和处理记录
+请使用这个仓库的 curate-photos skill，
+从 /path/to/raws 中选出 12 张照片，编排成一组城市旅行故事。
+先给我选片提案，得到我确认后再修图。
 ```
 
-## 外部工具
+## 用 agent 完成一次选片
 
-计划依赖的本地工具：
-
-- RawTherapee CLI：第一版主要 RAW 渲染引擎，使用 agent 生成的临时 `.pp3` profile。
-- darktable CLI：备选渲染引擎，也可用于更强的 lighttable 筛选/标记工作流。
-- Lightroom CLI：可选交互式引擎，要求 Lightroom Classic 已打开、Lightroom CLI Bridge 插件已启动，且目标照片已在 catalog 中。
-- ExifTool：读取元数据和辅助验证。
-
-## 预览合同
-
-`scripts/create_previews.py` 默认使用 RawTherapee `PreviewProvider`。输出的
-`preview_manifest.json` 不再只是文件路径列表；每一项都是
-`lumenflow.preview_artifact.v1`，包含：
-
-- RAW 的 SHA-256 与字节数。
-- 实际参与预览的基础 profile 和同名 `.pp3` sidecar 内容指纹。
-- 可复算的 `starting_state_hash` 和 `complete` / `partial` 完整度。
-- 执行命令、状态以及成功输出的 SHA-256。
-
-这使 agent 后续生成的编辑意图能够明确引用“看过的是哪张照片、基于什么起始状态”。
-兼容字段 `source`、`preview`、`command` 和 `status` 仍然保留。
-
-Lightroom 预览当前保持 fail-closed。只有 Bridge 同时声明并验证
-`safe_object_develop_read` 和 `verified_state_bound_preview`，Lumenflow 才会越过预检；
-完整的 Lightroom 状态绑定适配器仍需真机探针后实现。
-
-## 后端能力合同
-
-`scripts/backend_capabilities.py` 输出严格的
-`lumenflow.backend_capabilities.v1` 合同。每项能力只有三种状态：
-`supported`、`unsupported` 或 `unverified`；调用方必须通过 `require()` 显式检查，
-不能把“命令存在”推断成“能力安全可用”。
+准备 curation workspace：
 
 ```bash
-python3 scripts/backend_capabilities.py rawtherapee
-python3 scripts/backend_capabilities.py darktable
-python3 scripts/backend_capabilities.py lightroom
-python3 scripts/backend_capabilities.py lightroom --probe
+python scripts/curate_photos.py prepare /path/to/raws \
+  --output-dir /path/to/output/curation \
+  --date-from 2026-06-01 \
+  --date-to 2026-06-30
 ```
 
-当前合同明确区分：RawTherapee 的一等预览/渲染能力、darktable 的 legacy-only
-命令路径，以及 Lightroom 必须由运行中 Bridge 证明确切读取、写入、导出和预览能力的
-动态边界。未知能力、明确不支持的能力和尚未验证的能力分别返回不同的结构化错误码。
+该命令会生成：
 
-darktable 必须通过独立的真实 RAW 隔离导出探针，不能仅凭命令存在就升级能力：
+- `candidate_manifest.json`：RAW、元数据、预览和失败记录之间的可追踪映射。
+- `previews/`：从 RAW 提取的相机内嵌 JPEG。
+- `contact_sheets/`：供视觉模型完整浏览候选集的联系表。
+
+随后，agent 应查看所有联系表；对焦点、表情或近重复选择不确定时，再查看单张高分辨率预览。它会依据 [`selection_plan.schema.json`](knowledge/schemas/selection_plan.schema.json) 写出 `selection_plan.json`。
+
+校验并打包提案：
 
 ```bash
-python3 scripts/darktable_probe.py \
-  --raw /photo-source/sentinel.NEF \
-  --output-dir /photo-output/darktable-probe \
-  --report-output /photo-output/darktable-probe/report.json
+python scripts/curate_photos.py finalize \
+  /path/to/output/curation/candidate_manifest.json \
+  /path/to/output/curation/selection_plan.json
 ```
 
-探针使用临时配置、临时缓存、内存 library，并强制 `write_sidecar_files=never`；只有导出
-成功、RAW 与 sidecar 均未变化、输出可计算指纹时才返回 `passed`。本机实测安装状态及
-后端升级门槛见 [docs/darktable_backend_spike.md](docs/darktable_backend_spike.md)。
+输出包括有序预览、规范化计划和 `selection_report.md`。此时计划状态仍应是 `agent_recommended_pending_user_confirmation`；用户确认后，agent 才能将其改为 `user_confirmed` 并交给 `develop-photos`。
 
-## EditIntent 与执行收据
+`curate-photos` 不会修改 RAW、sidecar、Lightroom 评分或集合成员。
 
-新主路径使用三个分离合同：
+## 用 agent 完成一次修图
 
-- `lumenflow.edit_intent.v2`：模型表达用途、风格、全局调整、构图和局部调整需求，不含编辑器命令。
-- `lumenflow.execution_plan.v1`：编译器根据后端能力生成 profile、输出路径和无 shell 的 argv。
-- `lumenflow.execution_receipt.v1`：执行器记录每个操作状态、RAW 前后指纹、输出指纹和失败原因。
+修图主路径以视觉模型生成的 [`EditIntent v2`](knowledge/schemas/edit_intent.schema.json) 为输入。该意图必须绑定：
 
-当前首个编译器覆盖 RawTherapee 的全局曝光、亮度、对比度、高光恢复、阴影提升、
-黑位、饱和度、白平衡和像素裁剪。编译阶段不写文件；执行阶段要求调用方显式提供
-允许写入的输出根目录，并再次验证 RAW 指纹、能力合同、profile 内容、路径边界和完整命令。
+- 用户确认的授权引用；
+- RAW 内容指纹；
+- 模型实际查看过的 `PreviewArtifact`；
+- 生成预览时的起始状态哈希。
+
+编译为 RawTherapee 执行计划：
 
 ```bash
-python3 scripts/edit_intent.py compile intent.json \
+python scripts/edit_intent.py compile /path/to/photo.edit_intent.json \
   --backend rawtherapee \
-  --output-dir /photo-output/bangkok \
-  --plan-output /photo-output/bangkok/execution_plan.json
+  --output-dir /path/to/output \
+  --plan-output /path/to/output/photo.execution_plan.json
+```
 
-python3 scripts/edit_intent.py execute /photo-output/bangkok/execution_plan.json \
-  --allowed-output-dir /photo-output/bangkok \
-  --receipt-output /photo-output/bangkok/execution_receipt.json \
+先进行 dry-run：
+
+```bash
+python scripts/edit_intent.py execute /path/to/output/photo.execution_plan.json \
+  --allowed-output-dir /path/to/output \
+  --receipt-output /path/to/output/photo.execution_receipt.json \
   --dry-run
 ```
 
-旧 `lumenflow.adjustment_plan.v1` 和 `scripts/render_adjustment_plan.py` 继续保留，作为兼容路径；
-新功能不再向该合同加入后端特定字段。
+检查计划后，移除 `--dry-run` 执行真实渲染。执行器会再次检查 RAW 指纹、能力合同、profile 内容、命令和输出目录边界；不满足条件时会拒绝运行。
 
-## 成片复核与有界修订
-
-宿主模型直接查看实际渲染 JPEG，并写入 `lumenflow.review_result.v1`；确定性代码不做审美
-打分，而是核对 ReviewResult 是否绑定当前 intent revision、plan、成功 receipt 和同一份输出
-字节。默认最多允许两轮修订，拒绝 dry-run 收据、输出漂移、无效修订、重复 review、历史
-intent 循环和对授权/RAW/预览依据/用途的修改。
+首次成片不是自动接受的最终稿。宿主模型应查看实际输出，写入 [`ReviewResult v1`](knowledge/schemas/review_result.schema.json)，然后推进有界复核会话：
 
 ```bash
-python3 scripts/review_loop.py start intent.json \
+python scripts/review_loop.py start /path/to/photo.edit_intent.json \
   --max-revisions 2 \
-  --state-output review_session.json
+  --state-output /path/to/output/photo.review_session.json
 
-python3 scripts/review_loop.py advance \
-  review_session.json execution_plan.json execution_receipt.json review_result.json \
-  --state-output review_session.json \
-  --next-intent-output intent.r2.json
+python scripts/review_loop.py advance \
+  /path/to/output/photo.review_session.json \
+  /path/to/output/photo.execution_plan.json \
+  /path/to/output/photo.execution_receipt.json \
+  /path/to/output/photo.review_result.json \
+  --state-output /path/to/output/photo.review_session.json \
+  --next-intent-output /path/to/output/photo.edit_intent.r2.json
 ```
 
-完整合同和宿主模型职责见 [docs/review_loop.md](docs/review_loop.md)。
+完整职责与证据规则见 [`docs/review_loop.md`](docs/review_loop.md)。
 
-## 评测与回归门禁
+## 后端支持状态
 
-`scripts/benchmark_eval.py` 把执行可靠性与视觉质量分开统计。宿主模型对绑定到输出指纹的
-成片按技术质量、用途匹配、风格一致性、构图和自然度评分；运行时从 plan、receipt、
-review session 生成内容寻址的 observation。执行失败仍进入分母，而且任何完整性失败都会让
-后端门禁失败，不能用高视觉分抵消。
+| 后端 | 当前定位 | 预览 | EditIntent v2 | 真实执行 |
+| --- | --- | --- | --- | --- |
+| RawTherapee | 推荐的一等后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 | 支持 |
+| darktable | legacy/实验路径 | 尚无一等状态绑定 provider | 尚无编译器 | 仅在隔离探针通过后评估，不自动升级能力 |
+| Lightroom Classic | 交互式兼容路径 | 尚未完成可信状态绑定 | 仍使用旧 `adjustment_plan.v1` 路径 | 默认 fail-closed；当前只应 dry-run |
+
+后端能力由 `lumenflow.backend_capabilities.v1` 明确声明为 `supported`、`unsupported` 或 `unverified`。命令存在不等于能力已经安全可用：
 
 ```bash
-python3 scripts/benchmark_eval.py record case.json plan.json receipt.json \
-  --session review_session.json --assessment visual_assessment.json \
-  --runtime-ms 1840 --output observation.json
-
-python3 scripts/benchmark_eval.py report observations.json \
-  --minimum-cases 5 --output candidate-report.json
-
-python3 scripts/benchmark_eval.py compare candidate-report.json baseline-report.json \
-  --output comparison.json
+python scripts/backend_capabilities.py rawtherapee
+python scripts/backend_capabilities.py darktable
+python scripts/backend_capabilities.py lightroom --probe
 ```
 
-私人 RAW 与评测产物放在仓库外或已忽略的 `runs/` 下。语料设计、量表和默认门槛见
-[docs/benchmark.md](docs/benchmark.md)。
+darktable 的隔离验证方法见 [`docs/darktable_backend_spike.md`](docs/darktable_backend_spike.md)。Lightroom 只有在 CLI Bridge 对对象级读取、写入、导出和状态绑定预览完成真机验证后，才会开放非 dry-run 自动写入。
 
-## 个人编辑范例库
+## 架构与数据合同
 
-最终 `accepted` 的编辑可以写入本地 SQLite 范例库，供后续按用途词、场景标签和风格检索。
-入库记录不含 RAW/JPEG 像素、文件路径、授权引用或目录身份；检索结果只作为宿主模型的
-个性化参考，不能跳过新照片的视觉分析，也不能直接复制曝光、白平衡或裁剪。
+```text
+Lumenflow/
+├── skills/                 # agent 工作流与判断边界
+├── scripts/                # 扫描、预览、校验、执行、复核等确定性工具
+├── knowledge/
+│   ├── schemas/            # 可版本化 JSON 合同
+│   ├── style_families/     # 可公开的去来源化语义知识
+│   ├── style_cards/        # 手写 starter cards；私有生成物位于被忽略子目录
+│   ├── raw_profiles/       # legacy/fallback profile 位置
+│   └── source_records/     # 仅提交示例配置
+├── adapters/               # Codex、Claude、OpenClaw 宿主适配说明
+├── docs/                   # 架构、benchmark、roadmap 与工作流说明
+└── tests/                  # 标准库 unittest 测试
+```
+
+关键合同：
+
+| 合同 | 作用 |
+| --- | --- |
+| `CandidateManifest` | 记录候选 RAW、预览与失败，防止静默漏片 |
+| `SelectionPlan v1` | 固化用途、顺序、角色、理由、备选和用户确认状态 |
+| `PreviewArtifact v1` | 绑定 RAW 指纹、起始编辑状态、命令和预览输出字节 |
+| `BackendCapabilities v1` | 明确后端能力边界，未知或未验证能力默认拒绝 |
+| `EditIntent v2` | 表达与编辑器无关的视觉目标和逐图判断 |
+| `ExecutionPlan v1` | 保存编译后的 profile、输出边界与无 shell argv |
+| `ExecutionReceipt v1` | 记录执行状态、RAW 前后指纹和输出指纹 |
+| `ReviewResult v1` | 将接受/修订/拒绝判断绑定到实际输出字节 |
+
+更详细的设计见 [`docs/architecture_notes.md`](docs/architecture_notes.md) 和 [`docs/portability.md`](docs/portability.md)。
+
+## 风格知识库
+
+Lumenflow 区分“可复用知识”和“私有来源证据”：
+
+- `knowledge/style_families/*.json` 是去来源化的语义风格族，可提交、可检索。
+- `knowledge/style_library_index.json` 是运行时公开检索入口。
+- `knowledge/style_cards/tutorial_recipes/`、`tutorial_derived/` 和 `knowledge/private_provenance/` 保存本地证据与溯源，默认由 Git 忽略。
+
+照片处理时，agent 先看目标照片，再选择语义风格卡，并根据当前照片推理具体参数。风格卡是指导，不是可以直接复制到所有照片的 preset。完整更新与检索规则见 [`docs/style_library_workflows.md`](docs/style_library_workflows.md)。
+
+## 隐私与安全边界
+
+Lumenflow 默认遵循以下边界：
+
+- 不覆盖原始 RAW，不在用户未授权时修改 sidecar、Lightroom catalog、评分或集合。
+- 选片提案不等于用户确认；未确认计划不能进入自动修图。
+- 执行计划必须声明允许写入的输出根目录，并拒绝路径逃逸和已有输出覆盖。
+- RAW、渲染结果、benchmark 语料、SQLite 任务状态和个人范例库应放在仓库外，或放在已忽略的 `runs/`、`tmp/`、`local/` 中。
+- 本机配置、cookie、真实来源白名单、transcript、教程 recipe 和私有溯源映射不应提交。
+- 个人范例库不保存 RAW/JPEG 像素、原始文件路径或授权引用；只接受最终 `accepted` 的编辑记录。
+- Lightroom 和其他未验证后端采用 fail-closed 策略，不会因为检测到一个命令就开放写入。
+
+提交前建议运行：
 
 ```bash
-python3 scripts/personal_example_store.py add \
-  review_session.json execution_plan.json execution_receipt.json \
-  --tag bangkok --tag night
-
-python3 scripts/personal_example_store.py search \
-  --purpose "Bangkok night travel" --tag night --limit 5
+git status --short
+git ls-files | grep -E 'lumenflow\.local\.json|(^|/)local/|(^|/)runs/|(^|/)tmp/'
 ```
 
-默认数据库位于已忽略的 `local/personal_edit_examples.sqlite3`，支持列出和显式删除；隐私
-边界、备份限制和完整工作流见 [docs/personal_edit_examples.md](docs/personal_edit_examples.md)。
+第二条命令正常情况下不应输出任何内容。若曾经提交过真实凭据，仅从当前版本删除文件并不够；还需要轮换凭据并清理 Git 历史。
 
-## Lightroom 引擎
+## 配置
 
-Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。
+[`config/lumenflow.local.example.json`](config/lumenflow.local.example.json) 是完整模板。常用字段：
 
-运行前需要：
+| 字段 | 用途 |
+| --- | --- |
+| `photos.output_root` | 照片工作区和成片的默认根目录 |
+| `workflow.task_store` | 本地任务、确认状态与幂等操作数据库 |
+| `workflow.personal_example_store` | 仅保存最终接受编辑的本地范例库 |
+| `tools.*` | 覆盖本机 `rawtherapee-cli`、`darktable-cli`、`lr`、`ffmpeg` 等命令路径 |
+| `lightroom.*` | Lightroom 导出参数与严格的实验开关 |
+| `asr.*` | 私有教程的字幕/语音识别缓存与模型配置 |
+| `env.*` | 环境变量名称，不应直接写入密钥值 |
 
-1. Lightroom Classic 已启动。
-2. `Lightroom CLI Bridge` 插件已安装并启动。
-3. `lr system ping` 能返回 `pong: True`。
-4. 要处理的 RAW 已在 Lightroom catalog 中。
+若未显式传入 `--output-dir`，照片输出会写入：
 
-`adjustment_plan.json` 可以在顶层或单个 variant 下声明 Lightroom photo id。真正执行时还必须提供由外层任务状态生成的 `base_state_hash` 和 `operation_id`；下面为了简化只展示修图内容：
-
-```json
-{
-  "schema_version": "lumenflow.adjustment_plan.v1",
-  "source": "/path/to/IMG_0001.DNG",
-  "lightroom": {"photo_id": "123"},
-  "variants": [
-    {
-      "variant_id": "best",
-      "style_id": "clean_natural",
-      "rationale": "Use Lightroom as the rendering engine.",
-      "adjustments": {
-        "exposure_compensation": 0.35,
-        "saturation": -4,
-        "temperature": 5400,
-        "hsl": {
-          "orange": {"saturation": -5, "luminance": 8},
-          "green": {"hue": -10, "saturation": -20}
-        },
-        "tone_curve": {
-          "parametric": {"shadows": -8, "lights": 6},
-          "point": [[0, 0], [64, 58], [128, 132], [255, 255]]
-        },
-        "color_grading": {
-          "shadows": {"hue": 210, "saturation": 8},
-          "highlights": {"hue": 42, "saturation": 10},
-          "balance": 5
-        },
-        "calibration": {
-          "blue": {"hue": -8, "saturation": 12}
-        }
-      },
-      "composition": {
-        "decision": "no_crop",
-        "reason": "The source framing is already intentional."
-      },
-      "mask_decision": {
-        "decision": "manual_recommendation",
-        "reason": "The bright sky may need a local recovery pass, but Lightroom AI masks require overlay verification before execution.",
-        "recommended_masks": [
-          {
-            "type": "sky",
-            "rationale": "Recover bright sky detail without darkening the subject.",
-            "settings": {
-              "highlights": -35,
-              "dehaze": 12
-            }
-          }
-        ]
-      }
-    }
-  ]
-}
+```text
+<photos.output_root>/<源照片目录名>/
 ```
 
-渲染命令：
+## 测试
+
+项目测试使用 Python 标准库 `unittest`：
 
 ```bash
-python3 scripts/render_adjustment_plan.py output/plans/IMG_0001.adjustment_plan.json --engine lightroom
+python -m unittest discover -s tests
 ```
 
-如果 plan 没有 `lightroom.photo_id`，非 dry-run 时会尝试用 `lr -o json catalog find-by-path <source>` 从 catalog 中解析照片 id。Lightroom 引擎把参数编译为绝对目标值，并通过 `lr develop apply-verified` 的预留安全契约执行，再调用 `lr export photo`。当前 Bridge 会对 `apply-verified` 明确返回 `CAPABILITY_NOT_VERIFIED`，且能力握手保持关闭，因此只能 dry-run；必须通过隔离 catalog 真机探针后才能放开。
+当前主分支包含 166 个测试。部分用例会打印 dry-run 命令和 JSON 摘要，这是预期行为；测试不会处理真实照片。
 
-任务、用途提案、用户冻结确认、catalog 照片实例、起始状态快照和幂等操作记录由 `scripts/task_store.py` 保存到本地 SQLite，默认路径为被 git 忽略的 `local/lumenflow_tasks.sqlite3`。这些工作流状态不进入单图 `adjustment_plan`。
+改动 JSON 合同、执行器或安全边界时，还应运行：
 
-Lightroom 路径的全局参数支持基础曝光/色温/质感参数，也支持 Lightroom-only 的 `hsl`、`color_mixer`、`tone_curve`、`color_grading`、`calibration`。这些高级参数会写入 Lightroom catalog，便于后续在 Lightroom 里继续调整；RawTherapee 路径目前不执行这些高级 Lightroom 字段。
+```bash
+python scripts/check_environment.py
+python scripts/backend_capabilities.py rawtherapee
+git diff --check
+```
 
-当前 Lightroom AI mask 批处理路径默认禁用。现有 `lightroom-cli`/Bridge 的 `develop ai batch <type> --photos <photo_id>` 可能在 Develop/Masking 上下文切换未完成时把 AI 蒙版写到错误照片。能力握手未通过期间，即使本地开启实验性蒙版开关，非 dry-run 仍会被全局安全闸门拒绝。
+## 常见问题
+
+### 它能脱离视觉模型独立完成审美选片吗？
+
+不能，也不打算用固定评分器冒充审美判断。脚本会准备完整、可追踪的视觉材料；理解用途、比较照片和编排叙事由宿主模型完成。
+
+### 为什么选片使用内嵌 JPEG，而修图预览另有 PreviewArtifact？
+
+选片阶段需要快速、无副作用地浏览整个候选集，适合使用相机内嵌预览。修图阶段必须知道模型看到的是哪一份渲染和哪一个起始编辑状态，所以使用带指纹的状态绑定预览。
+
+### 为什么 Lightroom 默认不能自动写入？
+
+Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“命令成功”不足以证明写到了正确照片、没有覆盖并发手工修改、也没有重复操作。真机安全门通过前，Lumenflow 会拒绝非 dry-run 写入。
+
+### 可以用 darktable 替代 RawTherapee 吗？
+
+目前不能作为等价的一等后端。仓库提供隔离 RAW 导出探针和 legacy 命令路径，但还缺少状态绑定预览 provider、EditIntent 编译器和完整收据能力。
+
+### 依赖检查通过，但某个可选流程仍不可用？
+
+环境检查只把当前主照片路径的依赖标为必需。教程摄取、ASR、社交来源更新和 Lightroom 各有额外依赖，请查看对应 skill 和本机配置。
+
+## 项目状态与路线图
+
+已落地的主干包括：
+
+- 用途驱动的主动选片、去重与编排。
+- 用户确认门和仅处理确认照片的边界。
+- 状态绑定预览、后端能力合同和 RawTherapee 意图执行链。
+- 最多两轮的成片复核闭环。
+- benchmark/回归合同与本地个人编辑范例库。
+- 可公开的语义风格层与私有来源证据分离。
+
+当前重点是扩大 RawTherapee 参数覆盖、完成 clean-clone/host packaging、验证真实 Lightroom 安全边界，并在满足 provider/compiler/receipt 条件后评估其他后端。详见 [`docs/roadmap.md`](docs/roadmap.md)。
+
+## 参与贡献
+
+欢迎提交 issue、设计讨论和 pull request。请保持当前架构边界：
+
+1. 审美判断属于 agent，确定性扫描、校验和执行属于脚本。
+2. 新后端必须先定义并验证能力合同，不能从“命令可执行”推断“安全可用”。
+3. 新功能应补充测试；涉及合同变化时同步更新 schema 和文档。
+4. 不要提交 RAW、成片、cookie、API key、真实来源清单、transcript 或个人数据库。
+5. 提交 PR 前运行完整测试与 `git diff --check`。
+
+仓库暂未提供正式贡献者指南或行为准则；在这些文件补齐前，请通过 GitHub issue 先讨论较大的设计变更。
+
+## 许可证
+
+当前仓库尚未包含 `LICENSE` 文件。代码公开可见并不自动授予复制、修改或分发权；维护者需要在正式接受外部使用与贡献前选择并添加开源许可证。
