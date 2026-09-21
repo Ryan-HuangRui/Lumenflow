@@ -95,7 +95,13 @@ control in that module.
 | Sharpening / SharpenEdge / SharpenMicro / PostDemosaicSharpening | enable, method, radius, amount, contrast, iteration and edge controls |
 | Lens / geometry | lens profile mode/toggles, distortion, chromatic-aberration correction, rotation, perspective, coarse transforms |
 | Crop / Resize | bounded pixel crop, scale/dimensions, and upscaling flag |
-| Color Management | gamut, allowlisted output profile/intent, black-point compensation |
+| Color Management | gamut, the live-verified `RTv4_sRGB` output profile, output intent, black-point compensation |
+
+`Color Management.OutputProfile` is deliberately restricted to the exact
+bundled ICC base name `RTv4_sRGB`.  Generic labels such as `sRGB`, `Adobe RGB`,
+`ProPhoto`, or `Rec2020` are not accepted because RawTherapee 5.11 may resolve
+them differently or silently fall back; other bundled profiles require their
+own embedded-ICC live evidence before being added.
 
 The fixture test combines these sections in one immutable PP3 and renders all
 three local Bangkok RW2 copies.  It checks decoded-pixel difference from the

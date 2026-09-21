@@ -536,7 +536,7 @@
         "additionalProperties": false,
         "properties": {
           "Gamut": {"$ref": "#/$defs/native_bool"},
-          "OutputProfile": {"enum": ["RTv4_sRGB", "sRGB", "Adobe RGB", "ProPhoto", "Rec2020"]},
+          "OutputProfile": {"enum": ["RTv4_sRGB"]},
           "OutputProfileIntent": {"enum": ["Relative", "Perceptual", "Saturation", "Absolute"]},
           "OutputBPC": {"$ref": "#/$defs/native_bool"}
         }

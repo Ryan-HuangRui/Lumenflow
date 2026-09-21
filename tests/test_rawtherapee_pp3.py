@@ -248,6 +248,39 @@ Compiler=test
                 normalized = rawtherapee_pp3.validate_native_sections(contract)
                 self.assertEqual(normalized["sections"][section][key], minimum)
 
+    def test_output_profile_allowlist_matches_live_verified_icc_name(self) -> None:
+        schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "edit_intent.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        color_management_ref = schema["properties"]["style"]["properties"]["rawtherapee"][
+            "properties"
+        ]["sections"]["properties"]["Color Management"]["$ref"]
+        color_management_schema = schema
+        for component in color_management_ref.removeprefix("#/").split("/"):
+            color_management_schema = color_management_schema[component]
+
+        expected = ("RTv4_sRGB",)
+        runtime_spec = rawtherapee_pp3.RAWTHERAPEE_NATIVE_FIELD_SPECS["Color Management"][
+            "OutputProfile"
+        ]
+        self.assertEqual(runtime_spec.choices, expected)
+        self.assertEqual(
+            tuple(color_management_schema["properties"]["OutputProfile"]["enum"]),
+            expected,
+        )
+        for unsupported in ("sRGB", "Adobe RGB", "ProPhoto", "Rec2020"):
+            with self.subTest(unsupported=unsupported), self.assertRaises(
+                rawtherapee_pp3.PP3UnsupportedValue
+            ):
+                rawtherapee_pp3.validate_native_sections(
+                    {
+                        "profile_version": 349,
+                        "sections": {"Color Management": {"OutputProfile": unsupported}},
+                    }
+                )
+
     def test_native_contract_rejects_empty_and_mutually_conflicting_input_shapes(self) -> None:
         for value in (
             None,

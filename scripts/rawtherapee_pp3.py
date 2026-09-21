@@ -288,7 +288,10 @@ RAWTHERAPEE_NATIVE_FIELD_SPECS: dict[str, dict[str, NativeFieldSpec]] = {
     },
     "Color Management": {
         "Gamut": _native_bool(),
-        "OutputProfile": _native_enum("RTv4_sRGB", "sRGB", "Adobe RGB", "ProPhoto", "Rec2020"),
+        # The value is an exact bundled ICC base name, not a generic color-space
+        # label.  Keep this to the live-verified profile until each additional
+        # RawTherapee 5.11 output profile has its own embedded-ICC evidence.
+        "OutputProfile": _native_enum("RTv4_sRGB"),
         "OutputProfileIntent": _native_enum("Relative", "Perceptual", "Saturation", "Absolute"),
         "OutputBPC": _native_bool(),
     },
