@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import backend_capabilities
+import darktable_codec
 import lumenflow_config
 import preview_provider
 import render_adjustment_plan
@@ -68,6 +69,7 @@ GLOBAL_ADJUSTMENT_RANGES: dict[str, tuple[float | None, float | None]] = {
     "temperature_k": (2000, 50000),
     "green_multiplier": (0, None),
 }
+DARKTABLE_STATE_INPUT_ROLES = {"base_profile", "source_sidecar"}
 
 
 def _now() -> str:
@@ -188,9 +190,22 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
     if not str(intent.get("purpose", "")).strip():
         raise IntentValidationError("purpose is required")
     style = _require_object(intent.get("style"), "style")
-    _reject_unknown(style, {"style_id", "rationale"}, "style")
+    _reject_unknown(style, {"style_id", "rationale", "darktable"}, "style")
     if not str(style.get("style_id", "")).strip() or not str(style.get("rationale", "")).strip():
         raise IntentValidationError("style_id and style rationale are required")
+    darktable_style = style.get("darktable")
+    if darktable_style is not None:
+        darktable_style = _require_object(darktable_style, "style.darktable")
+        _reject_unknown(darktable_style, {"modules"}, "style.darktable")
+        modules = darktable_style.get("modules")
+        if not isinstance(modules, list) or not modules:
+            raise IntentValidationError("style.darktable.modules must be a non-empty array")
+        # The engine-specific codec performs field/range validation during
+        # compilation.  Keep schema validation strict about the container so
+        # malformed JSON cannot be interpreted as a replay request.
+        for index, module in enumerate(modules):
+            if not isinstance(module, dict):
+                raise IntentValidationError(f"style.darktable.modules[{index}] must be an object")
     global_adjustments = _require_object(intent.get("global_adjustments"), "global_adjustments")
     _validate_adjustments(global_adjustments, "global_adjustments")
 
@@ -350,6 +365,33 @@ def _rawtherapee_profile_inputs(
     return inputs
 
 
+def _darktable_starting_state(fingerprint: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "kind": "darktable_xmp",
+        "xmp": fingerprint,
+        "uses_engine_default": False,
+        "library": ":memory:",
+        "write_sidecars": False,
+    }
+
+
+def _read_darktable_xmp(path: Path) -> tuple[str, dict[str, Any]]:
+    if path.is_symlink() or not path.is_file():
+        raise IntentValidationError("darktable XMP input must be an existing regular file")
+    if path.stat().st_size > 1024 * 1024:
+        raise IntentValidationError("darktable XMP input exceeds the 1 MiB plan limit")
+    raw = path.read_bytes()
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise IntentValidationError("darktable XMP input must be UTF-8") from error
+    fingerprint = {
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "size_bytes": len(raw),
+    }
+    return content, fingerprint
+
+
 def _darktable_xmp_input(source_path: Path) -> tuple[Path, str, dict[str, Any], str]:
     candidates = {
         source_path.with_suffix(".xmp"),
@@ -361,21 +403,89 @@ def _darktable_xmp_input(source_path: Path) -> tuple[Path, str, dict[str, Any], 
             "darktable XMP replay requires exactly one regular source sidecar"
         )
     xmp_path = existing[0]
-    if xmp_path.stat().st_size > 1024 * 1024:
-        raise IntentValidationError("darktable XMP sidecar exceeds the 1 MiB plan limit")
-    try:
-        content = xmp_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as error:
-        raise IntentValidationError("darktable XMP sidecar must be UTF-8") from error
-    fingerprint = preview_provider.file_fingerprint(xmp_path)
-    starting_state = {
-        "kind": "darktable_xmp",
-        "xmp": fingerprint,
-        "uses_engine_default": False,
-        "library": ":memory:",
-        "write_sidecars": False,
+    content, fingerprint = _read_darktable_xmp(xmp_path)
+    return (
+        xmp_path,
+        content,
+        fingerprint,
+        preview_provider.canonical_hash(_darktable_starting_state(fingerprint)),
+    )
+
+
+def _darktable_state_input(
+    intent: dict[str, Any],
+    source_path: Path,
+) -> tuple[Path, str, dict[str, Any], str, dict[str, Any]]:
+    """Resolve the preview-bound XMP, embedding its bytes before execution.
+
+    An explicit state input may carry content copied from the preview artifact;
+    in that case the path is provenance only and is never read.  Without
+    content, the path is read once during compilation and its declared
+    fingerprint must match.  The executor consumes only the resulting plan.
+    """
+
+    state_inputs = intent.get("preview_basis", {}).get("state_inputs")
+    if state_inputs is None:
+        xmp_path, content, fingerprint, state_hash = _darktable_xmp_input(source_path)
+        return (
+            xmp_path,
+            content,
+            fingerprint,
+            state_hash,
+            {"role": "source_sidecar", "path": str(xmp_path), **fingerprint},
+        )
+    if not isinstance(state_inputs, list) or len(state_inputs) != 1:
+        raise IntentValidationError(
+            "preview_basis.state_inputs must contain exactly one darktable XMP input"
+        )
+    state_input = state_inputs[0]
+    if not isinstance(state_input, dict):
+        raise IntentValidationError("preview_basis.state_inputs[0] must be an object")
+    role = state_input.get("role")
+    if role not in DARKTABLE_STATE_INPUT_ROLES:
+        raise IntentValidationError("preview_basis.state_inputs[0].role is not supported")
+    path_text = str(state_input.get("path", "")).strip()
+    if not path_text:
+        raise IntentValidationError("preview_basis.state_inputs[0].path is required")
+    declared = {
+        "sha256": state_input.get("sha256"),
+        "size_bytes": state_input.get("size_bytes"),
     }
-    return xmp_path, content, fingerprint, preview_provider.canonical_hash(starting_state)
+    _validate_fingerprint(declared, "preview_basis.state_inputs[0]")
+    xmp_path = Path(path_text)
+    if "content" in state_input:
+        content = state_input["content"]
+        if not isinstance(content, str):
+            raise IntentValidationError("preview_basis.state_inputs[0].content must be UTF-8 text")
+        raw = content.encode("utf-8")
+        if len(raw) > 1024 * 1024:
+            raise IntentValidationError("darktable XMP input exceeds the 1 MiB plan limit")
+        actual = {"sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
+        if actual != declared:
+            raise ExecutionPreconditionError(
+                "STATE_INPUT_FINGERPRINT_MISMATCH",
+                "Embedded darktable XMP bytes do not match the preview-bound fingerprint",
+            )
+    else:
+        content, actual = _read_darktable_xmp(xmp_path)
+        if actual != declared:
+            raise ExecutionPreconditionError(
+                "STATE_INPUT_FINGERPRINT_MISMATCH",
+                "Darktable XMP input changed since the preview was created",
+            )
+    try:
+        darktable_codec.validate_xmp(content)
+    except darktable_codec.DarktableCodecError as error:
+        raise IntentValidationError(str(error)) from error
+    starting_state = _darktable_starting_state(declared)
+    normalized = {"role": role, "path": path_text, **declared}
+    return (
+        xmp_path,
+        content,
+        declared,
+        preview_provider.canonical_hash(starting_state),
+        normalized,
+    )
 
 
 def _compile_darktable_intent(
@@ -385,22 +495,38 @@ def _compile_darktable_intent(
     local_config: dict[str, Any],
     capabilities: backend_capabilities.BackendCapabilities,
 ) -> dict[str, Any]:
+    explicit_modules = (
+        intent["style"].get("darktable", {}).get("modules", [])
+        if isinstance(intent["style"].get("darktable"), dict)
+        else []
+    )
+    dynamic_modules: list[dict[str, Any]] = []
     if intent["global_adjustments"]:
+        try:
+            dynamic_modules.extend(
+                darktable_codec.modules_from_global_adjustments(intent["global_adjustments"])
+            )
+        except darktable_codec.DarktableCodecError as error:
+            raise IntentValidationError(
+                "The darktable compiler does not map dynamic adjustments: " + str(error)
+            ) from error
+    if explicit_modules:
+        dynamic_modules.extend(explicit_modules)
+
+    composition_decision = intent["composition"]["decision"]
+    if composition_decision != "preserve_existing_crop":
         raise IntentValidationError(
-            "The darktable XMP replay compiler does not map dynamic adjustments"
-        )
-    if intent["composition"]["decision"] != "preserve_existing_crop":
-        raise IntentValidationError(
-            "The darktable XMP replay compiler requires composition.decision=preserve_existing_crop"
+            "The darktable module compiler requires composition.decision=preserve_existing_crop; "
+            "vendor-neutral pixel crop is not supported"
         )
     if intent["local_adjustments"]["decision"] != "none":
         raise IntentValidationError(
-            "The darktable XMP replay compiler does not map local adjustments"
+            "The darktable module compiler does not map local adjustments"
         )
 
     source_path = Path(intent["source"]["path"])
-    _xmp_path, xmp_content, xmp_fingerprint, starting_state_hash = _darktable_xmp_input(
-        source_path
+    _xmp_path, xmp_content, xmp_fingerprint, starting_state_hash, state_input = (
+        _darktable_state_input(intent, source_path)
     )
     if intent["preview_basis"]["state_completeness"] != "complete":
         raise ExecutionPreconditionError(
@@ -418,6 +544,25 @@ def _compile_darktable_intent(
     stem = f"{safe_source_stem}_{safe_intent_id}_r{intent['revision']}"
     profile_path = output_dir / "profiles" / f"{stem}.xmp"
     output_path = output_dir / f"{stem}.jpg"
+    compiler = {"id": "lumenflow.darktable-xmp-replay", "version": "1"}
+    profile_content = xmp_content
+    profile_sha256 = xmp_fingerprint["sha256"]
+    starting_state_payload: dict[str, Any] | None = None
+    if dynamic_modules:
+        try:
+            profile_content, encoded_modules = darktable_codec.compile_xmp(
+                xmp_content,
+                dynamic_modules,
+            )
+        except darktable_codec.DarktableCodecError as error:
+            raise IntentValidationError(str(error)) from error
+        compiler = {"id": "lumenflow.darktable-xmp-modules", "version": "1"}
+        profile_sha256 = hashlib.sha256(profile_content.encode("utf-8")).hexdigest()
+        starting_state_payload = {
+            **_darktable_starting_state(xmp_fingerprint),
+            "state_inputs": [state_input],
+            "xmp_content": xmp_content,
+        }
     runtime_key = _canonical_hash(
         {
             "source": intent["source"],
@@ -448,12 +593,12 @@ def _compile_darktable_intent(
         "preview_basis": intent["preview_basis"],
         "required_capabilities": required_capabilities,
         "profile_path": str(profile_path),
-        "profile_sha256": xmp_fingerprint["sha256"],
+        "profile_sha256": profile_sha256,
         "output_path": str(output_path),
         "command_argv": command,
     }
     plan_id = "plan_" + _canonical_hash(identity)[:32]
-    return {
+    plan = {
         "schema_version": EXECUTION_PLAN_SCHEMA_VERSION,
         "plan_id": plan_id,
         "intent_id": intent["intent_id"],
@@ -469,7 +614,7 @@ def _compile_darktable_intent(
         "output_root": str(output_dir),
         "required_capabilities": required_capabilities,
         "artifacts": {
-            "profile": {"path": str(profile_path), "sha256": xmp_fingerprint["sha256"]},
+            "profile": {"path": str(profile_path), "sha256": profile_sha256},
             "output": {"path": str(output_path), "format": "JPEG"},
         },
         "operations": [
@@ -478,8 +623,8 @@ def _compile_darktable_intent(
                 "kind": "materialize_profile",
                 "payload": {
                     "path": str(profile_path),
-                    "content": xmp_content,
-                    "sha256": xmp_fingerprint["sha256"],
+                    "content": profile_content,
+                    "sha256": profile_sha256,
                 },
                 "command_argv": [],
             },
@@ -490,9 +635,12 @@ def _compile_darktable_intent(
                 "command_argv": command,
             },
         ],
-        "compiler": {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
+        "compiler": compiler,
         "created_at": _now(),
     }
+    if starting_state_payload is not None:
+        plan["starting_state"] = starting_state_payload
+    return plan
 
 
 def compile_intent(
@@ -511,6 +659,8 @@ def compile_intent(
     if intent["local_adjustments"]["decision"] == "use_masks":
         required_capabilities.append("mask.ai")
     capabilities.require("intent.compile.v2")
+    for capability in required_capabilities[1:]:
+        capabilities.require(capability)
 
     source_path = Path(intent["source"]["path"])
     actual_source_fingerprint = preview_provider.file_fingerprint(source_path)
@@ -527,9 +677,6 @@ def compile_intent(
             local_config=local_config,
             capabilities=capabilities,
         )
-
-    for capability in required_capabilities[1:]:
-        capabilities.require(capability)
 
     if backend_id != "rawtherapee":
         raise IntentValidationError(f"No EditIntent v2 compiler is registered for {backend_id}")
@@ -656,6 +803,7 @@ def _validate_execution_plan(
         "operations",
         "compiler",
         "created_at",
+        "starting_state",
     }
     unknown = set(plan) - expected_fields
     if unknown:
@@ -755,15 +903,114 @@ def _validate_execution_plan(
             "INVALID_EXECUTION_PLAN",
             "Required capabilities are invalid",
         )
-    expected_compiler = {
-        "rawtherapee": {"id": "lumenflow.rawtherapee", "version": "1"},
-        "darktable": {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
+    allowed_compilers = {
+        "rawtherapee": [{"id": "lumenflow.rawtherapee", "version": "1"}],
+        "darktable": [
+            {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
+            {"id": "lumenflow.darktable-xmp-modules", "version": "1"},
+        ],
     }[backend_id]
-    if plan.get("compiler") != expected_compiler:
+    if plan.get("compiler") not in allowed_compilers:
         raise ExecutionPreconditionError(
             "COMPILER_CONTRACT_MISMATCH",
             "Execution plan compiler does not match the active compiler contract",
         )
+    if backend_id == "darktable" and plan["compiler"]["id"] == "lumenflow.darktable-xmp-modules":
+        starting_state = plan.get("starting_state")
+        expected_state_fields = {
+            "kind",
+            "xmp",
+            "uses_engine_default",
+            "library",
+            "write_sidecars",
+            "state_inputs",
+            "xmp_content",
+        }
+        if not isinstance(starting_state, dict) or set(starting_state) != expected_state_fields:
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Dynamic darktable plans must embed their preview-bound XMP state",
+            )
+        if (
+            starting_state.get("kind") != "darktable_xmp"
+            or starting_state.get("uses_engine_default") is not False
+            or starting_state.get("library") != ":memory:"
+            or starting_state.get("write_sidecars") is not False
+        ):
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable starting state is invalid",
+            )
+        xmp_fingerprint = starting_state.get("xmp")
+        if (
+            not isinstance(xmp_fingerprint, dict)
+            or set(xmp_fingerprint) != {"sha256", "size_bytes"}
+            or not re.fullmatch(r"[0-9a-f]{64}", str(xmp_fingerprint.get("sha256", "")))
+            or not isinstance(xmp_fingerprint.get("size_bytes"), int)
+            or xmp_fingerprint["size_bytes"] < 0
+        ):
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable XMP fingerprint is invalid",
+            )
+        state_inputs = starting_state.get("state_inputs")
+        if not isinstance(state_inputs, list) or len(state_inputs) != 1:
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable state_inputs must contain exactly one input",
+            )
+        state_input = state_inputs[0]
+        if (
+            not isinstance(state_input, dict)
+            or set(state_input) != {"role", "path", "sha256", "size_bytes"}
+            or state_input.get("role") not in DARKTABLE_STATE_INPUT_ROLES
+            or not str(state_input.get("path", "")).strip()
+            or state_input.get("sha256") != xmp_fingerprint["sha256"]
+            or state_input.get("size_bytes") != xmp_fingerprint["size_bytes"]
+        ):
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable state input is invalid",
+            )
+        xmp_content = starting_state.get("xmp_content")
+        if not isinstance(xmp_content, str) or len(xmp_content.encode("utf-8")) > 1048576:
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable XMP content is invalid",
+            )
+        xmp_bytes = xmp_content.encode("utf-8")
+        if (
+            len(xmp_bytes) != xmp_fingerprint["size_bytes"]
+            or hashlib.sha256(xmp_bytes).hexdigest() != xmp_fingerprint["sha256"]
+        ):
+            raise ExecutionPreconditionError(
+                "PROFILE_INTEGRITY_MISMATCH",
+                "Embedded darktable XMP content does not match its fingerprint",
+            )
+        try:
+            darktable_codec.validate_xmp(xmp_content)
+        except darktable_codec.DarktableCodecError as error:
+            raise ExecutionPreconditionError(
+                "INVALID_EXECUTION_PLAN",
+                "Embedded darktable XMP content is not a valid 5.4.1 document",
+            ) from error
+        expected_state_hash = preview_provider.canonical_hash(
+            {
+                "kind": "darktable_xmp",
+                "xmp": xmp_fingerprint,
+                "uses_engine_default": False,
+                "library": ":memory:",
+                "write_sidecars": False,
+            }
+        )
+        if (
+            preview_basis["state_completeness"] != "complete"
+            or preview_basis["starting_state_hash"] != expected_state_hash
+        ):
+            raise ExecutionPreconditionError(
+                "STARTING_STATE_MISMATCH",
+                "The embedded darktable XMP state does not match the preview basis",
+            )
 
     source = plan.get("source")
     if not isinstance(source, dict) or set(source) != {"path", "fingerprint"}:
@@ -866,19 +1113,31 @@ def _validate_execution_plan(
             executable=executable,
         )
     else:
-        fingerprint = {
-            "sha256": profile["sha256"],
-            "size_bytes": len(profile_payload["content"].encode("utf-8")),
-        }
-        expected_state_hash = preview_provider.canonical_hash(
-            {
-                "kind": "darktable_xmp",
-                "xmp": fingerprint,
-                "uses_engine_default": False,
-                "library": ":memory:",
-                "write_sidecars": False,
+        if plan["compiler"]["id"] == "lumenflow.darktable-xmp-modules":
+            embedded_state = plan["starting_state"]
+            expected_state_hash = preview_provider.canonical_hash(
+                {
+                    "kind": embedded_state["kind"],
+                    "xmp": embedded_state["xmp"],
+                    "uses_engine_default": embedded_state["uses_engine_default"],
+                    "library": embedded_state["library"],
+                    "write_sidecars": embedded_state["write_sidecars"],
+                }
+            )
+        else:
+            fingerprint = {
+                "sha256": profile["sha256"],
+                "size_bytes": len(profile_payload["content"].encode("utf-8")),
             }
-        )
+            expected_state_hash = preview_provider.canonical_hash(
+                {
+                    "kind": "darktable_xmp",
+                    "xmp": fingerprint,
+                    "uses_engine_default": False,
+                    "library": ":memory:",
+                    "write_sidecars": False,
+                }
+            )
         if (
             preview_basis["state_completeness"] != "complete"
             or preview_basis["starting_state_hash"] != expected_state_hash

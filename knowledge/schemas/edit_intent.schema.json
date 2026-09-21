@@ -49,7 +49,7 @@
         "state_completeness": {"enum": ["complete", "partial"]},
         "state_inputs": {
           "type": "array",
-          "description": "Optional explicit RawTherapee profile inputs captured by the preview artifact.",
+          "description": "Optional explicit profile or XMP inputs captured by the preview artifact.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -71,7 +71,31 @@
       "required": ["style_id", "rationale"],
       "properties": {
         "style_id": {"type": "string", "minLength": 1},
-        "rationale": {"type": "string", "minLength": 1}
+        "rationale": {"type": "string", "minLength": 1},
+        "darktable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["modules"],
+          "properties": {
+            "modules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["operation", "params"],
+                "properties": {
+                  "operation": {"type": "string", "minLength": 1},
+                  "params": {"type": "object"},
+                  "enabled": {"type": "boolean"},
+                  "multi_name": {"type": "string", "maxLength": 256},
+                  "multi_priority": {"type": "integer", "minimum": 0, "maximum": 1000},
+                  "replace": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        }
       }
     },
     "global_adjustments": {

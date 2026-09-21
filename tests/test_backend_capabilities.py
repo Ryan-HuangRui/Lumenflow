@@ -104,6 +104,7 @@ class BackendCapabilitiesTests(unittest.TestCase):
         self.assertEqual(contract.require("state.read").state, "supported")
         self.assertEqual(contract.require("render").state, "supported")
         self.assertEqual(contract.require("export.verified").state, "supported")
+        self.assertEqual(contract.capability("composition.crop").state, "unsupported")
 
     def test_contract_schema_is_strict_and_versioned(self) -> None:
         schema = json.loads(

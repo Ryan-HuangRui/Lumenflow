@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 import backend_capabilities
+import darktable_codec
 import driver_adapter
 import lumenflow_config
 import render_raw
@@ -85,10 +86,8 @@ def preview_basis_from_artifact(
     """Build the execution binding carried into a user-approved EditIntent.
 
     Keeping this conversion next to the artifact contract prevents callers
-    from accidentally dropping the explicit RawTherapee profile inputs that
-    are required to replay a preview created with a non-default base profile.
-    Darktable callers receive the same stable identity fields; its XMP state
-    remains validated by its dedicated compiler.
+    from accidentally dropping explicit profile/XMP inputs that are required
+    to replay a preview created with a non-default base profile.
     """
 
     payload = artifact.to_dict() if isinstance(artifact, PreviewArtifact) else artifact
@@ -97,8 +96,7 @@ def preview_basis_from_artifact(
         "starting_state_hash": payload["starting_state_hash"],
         "state_completeness": payload["state_completeness"],
     }
-    provider_id = payload.get("provider", {}).get("id") if isinstance(payload.get("provider"), dict) else None
-    if include_state_inputs and provider_id == "rawtherapee" and payload.get("state_inputs"):
+    if include_state_inputs and payload.get("state_inputs"):
         basis["state_inputs"] = [dict(item) for item in payload["state_inputs"]]
     return basis
 
@@ -244,6 +242,21 @@ class DarktablePreviewProvider:
         )
 
     @staticmethod
+    def _validate_xmp(path: Path) -> None:
+        if path.stat().st_size > 1024 * 1024:
+            raise PreviewProviderError("darktable base XMP exceeds the 1 MiB plan limit")
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            raise PreviewProviderError("darktable base XMP must be readable UTF-8") from error
+        try:
+            darktable_codec.validate_xmp(content)
+        except darktable_codec.DarktableCodecError as error:
+            raise PreviewProviderError(
+                "darktable base XMP is not a current 5.4.1 codec-valid document"
+            ) from error
+
+    @staticmethod
     def _xmp_state(
         request: PreviewRequest,
     ) -> tuple[Path | None, dict[str, Any], list[dict[str, Any]], str]:
@@ -274,10 +287,12 @@ class DarktablePreviewProvider:
         state_inputs: list[dict[str, Any]] = []
         xmp_state: dict[str, Any] | None = None
         if xmp is not None:
+            DarktablePreviewProvider._validate_xmp(xmp)
             fingerprint = file_fingerprint(xmp)
             xmp_state = fingerprint
+            role = "base_profile" if request.base_profile is not None else "source_sidecar"
             state_inputs.append(
-                {"role": "develop_xmp", "path": str(xmp), **fingerprint}
+                {"role": role, "path": str(xmp), **fingerprint}
             )
         starting_state = {
             "kind": "darktable_xmp",

@@ -119,6 +119,10 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertIn("--library", command)
             self.assertIn(":memory:", command)
             self.assertIn("write_sidecar_files=never", command)
+            self.assertIn("--apply-custom-presets", command)
+            self.assertIn("false", command)
+            self.assertIn("--disable-opencl", command)
+            self.assertIn("--threads", command)
 
     def test_build_rawtherapee_command_supports_final_export_container(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

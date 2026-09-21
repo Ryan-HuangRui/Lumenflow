@@ -28,7 +28,7 @@ MINIMAL_XMP = """<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
   <rdf:Description rdf:about="" xmlns:darktable="http://darktable.sf.net/"
     darktable:xmp_version="5" darktable:raw_params="0"
     darktable:auto_presets_applied="0" darktable:history_end="0"
-    darktable:iop_order_version="2">
+    darktable:iop_order_version="5">
    <darktable:masks_history><rdf:Seq/></darktable:masks_history>
    <darktable:history><rdf:Seq/></darktable:history>
   </rdf:Description>

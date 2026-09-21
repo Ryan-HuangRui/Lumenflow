@@ -96,6 +96,9 @@ Implemented foundation:
 - Strict cross-backend capability contracts with fail-closed Lightroom evidence mapping.
 - Vendor-neutral `EditIntent v2` plus RawTherapee `ExecutionPlan` and verified `ExecutionReceipt` contracts.
 - RawTherapee dynamic compilation and an isolated darktable exact-XMP-replay execution path.
+- A version-pinned darktable 5.4.1 module codec with live-verified exposure, white balance,
+  sigmoid, filmic RGB, color balance RGB, and engine-native crop compilation; generic pixel-crop
+  composition and unverified modules remain fail-closed.
 - A versioned darktable real-RAW feasibility probe, state-bound preview provider, strict replay compiler, verified receipt, and opt-in live integration test.
 - Model-authored `ReviewResult` evidence bound to verified output bytes, plus a persisted two-revision refinement loop with replay and cycle protection.
 - Evidence-bound backend benchmark observations, visual rubric reports, and baseline regression gates that cannot hide runtime failures behind aesthetic scores.
@@ -109,7 +112,9 @@ Maintenance work:
 
 - Expand RawTherapee `.pp3` parameter coverage.
 - Add EditIntent v2 compilers only after each backend advertises the required capabilities.
-- Add darktable dynamic module mappings only after each adjustment has real-RAW fixtures and regression evidence; keep unsupported exposure/color/crop/mask intent fail-closed.
+- Expand darktable dynamic module mappings only after each adjustment has real-RAW fixtures and
+  regression evidence; denoise, lens, rotate/perspective, mask, output-profile and catalog-write
+  intent remains fail-closed until then.
 - Expand review categories only when benchmark evidence shows the current contract is insufficient.
 - Grow the private benchmark corpus across lighting, skin tone, dynamic-range, color, and composition cases without committing personal RAW files.
 - Evaluate whether semantic embeddings improve personal-example retrieval before adding any embedding dependency; keep deterministic token/tag/style matching as the auditable baseline.

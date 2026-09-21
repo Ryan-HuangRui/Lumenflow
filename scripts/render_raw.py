@@ -105,7 +105,13 @@ def build_darktable_command(
     command.append(str(output))
     if style_name:
         command.extend(["--style", style_name])
+    # Keep headless renders independent of user-installed custom presets.  The
+    # isolated config already disables OpenCL, but making CPU-only execution
+    # explicit avoids GPU/plugin state and limits this 5.4.1 path to one
+    # deterministic OpenMP worker; it does not change the XMP pixel intent.
+    command.extend(["--apply-custom-presets", "false"])
     command.append("--core")
+    command.extend(["--disable-opencl", "--threads", "1"])
     if configdir is not None:
         command.extend(["--configdir", str(configdir)])
     if cachedir is not None:
