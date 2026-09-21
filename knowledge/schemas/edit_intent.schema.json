@@ -49,7 +49,7 @@
         "state_completeness": {"enum": ["complete", "partial"]},
         "state_inputs": {
           "type": "array",
-          "description": "Optional explicit RawTherapee profile inputs captured by the preview artifact.",
+          "description": "Optional explicit profile or XMP inputs captured by the preview artifact.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -89,7 +89,7 @@
                   "params": {"type": "object"},
                   "enabled": {"type": "boolean"},
                   "multi_name": {"type": "string", "maxLength": 256},
-                  "multi_priority": {"type": "integer"},
+                  "multi_priority": {"type": "integer", "minimum": 0, "maximum": 1000},
                   "replace": {"type": "boolean"}
                 }
               }

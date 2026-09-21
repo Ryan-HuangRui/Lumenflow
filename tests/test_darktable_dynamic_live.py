@@ -61,12 +61,7 @@ class DarktableDynamicLiveTests(unittest.TestCase):
                         "reference_id": "darktable-dynamic-live",
                     },
                     "source": {"path": str(raw), "fingerprint": source_before},
-                    "preview_basis": {
-                        "artifact_id": preview.artifact_id,
-                        "starting_state_hash": preview.starting_state_hash,
-                        "state_completeness": preview.state_completeness,
-                        "state_inputs": [dict(preview.state_inputs[0])],
-                    },
+                    "preview_basis": preview_provider.preview_basis_from_artifact(preview),
                     "purpose": "Exercise dynamic darktable modules without a source sidecar.",
                     "style": {
                         "style_id": "darktable-live-dynamic",

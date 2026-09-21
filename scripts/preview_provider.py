@@ -85,10 +85,8 @@ def preview_basis_from_artifact(
     """Build the execution binding carried into a user-approved EditIntent.
 
     Keeping this conversion next to the artifact contract prevents callers
-    from accidentally dropping the explicit RawTherapee profile inputs that
-    are required to replay a preview created with a non-default base profile.
-    Darktable callers receive the same stable identity fields; its XMP state
-    remains validated by its dedicated compiler.
+    from accidentally dropping explicit profile/XMP inputs that are required
+    to replay a preview created with a non-default base profile.
     """
 
     payload = artifact.to_dict() if isinstance(artifact, PreviewArtifact) else artifact
@@ -97,8 +95,7 @@ def preview_basis_from_artifact(
         "starting_state_hash": payload["starting_state_hash"],
         "state_completeness": payload["state_completeness"],
     }
-    provider_id = payload.get("provider", {}).get("id") if isinstance(payload.get("provider"), dict) else None
-    if include_state_inputs and provider_id == "rawtherapee" and payload.get("state_inputs"):
+    if include_state_inputs and payload.get("state_inputs"):
         basis["state_inputs"] = [dict(item) for item in payload["state_inputs"]]
     return basis
 

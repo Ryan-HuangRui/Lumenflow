@@ -220,7 +220,7 @@ def darktable_capabilities() -> BackendCapabilities:
             "intent.compile.v2": _supported(
                 "EditIntent v2 compiles a verified subset of darktable 5.4.1 module structs and replays them through darktable-cli",
                 "compiler=lumenflow.darktable-xmp-modules@1",
-                "modules=exposure,temperature,sigmoid,filmicrgb,colorbalancergb,crop",
+                "modules=exposure,temperature,sigmoid,filmicrgb,colorbalancergb,engine-native-crop",
             ),
             "render": _supported(
                 "darktable-cli passed isolated real-RAW exports with source and sidecar preservation",

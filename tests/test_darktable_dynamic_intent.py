@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import edit_intent  # noqa: E402
+import backend_capabilities  # noqa: E402
 import preview_provider  # noqa: E402
 
 
@@ -26,12 +27,7 @@ class DarktableDynamicIntentTests(unittest.TestCase):
             "revision": 1,
             "authorization": {"kind": "explicit_user_request", "reference_id": "test"},
             "source": {"path": str(raw), "fingerprint": preview_provider.file_fingerprint(raw)},
-            "preview_basis": {
-                "artifact_id": preview.artifact_id,
-                "starting_state_hash": preview.starting_state_hash,
-                "state_completeness": preview.state_completeness,
-                "state_inputs": [dict(preview.state_inputs[0])],
-            },
+            "preview_basis": preview_provider.preview_basis_from_artifact(preview),
             "purpose": "codec test",
             "style": {
                 "style_id": "darktable-verified-modules",
@@ -99,6 +95,34 @@ class DarktableDynamicIntentTests(unittest.TestCase):
             )
             self.assertEqual(receipt["status"], "success")
             self.assertTrue(receipt["source_unchanged"])
+
+    def test_vendor_neutral_pixel_crop_is_not_claimed_for_darktable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            xmp = root / "bangkok.DNG.xmp"
+            raw.write_bytes(b"raw-bangkok")
+            xmp.write_text(
+                (ROOT / "tests" / "fixtures" / "darktable_profile.xmp").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            preview = preview_provider.DarktablePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(raw, root / "preview.jpg", xmp, True, 10)
+            )
+            intent = self._intent(raw, xmp, preview)
+            intent["composition"] = {
+                "decision": "crop",
+                "reason": "A vendor-neutral pixel crop is requested.",
+                "crop": {"unit": "pixels", "x": 1, "y": 1, "width": 10, "height": 10},
+            }
+            with self.assertRaises(backend_capabilities.UnsupportedCapabilityError):
+                edit_intent.compile_intent(
+                    intent,
+                    backend_id="darktable",
+                    output_dir=root / "execution",
+                )
 
 
 if __name__ == "__main__":

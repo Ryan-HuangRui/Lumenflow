@@ -9,8 +9,10 @@ fail-closed: it does not accept arbitrary XML fields or claim support for module
 parameter layout has not been verified.
 
 The state-bound preview provider and execution-plan/receipt path were verified with a public RAW
-sentinel and darktable-cli 5.4.1. The compiler only copies a fingerprint-matched XMP into the
-allowed output root and constructs validated argv.
+sentinel and darktable-cli 5.4.1. A preview may bind either an external base XMP or a regular
+source sidecar through the generic `preview_basis.state_inputs` roles `base_profile` and
+`source_sidecar`. Dynamic compilation embeds the fingerprint-verified XMP bytes in the plan;
+execution never re-reads a mutable sidecar.
 
 The presence of a `darktable-cli` path is not sufficient evidence. Run:
 
@@ -77,8 +79,10 @@ parameters:
 
 Unknown operations and fields raise a codec error before any XMP or output is written. The
 vendor-neutral global mapping is intentionally limited to exposure, black point, contrast and
-saturation; white-balance, tone and crop changes should use explicit `style.darktable.modules`
-requests until their semantic mapping is made camera- and workflow-aware.
+saturation; white-balance and tone changes should use explicit `style.darktable.modules` requests
+until their semantic mapping is made camera- and workflow-aware. The `crop` struct is
+engine-native only: generic `composition.crop` is unsupported, and an explicit crop module is
+allowed only alongside `composition.decision=preserve_existing_crop`.
 
 For example, a dynamic EditIntent can request verified module fields like this (the normal
 authorization/source/preview fields are omitted here):
@@ -95,6 +99,10 @@ authorization/source/preview fields are omitted here):
         {"operation": "colorbalancergb", "params": {"saturation_global": -0.04}},
         {"operation": "crop", "params": {"cx": 0.05, "cy": 0.05, "cw": 0.95, "ch": 0.95}}
       ]
+    },
+    "composition": {
+      "decision": "preserve_existing_crop",
+      "reason": "Use only the explicit engine-native crop module."
     }
   }
 }
@@ -105,6 +113,13 @@ The opt-in live test is:
 ```bash
 LUMENFLOW_DARKTABLE_LIVE_RAW_DIR=/private/tmp/lumenflow-raw-fixtures/bangkok-2026 \
   python3 -m unittest tests.test_darktable_codec_live -v
+```
+
+The full state-bound dynamic path is covered separately:
+
+```bash
+LUMENFLOW_DARKTABLE_LIVE_RAW_DIR=/private/tmp/lumenflow-raw-fixtures/bangkok-2026 \
+  python3 -m unittest tests.test_darktable_dynamic_live -v
 ```
 
 It passed for the three copied Bangkok RW2 files (`P1034631.RW2`, `P1034748.RW2`,
@@ -123,6 +138,12 @@ This evidence promotes dynamic compilation only for the listed module fields. De
 correction, rotate/perspective, local blending/masks, output profile/bit-depth options, and
 catalog writes remain unsupported and fail closed.
 
+The no-source-sidecar live path passed for all three copied Bangkok RAWs. Each test copied the
+RAW into a temporary directory, rendered a preview from an external `base_profile` XMP, compiled
+the module plan from `preview_basis.state_inputs`, and executed the embedded-XMP plan through
+darktable-cli 5.4.1. The three source SHA-256 values above were unchanged and no adjacent XMP was
+created.
+
 ## Implemented safety boundary
 
 - Preview argv always uses a dedicated config/cache directory, `--library :memory:`, and
@@ -130,9 +151,10 @@ catalog writes remain unsupported and fail closed.
 - Preview artifacts fingerprint the RAW plus the exact explicit XMP and fail if either source or
   sidecar state changes during rendering.
 - Existing preview and final-render outputs are never overwritten.
-- The EditIntent compiler requires exactly one regular source XMP, a `complete` preview basis, and
-  an exact starting-state hash match. It materializes a byte-identical XMP snapshot inside the
-  allowed output root.
+- Dynamic EditIntent compilation requires exactly one preview-bound XMP state input, a `complete`
+  preview basis, and an exact starting-state hash match. It embeds the verified base XMP bytes in
+  the execution plan and materializes the compiled snapshot inside the allowed output root.
+  Legacy exact-XMP replay retains its regular source-sidecar fallback.
 - Execution reconstructs and compares the full argv. Shell commands are never accepted, output
   paths must remain below the explicitly allowed root, and receipts fingerprint source/output.
 - Dry-run and non-dry-run execution both use the same strict plan validation. The verified live

@@ -97,8 +97,8 @@ Implemented foundation:
 - Vendor-neutral `EditIntent v2` plus RawTherapee `ExecutionPlan` and verified `ExecutionReceipt` contracts.
 - RawTherapee dynamic compilation and an isolated darktable exact-XMP-replay execution path.
 - A version-pinned darktable 5.4.1 module codec with live-verified exposure, white balance,
-  sigmoid, filmic RGB, color balance RGB, and crop compilation; unverified modules remain
-  fail-closed.
+  sigmoid, filmic RGB, color balance RGB, and engine-native crop compilation; generic pixel-crop
+  composition and unverified modules remain fail-closed.
 - A versioned darktable real-RAW feasibility probe, state-bound preview provider, strict replay compiler, verified receipt, and opt-in live integration test.
 - Model-authored `ReviewResult` evidence bound to verified output bytes, plus a persisted two-revision refinement loop with replay and cycle protection.
 - Evidence-bound backend benchmark observations, visual rubric reports, and baseline regression gates that cannot hide runtime failures behind aesthetic scores.

@@ -87,7 +87,7 @@ The legacy `lumenflow.adjustment_plan.v1` → `scripts/render_adjustment_plan.py
 
 ### Preview boundary
 
-Preview generation is a backend boundary, not a loose JPEG helper. A downstream model may reason from a preview only when the manifest identifies the source bytes and the starting edit state used to render it. RawTherapee is the first provider: a source `.pp3` sidecar is treated as the complete starting state, while a base profile or engine defaults alone are marked partial. Lightroom remains fail-closed until the bridge proves both safe object-level develop reads and state-bound preview generation through a live probe.
+Preview generation is a backend boundary, not a loose JPEG helper. A downstream model may reason from a preview only when the manifest identifies the source bytes and the starting edit state used to render it. Preview artifacts expose generic `state_inputs` roles (`base_profile` and `source_sidecar`) so the approved EditIntent can carry the exact profile/XMP inputs across backends. RawTherapee treats its explicit profile stack as the complete starting state; darktable accepts an external base XMP or source sidecar and embeds dynamic-compilation bytes into its execution plan. Lightroom remains fail-closed until the bridge proves both safe object-level develop reads and state-bound preview generation through a live probe.
 
 ### Backend capability boundary
 
@@ -95,7 +95,7 @@ Every backend publishes `lumenflow.backend_capabilities.v1` before later compile
 
 Lightroom capabilities are derived from the live versioned bridge contract. Protocol or version mismatch invalidates all runtime evidence even when individual capability flags are true. RawTherapee capabilities are static for the current profile-based adapter. Darktable's dynamic compiler advertises only the module structs proven by `scripts/darktable_codec.py`; unlisted modules remain fail-closed.
 
-The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe.v1`. It runs a real RAW export with a temporary config/cache, an in-memory library, and sidecar writes disabled, then compares RAW and sidecar state and fingerprints the output. A command/version check alone is inconclusive. The verified adapter also includes a state-bound preview provider, an exact-XMP-replay compiler, a fail-closed 5.4.1 module codec for exposure/temperature/sigmoid/filmic RGB/color balance RGB/crop, a receipt adapter, and live regression evidence. Denoise, lens correction, rotate/perspective, masks, output-profile controls and catalog writes remain unsupported.
+The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe.v1`. It runs a real RAW export with a temporary config/cache, an in-memory library, and sidecar writes disabled, then compares RAW and sidecar state and fingerprints the output. A command/version check alone is inconclusive. The verified adapter also includes a state-bound preview provider, an exact-XMP-replay compiler, a fail-closed 5.4.1 module codec for exposure/temperature/sigmoid/filmic RGB/color balance RGB/crop, a receipt adapter, and live regression evidence. The crop struct is engine-native only; generic pixel-crop composition remains unsupported. Denoise, lens correction, rotate/perspective, masks, output-profile controls and catalog writes remain unsupported.
 
 ### Intent, compilation, and execution
 
@@ -106,7 +106,11 @@ The current runtime path separates model judgment from backend mechanics:
 3. The executor accepts an explicit allowed output root, revalidates source bytes, backend/compiler versions, artifact paths, embedded profile content, and the exact argv it can reconstruct locally.
 4. `lumenflow.execution_receipt.v1` records per-operation outcomes, source before/after fingerprints, verified output bytes, and failure details.
 
-The first compiler targets RawTherapee. It never invokes a shell, refuses output paths outside the caller-approved root, refuses existing output replacement, and rejects a plan whose command or profile payload was modified. `adjustment_plan.v1` remains available as a compatibility renderer while callers migrate; it is not extended with new runtime responsibilities.
+The verified compilers target RawTherapee PP3 and darktable XMP/module plans. They never invoke a
+shell, refuse output paths outside the caller-approved root, refuse existing output replacement,
+and reject a plan whose command or embedded profile payload was modified. `adjustment_plan.v1`
+remains available as a compatibility renderer while callers migrate; it is not extended with new
+runtime responsibilities.
 
 ### Review and bounded refinement
 

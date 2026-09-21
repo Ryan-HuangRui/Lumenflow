@@ -659,6 +659,8 @@ def compile_intent(
     if intent["local_adjustments"]["decision"] == "use_masks":
         required_capabilities.append("mask.ai")
     capabilities.require("intent.compile.v2")
+    for capability in required_capabilities[1:]:
+        capabilities.require(capability)
 
     source_path = Path(intent["source"]["path"])
     actual_source_fingerprint = preview_provider.file_fingerprint(source_path)
@@ -675,9 +677,6 @@ def compile_intent(
             local_config=local_config,
             capabilities=capabilities,
         )
-
-    for capability in required_capabilities[1:]:
-        capabilities.require(capability)
 
     if backend_id != "rawtherapee":
         raise IntentValidationError(f"No EditIntent v2 compiler is registered for {backend_id}")

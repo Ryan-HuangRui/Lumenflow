@@ -130,7 +130,7 @@
         "state_completeness": {"enum": ["complete", "partial"]},
         "state_inputs": {
           "type": "array",
-          "description": "Optional explicit RawTherapee profile inputs captured by the preview artifact.",
+          "description": "Optional explicit profile or XMP inputs captured by the preview artifact.",
           "items": {
             "type": "object",
             "additionalProperties": false,
