@@ -1,0 +1,69 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "landscape_blue_green_epic",
+  "style_name": "风光蓝绿大片",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "landscape_cinematic",
+  "active_for_photo_matching": true,
+  "description": "风光、航拍、户外探险和史诗感蓝绿调，强调空间层次和大场景冲击力。",
+  "suitable_scenes": [
+    "风光",
+    "航拍",
+    "山川湖海",
+    "户外探险",
+    "史诗感旅行"
+  ],
+  "avoid_scenes": [
+    "近景柔光人像",
+    "室内生活照"
+  ],
+  "visual_features": {
+    "tone": "epic landscape depth",
+    "color": "blue-green/cyan landscape palette with warm accents",
+    "contrast": "medium-high with protected highlights",
+    "texture": "clear terrain and sky detail"
+  },
+  "tone_guidance": {
+    "overall": "epic landscape depth",
+    "contrast": "medium-high with protected highlights",
+    "texture": "clear terrain and sky detail"
+  },
+  "color_guidance": {
+    "overall": "blue-green/cyan landscape palette with warm accents",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "hsl_color_cleanup",
+    "local_adjustments",
+    "color_grading",
+    "detail_and_texture",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "风光大片先建立天空、地面和远近层次，再增强蓝绿或暖色对比。",
+    "避免为了通透过度去朦胧导致边缘发硬。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 4,
+    "category_counts": {
+      "basic_tone": 59,
+      "color_grading": 10,
+      "hsl_color": 33,
+      "mask_local": 11,
+      "presence_detail": 9,
+      "tone_curve": 38
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate one guidance style card per tutorial recipe."""
+"""Generate private, source-bearing evidence cards for semantic style merging."""
 
 from __future__ import annotations
 
@@ -449,7 +449,7 @@ def write_index(output_dir: Path, cards: list[dict[str, Any]]) -> Path:
     lines = [
         "# Tutorial Derived Style Cards",
         "",
-        "Generated one guidance style card per successful tutorial recipe. These cards guide agent reasoning; they are not executable presets.",
+        "Generated one private evidence card per successful tutorial recipe. These cards are merge inputs, not runtime styles or executable presets.",
         "",
         "| style_id | family | language | steps | title |",
         "| --- | --- | --- | ---: | --- |",
@@ -521,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
         family_dir=args.family_dir,
         output_dir=args.output_dir,
     )
-    print(f"Generated {len(written)} tutorial-derived style cards in {args.output_dir}")
+    print(f"Generated {len(written)} private tutorial evidence cards in {args.output_dir}")
     return 0
 
 

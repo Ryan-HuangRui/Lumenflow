@@ -1,0 +1,67 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "rainy_cinematic_street",
+  "style_name": "雨夜电影街拍",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "cinematic_street",
+  "active_for_photo_matching": true,
+  "description": "雨夜、湿地面、霓虹反光和街头电影感，强调暗部层次与冷暖光源。",
+  "suitable_scenes": [
+    "雨夜街拍",
+    "夜景人像",
+    "湿地面反光",
+    "城市路灯"
+  ],
+  "avoid_scenes": [
+    "明亮儿童照",
+    "柔和日系人像",
+    "纯自然风光"
+  ],
+  "visual_features": {
+    "tone": "cinematic, deep but readable",
+    "color": "cool shadows, warm highlights, controlled neon",
+    "contrast": "medium-high",
+    "texture": "crisp urban texture"
+  },
+  "tone_guidance": {
+    "overall": "cinematic, deep but readable",
+    "contrast": "medium-high",
+    "texture": "crisp urban texture"
+  },
+  "color_guidance": {
+    "overall": "cool shadows, warm highlights, controlled neon",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "hsl_color_cleanup",
+    "color_grading",
+    "detail_and_texture",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "压暗时保留主体轮廓、灯牌和地面反光层次。",
+    "霓虹颜色可以增强，但不要让皮肤或天空产生脏色块。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 3,
+    "category_counts": {
+      "basic_tone": 65,
+      "color_grading": 8,
+      "hsl_color": 15,
+      "presence_detail": 6,
+      "tone_curve": 26
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

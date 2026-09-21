@@ -1,0 +1,69 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "japanese_clean_portrait",
+  "style_name": "日系干净人像",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "clean_bright_portrait",
+  "active_for_photo_matching": true,
+  "description": "明亮、干净、柔和的日系人像与日常记录方向，重点是去脏、保肤色和通透感。",
+  "suitable_scenes": [
+    "自然光人像",
+    "日常记录",
+    "浅色街景",
+    "樱花或夏日外景"
+  ],
+  "avoid_scenes": [
+    "强夜景",
+    "高反差商业片",
+    "需要浓重情绪的暗调照片"
+  ],
+  "visual_features": {
+    "tone": "bright, clean, soft",
+    "color": "clean skin, controlled greens, gentle warm highlights",
+    "contrast": "low-medium",
+    "texture": "soft clarity and low dirty color cast"
+  },
+  "tone_guidance": {
+    "overall": "bright, clean, soft",
+    "contrast": "low-medium",
+    "texture": "soft clarity and low dirty color cast"
+  },
+  "color_guidance": {
+    "overall": "clean skin, controlled greens, gentle warm highlights",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "color_grading",
+    "detail_and_texture",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先处理画面发黄、发灰、发脏的问题，再决定整体亮度。",
+    "肤色和白色物体优先保持可信，绿色只做清理不做过度风格化。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 13,
+    "category_counts": {
+      "basic_tone": 177,
+      "color_grading": 22,
+      "hsl_color": 170,
+      "mask_local": 4,
+      "presence_detail": 11,
+      "tone_curve": 131
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

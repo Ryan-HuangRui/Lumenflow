@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "photographer_reference_texture",
+  "style_name": "摄影师仿色质感",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "reference_style",
+  "active_for_photo_matching": true,
+  "description": "无法稳定归入单一色系、但明确围绕某位摄影师或案例建立的仿色质感方向。",
+  "suitable_scenes": [
+    "摄影师风格仿色",
+    "旅行人像",
+    "环境人像",
+    "多案例参考"
+  ],
+  "avoid_scenes": [
+    "没有相近光线或题材却强行套用参考",
+    "需要严格中性还原的照片"
+  ],
+  "visual_features": {
+    "tone": "reference-driven photographer texture",
+    "color": "case-specific palette inferred from a chosen visual reference",
+    "contrast": "case-specific light and shadow structure",
+    "texture": "photographer-specific detail and atmosphere"
+  },
+  "tone_guidance": {
+    "overall": "reference-driven photographer texture",
+    "contrast": "case-specific light and shadow structure",
+    "texture": "photographer-specific detail and atmosphere"
+  },
+  "color_guidance": {
+    "overall": "case-specific palette inferred from a chosen visual reference",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "detail_and_texture",
+    "local_adjustments",
+    "color_grading",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先分析所选参考图的题材、光线和色彩关系是否适合目标照片。",
+    "这类知识只定义参考分析方法，具体参数必须根据目标照片与参考图重新推理。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 30,
+    "category_counts": {
+      "basic_tone": 479,
+      "color_grading": 31,
+      "hsl_color": 344,
+      "mask_local": 34,
+      "presence_detail": 36,
+      "tone_curve": 275
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

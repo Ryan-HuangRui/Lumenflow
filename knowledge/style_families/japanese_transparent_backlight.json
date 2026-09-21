@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "japanese_transparent_backlight",
+  "style_name": "日系通透逆光",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "clean_bright_portrait",
+  "active_for_photo_matching": true,
+  "description": "逆光、硬光或灰暗原片中提炼通透感，强调高光保护、脸部提亮和空气感。",
+  "suitable_scenes": [
+    "逆光人像",
+    "硬光人像",
+    "灰暗人像",
+    "透明感外景"
+  ],
+  "avoid_scenes": [
+    "夜景霓虹",
+    "需要厚重阴影的照片"
+  ],
+  "visual_features": {
+    "tone": "transparent, airy, lifted subject",
+    "color": "warm skin with clean cool environment",
+    "contrast": "soft global contrast with local subject lift",
+    "texture": "low haze and gentle detail"
+  },
+  "tone_guidance": {
+    "overall": "transparent, airy, lifted subject",
+    "contrast": "soft global contrast with local subject lift",
+    "texture": "low haze and gentle detail"
+  },
+  "color_guidance": {
+    "overall": "warm skin with clean cool environment",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "detail_and_texture",
+    "local_adjustments",
+    "color_grading",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先判断主体是否因为逆光变暗，再用局部调整恢复脸部可读性。",
+    "高光压缩要保留光感，不能把逆光调成平光。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 9,
+    "category_counts": {
+      "basic_tone": 156,
+      "color_grading": 5,
+      "hsl_color": 111,
+      "mask_local": 20,
+      "presence_detail": 23,
+      "tone_curve": 42
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}
