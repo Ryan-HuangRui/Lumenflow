@@ -67,6 +67,7 @@ into:
 16. Write `lumenflow.review_result.v1`, binding the current intent revision, plan, receipt, and output fingerprint. Use `accept`, `revise`, or `reject`; a revision may replace only style, global adjustments, composition, or local-adjustment intent.
 17. Advance the persisted session with `scripts/review_loop.py`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
 18. For `revise`, compile and execute the emitted next intent, inspect the new verified output, and repeat. Write final execution receipts, session state, processing report, and review notes when the session reaches a terminal state.
+19. For benchmark runs, write a `lumenflow.visual_assessment.v1` only after inspecting the exact output fingerprint, then use `scripts/benchmark_eval.py record`. Do not assign a visual score to a failed or dry-run execution, and do not omit failed cases from the aggregate report.
 
 Typical command:
 

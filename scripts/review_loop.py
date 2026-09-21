@@ -153,7 +153,7 @@ def validate_review_result(review: dict[str, Any]) -> None:
         raise ReviewLoopError("INVALID_REVIEW_CONTRACT", "reject requires at least one issue")
 
 
-def _validate_session(session: dict[str, Any]) -> None:
+def validate_review_session(session: dict[str, Any]) -> None:
     expected = {
         "schema_version",
         "session_id",
@@ -372,7 +372,7 @@ def advance_review_session(
     receipt: dict[str, Any],
     review: dict[str, Any],
 ) -> dict[str, Any]:
-    _validate_session(session)
+    validate_review_session(session)
     if session["status"] != "active":
         raise ReviewLoopError("REVIEW_SESSION_CLOSED", "Only an active review session can advance")
     if (

@@ -218,6 +218,28 @@ python3 scripts/review_loop.py advance \
 
 完整合同和宿主模型职责见 [docs/review_loop.md](docs/review_loop.md)。
 
+## 评测与回归门禁
+
+`scripts/benchmark_eval.py` 把执行可靠性与视觉质量分开统计。宿主模型对绑定到输出指纹的
+成片按技术质量、用途匹配、风格一致性、构图和自然度评分；运行时从 plan、receipt、
+review session 生成内容寻址的 observation。执行失败仍进入分母，而且任何完整性失败都会让
+后端门禁失败，不能用高视觉分抵消。
+
+```bash
+python3 scripts/benchmark_eval.py record case.json plan.json receipt.json \
+  --session review_session.json --assessment visual_assessment.json \
+  --runtime-ms 1840 --output observation.json
+
+python3 scripts/benchmark_eval.py report observations.json \
+  --minimum-cases 5 --output candidate-report.json
+
+python3 scripts/benchmark_eval.py compare candidate-report.json baseline-report.json \
+  --output comparison.json
+```
+
+私人 RAW 与评测产物放在仓库外或已忽略的 `runs/` 下。语料设计、量表和默认门槛见
+[docs/benchmark.md](docs/benchmark.md)。
+
 ## Lightroom 引擎
 
 Lightroom 支持通过 fork 后的 `lightroom-cli` 接入。它不是无头 CLI 渲染器。当前自动写入采用 fail-closed 策略：只有运行中的插件通过版本、协议和能力握手，并明确声明对象级写入与导出结果已经过真机验证，非 dry-run 才会继续。

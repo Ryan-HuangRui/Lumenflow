@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/benchmark_report.schema.json",
+  "title": "Lumenflow benchmark report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_id", "criteria", "observation_ids", "backends", "overall_passed"],
+  "properties": {
+    "schema_version": {"const": "lumenflow.benchmark_report.v1"},
+    "report_id": {"type": "string", "pattern": "^benchmark_report_[0-9a-f]{32}$"},
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_cases", "minimum_acceptance_rate", "minimum_mean_score", "minimum_check_pass_rate", "require_zero_integrity_failures"],
+      "properties": {
+        "minimum_cases": {"type": "integer", "minimum": 1},
+        "minimum_acceptance_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "minimum_mean_score": {"type": "number", "minimum": 1, "maximum": 5},
+        "minimum_check_pass_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "require_zero_integrity_failures": {"const": true}
+      }
+    },
+    "observation_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^observation_[0-9a-f]{32}$"}},
+    "backends": {
+      "type": "object",
+      "propertyNames": {"enum": ["rawtherapee", "darktable", "lightroom"]},
+      "additionalProperties": {"$ref": "#/$defs/backend_summary"}
+    },
+    "overall_passed": {"type": "boolean"}
+  },
+  "$defs": {
+    "backend_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "accepted", "acceptance_rate", "integrity_failures", "mean_score", "check_pass_rate", "mean_runtime_ms", "mean_revisions", "gate_passed"],
+      "properties": {
+        "attempted": {"type": "integer", "minimum": 1},
+        "accepted": {"type": "integer", "minimum": 0},
+        "acceptance_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "integrity_failures": {"type": "integer", "minimum": 0},
+        "mean_score": {"type": ["number", "null"], "minimum": 1, "maximum": 5},
+        "check_pass_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "mean_runtime_ms": {"type": "number", "minimum": 0},
+        "mean_revisions": {"type": "number", "minimum": 0},
+        "gate_passed": {"type": "boolean"}
+      }
+    }
+  }
+}
