@@ -38,32 +38,33 @@ into:
 4. Generate previews with `scripts/create_previews.py`.
 5. Read `preview_manifest.json` before visual analysis. Each entry must use `lumenflow.preview_artifact.v1`; retain its `artifact_id`, `source_fingerprint`, `starting_state_hash`, and `state_completeness` with downstream plan/review evidence. A partial starting state is usable for RawTherapee drafting but must not be represented as a complete editor-state snapshot.
 6. Inspect the preview images with the host agent's vision/reasoning capability.
-7. Retrieve reusable style guidance:
+7. Read the selected backend's `lumenflow.backend_capabilities.v1` contract and require the operation needed for the current stage. Stop on `unsupported`, and stop for real verification on `unverified`; do not silently choose a different backend when the user selected one explicitly.
+8. Retrieve reusable style guidance:
    - Read `knowledge/style_library_index.json` first.
    - Filter direct candidates to entries with `active_for_photo_matching=true`.
    - Choose a semantic style from `knowledge/style_families/*.json`.
    - Do not read private tutorial recipes, transcripts, provenance, or video-level evidence during photo development.
    - Use method/workflow cards only as supporting execution guidance, not as the primary visual style.
-8. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
-9. Decide composition before rendering. This is a per-photo judgment, not a batch preset:
+9. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
+10. Decide composition before rendering. This is a per-photo judgment, not a batch preset:
    - Keep original framing when the composition is already intentional.
    - Preserve detected existing crops by default unless the user explicitly asks to change them.
    - Crop only when it removes clear distractions, strengthens the subject, or fixes a weak frame.
    - Record `composition.decision` as `preserve_existing_crop`, `no_crop`, `crop`, or `manual_recommendation`.
    - Record the framing reason in `composition.reason`; crop executions should also include `composition.crop.reason`.
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
-10. Decide local adjustments before rendering. Record `mask_decision.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include executable Lightroom AI `masks`; if no mask is needed, explain why in `mask_decision.reason`.
-11. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
-12. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
-13. Review rendered outputs with the host agent's vision/reasoning capability:
+11. Decide local adjustments before rendering. Record `mask_decision.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include executable Lightroom AI `masks`; if no mask is needed, explain why in `mask_decision.reason`.
+12. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
+13. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
+14. Review rendered outputs with the host agent's vision/reasoning capability:
     - exposure and highlight clipping
     - blocked shadows
     - color cast and skin/subject color
     - style strength
     - crop quality and whether important context was lost
     - obvious rendering artifacts
-14. If review finds a material issue, write a revised plan with `revision` incremented, `parent_plan` pointing to the previous plan, and `review_basis` explaining the change; render again.
-15. Write final `processing_records.json`, `processing_report.md`, and review notes.
+15. If review finds a material issue, write a revised plan with `revision` incremented, `parent_plan` pointing to the previous plan, and `review_basis` explaining the change; render again.
+16. Write final `processing_records.json`, `processing_report.md`, and review notes.
 
 Typical command:
 

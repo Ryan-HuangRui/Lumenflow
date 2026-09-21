@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+import backend_capabilities
 import driver_adapter
 import lumenflow_config
 import render_raw
@@ -98,6 +99,8 @@ class RawTherapeePreviewProvider:
     ) -> None:
         self.local_config = local_config or {}
         self.runner = runner
+        self.capabilities = backend_capabilities.backend_capabilities_for("rawtherapee")
+        self.capabilities.require("preview.state_bound")
         self.executable = lumenflow_config.tool_command(
             self.local_config,
             "rawtherapee_cli",
@@ -176,6 +179,7 @@ class RawTherapeePreviewProvider:
                 "id": self.provider_id,
                 "adapter_version": self.adapter_version,
                 "executable": self.executable,
+                "capability_contract_version": self.capabilities.schema_version,
             },
             source=str(request.source),
             preview=str(request.output),
@@ -217,20 +221,24 @@ class LightroomPreviewProvider:
         del request
         lightroom_config = self.local_config.get("lightroom") or {}
         try:
-            requirements = {
-                "required_cli_version": lightroom_config.get("required_cli_version"),
-                "required_plugin_version": lightroom_config.get("required_plugin_version"),
-            }
             if self.status_runner is None:
-                driver_adapter.preflight_preview(self.executable, timeout=10, **requirements)
+                status = driver_adapter.read_bridge_status(self.executable, timeout=10)
             else:
-                driver_adapter.preflight_preview(
+                status = driver_adapter.read_bridge_status(
                     self.executable,
                     timeout=10,
                     runner=self.status_runner,
-                    **requirements,
                 )
-        except driver_adapter.BridgeSafetyError as error:
+            capabilities = backend_capabilities.lightroom_capabilities_from_status(
+                status,
+                required_cli_version=lightroom_config.get("required_cli_version"),
+                required_plugin_version=lightroom_config.get("required_plugin_version"),
+            )
+            capabilities.require("preview.state_bound")
+        except (
+            backend_capabilities.CapabilityContractError,
+            driver_adapter.BridgeSafetyError,
+        ) as error:
             raise PreviewCapabilityError(str(error)) from error
         raise PreviewCapabilityError(
             "Lightroom reported preview capabilities, but the state-bound preview adapter has not been implemented"

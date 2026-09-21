@@ -84,6 +84,12 @@ Style cards are guidance only. Concrete values belong in the per-photo adjustmen
 
 Preview generation is a backend boundary, not a loose JPEG helper. A downstream model may reason from a preview only when the manifest identifies the source bytes and the starting edit state used to render it. RawTherapee is the first provider: a source `.pp3` sidecar is treated as the complete starting state, while a base profile or engine defaults alone are marked partial. Lightroom remains fail-closed until the bridge proves both safe object-level develop reads and state-bound preview generation through a live probe.
 
+### Backend capability boundary
+
+Every backend publishes `lumenflow.backend_capabilities.v1` before later compiler and execution layers make a decision. Capability names and states are closed sets. `supported` permits execution, `unsupported` is a deterministic product limitation, and `unverified` requires runtime evidence rather than fallback or optimistic execution. RawTherapee, Lightroom, and the legacy darktable path declare the same capability keys so orchestration can compare them without backend-specific conditionals.
+
+Lightroom capabilities are derived from the live versioned bridge contract. Protocol or version mismatch invalidates all runtime evidence even when individual capability flags are true. RawTherapee capabilities are static for the current profile-based adapter. Darktable intentionally advertises only `render.legacy` until the isolated dynamic-module spike succeeds.
+
 ## Style Library
 
 Tutorial ingestion separates public reusable knowledge from private evidence:

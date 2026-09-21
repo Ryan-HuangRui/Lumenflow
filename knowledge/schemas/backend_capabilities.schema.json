@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/backend_capabilities.schema.json",
+  "title": "Lumenflow Backend Capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "backend_id", "adapter_version", "capabilities"],
+  "properties": {
+    "schema_version": {
+      "const": "lumenflow.backend_capabilities.v1"
+    },
+    "backend_id": {
+      "enum": ["rawtherapee", "darktable", "lightroom"]
+    },
+    "adapter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preview.state_bound",
+        "state.read",
+        "plan.compile.v1",
+        "intent.compile.v2",
+        "render",
+        "render.legacy",
+        "export.verified",
+        "develop.write.verified",
+        "composition.crop",
+        "mask.ai",
+        "adjustments.advanced_color"
+      ],
+      "properties": {
+        "preview.state_bound": {"$ref": "#/$defs/capability"},
+        "state.read": {"$ref": "#/$defs/capability"},
+        "plan.compile.v1": {"$ref": "#/$defs/capability"},
+        "intent.compile.v2": {"$ref": "#/$defs/capability"},
+        "render": {"$ref": "#/$defs/capability"},
+        "render.legacy": {"$ref": "#/$defs/capability"},
+        "export.verified": {"$ref": "#/$defs/capability"},
+        "develop.write.verified": {"$ref": "#/$defs/capability"},
+        "composition.crop": {"$ref": "#/$defs/capability"},
+        "mask.ai": {"$ref": "#/$defs/capability"},
+        "adjustments.advanced_color": {"$ref": "#/$defs/capability"}
+      }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason", "evidence"],
+      "properties": {
+        "state": {
+          "enum": ["supported", "unsupported", "unverified"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
