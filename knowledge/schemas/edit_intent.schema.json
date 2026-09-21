@@ -370,7 +370,7 @@
           "Ldetail": {"type": "number", "minimum": 0, "maximum": 100},
           "Chroma": {"type": "number", "minimum": 0, "maximum": 100},
           "AutoGain": {"$ref": "#/$defs/native_bool"},
-          "Gamma": {"type": "number", "exclusiveMinimum": 0.1, "maximum": 10},
+          "Gamma": {"type": "number", "minimum": 0.1, "maximum": 10},
           "Passes": {"type": "integer", "minimum": 1, "maximum": 5}
         }
       },
@@ -522,7 +522,7 @@
         "additionalProperties": false,
         "properties": {
           "Enabled": {"$ref": "#/$defs/native_bool"},
-          "Scale": {"type": "number", "exclusiveMinimum": 0.01, "maximum": 10},
+          "Scale": {"type": "number", "minimum": 0.01, "maximum": 10},
           "Width": {"type": "integer", "minimum": 1, "maximum": 100000},
           "Height": {"type": "integer", "minimum": 1, "maximum": 100000},
           "LongEdge": {"type": "integer", "minimum": 1, "maximum": 100000},
@@ -567,7 +567,7 @@
         "properties": {
           "Enabled": {"$ref": "#/$defs/native_bool"},
           "Strength": {"type": "number", "minimum": 0, "maximum": 10},
-          "Gamma": {"type": "number", "exclusiveMinimum": 0.1, "maximum": 10},
+          "Gamma": {"type": "number", "minimum": 0.1, "maximum": 10},
           "EdgeStopping": {"type": "number", "minimum": 0, "maximum": 10},
           "Scale": {"type": "number", "minimum": 0, "maximum": 10},
           "ReweightingIterates": {"type": "integer", "minimum": 0, "maximum": 100}

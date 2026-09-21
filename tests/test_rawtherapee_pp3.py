@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -211,6 +212,41 @@ Compiler=test
         for case in cases:
             with self.subTest(case=case), self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
                 rawtherapee_pp3.validate_native_sections(case)
+
+    def test_native_boundary_values_match_schema_and_runtime(self) -> None:
+        schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "edit_intent.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        section_properties = schema["properties"]["style"]["properties"]["rawtherapee"][
+            "properties"
+        ]["sections"]["properties"]
+        boundaries = {
+            ("Directional Pyramid Denoising", "Gamma"): 0.1,
+            ("Resize", "Scale"): 0.01,
+            ("EPD", "Gamma"): 0.1,
+            ("EPD", "Scale"): 0.0,
+        }
+        for (section, key), minimum in boundaries.items():
+            with self.subTest(section=section, key=key):
+                runtime_spec = rawtherapee_pp3.RAWTHERAPEE_NATIVE_FIELD_SPECS[section][key]
+                self.assertEqual(runtime_spec.minimum, minimum)
+
+                section_schema = schema
+                ref_path = section_properties[section]["$ref"].removeprefix("#/")
+                for component in ref_path.split("/"):
+                    section_schema = section_schema[component]
+                field_schema = section_schema["properties"][key]
+                self.assertEqual(field_schema["minimum"], minimum)
+                self.assertNotIn("exclusiveMinimum", field_schema)
+
+                contract = {
+                    "profile_version": 349,
+                    "sections": {section: {key: minimum}},
+                }
+                normalized = rawtherapee_pp3.validate_native_sections(contract)
+                self.assertEqual(normalized["sections"][section][key], minimum)
 
     def test_native_contract_rejects_empty_and_mutually_conflicting_input_shapes(self) -> None:
         for value in (
