@@ -16,7 +16,11 @@ class DarktableCodecTests(unittest.TestCase):
         self.assertEqual(darktable_codec.DARKTABLE_VERSION, "5.4.1")
         self.assertEqual(
             set(darktable_codec.supported_operations()),
-            {"exposure", "temperature", "sigmoid", "filmicrgb", "colorbalancergb", "crop"},
+            {
+                "exposure", "temperature", "sigmoid", "filmicrgb", "colorbalancergb", "crop",
+                "highlights", "demosaic", "denoiseprofile", "lens", "sharpen", "diffuse",
+                "toneequal", "colorequal", "ashift",
+            },
         )
         self.assertEqual(
             {name: len(spec.template) for name, spec in darktable_codec.MODULE_SPECS.items()},
@@ -27,6 +31,15 @@ class DarktableCodecTests(unittest.TestCase):
                 "filmicrgb": 116,
                 "colorbalancergb": 132,
                 "crop": 24,
+                "highlights": 48,
+                "demosaic": 48,
+                "denoiseprofile": 416,
+                "lens": 356,
+                "sharpen": 12,
+                "diffuse": 60,
+                "toneequal": 72,
+                "colorequal": 128,
+                "ashift": 892,
             },
         )
 
@@ -128,13 +141,51 @@ class DarktableCodecTests(unittest.TestCase):
 
     def test_unsupported_operations_and_fields_are_rejected(self) -> None:
         with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "not verified"):
-            darktable_codec.encode_module({"operation": "denoiseprofile", "params": {}})
+            darktable_codec.encode_module({"operation": "rotatepixels", "params": {}})
         with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "unverified fields"):
             darktable_codec.encode_module(
                 {"operation": "exposure", "params": {"unknown_slider": 1}}
             )
         with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "must be an integer"):
             darktable_codec.encode_module({"operation": "exposure", "params": {"mode": 0.5}})
+
+    def test_phase2_fields_are_bounded_and_lens_strings_are_binary_safe(self) -> None:
+        highlights = darktable_codec.encode_module(
+            {"operation": "highlights", "params": {"mode": 5, "iterations": 32, "recovery": 5}}
+        )
+        self.assertEqual(len(bytes.fromhex(highlights["params"])), 48)
+        lens = darktable_codec.encode_module(
+            {
+                "operation": "lens",
+                "params": {"method": 1, "camera": "DC-S5", "lens": "Lumix test lens"},
+            }
+        )
+        self.assertEqual(len(bytes.fromhex(lens["params"])), 356)
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "above the verified range"):
+            darktable_codec.encode_module(
+                {"operation": "demosaic", "params": {"cs_iter": 26}}
+            )
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "verified values"):
+            darktable_codec.encode_module(
+                {"operation": "demosaic", "params": {"demosaicing_method": 2052}}
+            )
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "NUL-free"):
+            darktable_codec.encode_module(
+                {"operation": "lens", "params": {"camera": "bad\x00camera"}}
+            )
+
+    def test_phase2_array_fields_are_explicit_not_arbitrary_payloads(self) -> None:
+        module = darktable_codec.encode_module(
+            {
+                "operation": "denoiseprofile",
+                "params": {"x_0_0": 0.0, "x_5_6": 1.0, "y_4_3": 0.25, "strength": 0.8},
+            }
+        )
+        self.assertEqual(len(bytes.fromhex(module["params"])), 416)
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "unverified fields"):
+            darktable_codec.encode_module(
+                {"operation": "colorequal", "params": {"curve": [1, 2, 3]}}
+            )
 
     def test_malformed_or_non_darktable_xmp_is_rejected(self) -> None:
         with self.assertRaises(darktable_codec.DarktableCodecError):

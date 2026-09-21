@@ -73,23 +73,69 @@ embedded into the execution plan. RAW and XMP hashes remained identical before a
 
 ## Dynamic module codec evidence on 2026-09-22
 
-`scripts/darktable_codec.py` is pinned to darktable 5.4.1 and currently encodes only the following
-module structs, using the exact little-endian layouts from the 5.4.1 source and neutral blend
-parameters:
+`scripts/darktable_codec.py` is codec schema v2, pinned to darktable 5.4.1.  Each row below is
+implemented from the corresponding `release-5.4.1` source struct, with an exact module version,
+payload size, explicit field offsets, and bounded numeric/string values.  The source audit covered
+the module files under `src/iop/` for exposure, temperature, sigmoid, filmicrgb, colorbalancergb,
+crop, highlights, demosaic, denoiseprofile, lens, sharpen, diffuse, toneequal, colorequal and
+ashift in the 5.4.1 source tree.
 
-- `exposure` (module version 7);
-- `temperature` / white balance (version 4);
-- `sigmoid` (version 3);
-- `filmicrgb` / AgX-adjacent tone mapping (version 6);
-- `colorbalancergb` (version 5);
-- `crop` (version 3, normalized coordinates).
+| operation | module version | payload bytes | bounded controls |
+| --- | ---: | ---: | --- |
+| `exposure` | 7 | 28 | exposure/black/deflicker and flags |
+| `temperature` | 4 | 20 | RGB multipliers and preset |
+| `sigmoid` | 3 | 56 | contrast, targets, hue/purity controls |
+| `filmicrgb` | 6 | 116 | scene/display tone, reconstruction and flags |
+| `colorbalancergb` | 5 | 132 | luminance/chroma/hue, brilliance and saturation |
+| `crop` | 3 | 24 | normalized engine-native crop and ratio |
+| `highlights` | 4 | 48 | recovery mode, clip, wavelet and iterations |
+| `demosaic` | 6 | 48 | verified Bayer/X-Trans/dual method enum and refinements |
+| `denoiseprofile` | 12 | 416 | profile strength, wavelet curves and transform flags |
+| `lens` | 10 | 356 | metadata/Lensfun controls, camera/lens strings and vignette |
+| `sharpen` | 1 | 12 | radius, amount and threshold |
+| `diffuse` | 2 | 60 | iterations, radius, anisotropy and speed controls |
+| `toneequal` | 2 | 72 | nine tonal bands, detail/mask method and iterations |
+| `colorequal` | 4 | 128 | hue/saturation/brightness nodes and filter controls |
+| `ashift` | 5 | 892 | rotation, lens shift, shear, perspective and crop mode |
 
-Unknown operations and fields raise a codec error before any XMP or output is written. The
-vendor-neutral global mapping is intentionally limited to exposure, black point, contrast and
-saturation; white-balance and tone changes should use explicit `style.darktable.modules` requests
-until their semantic mapping is made camera- and workflow-aware. The `crop` struct is
-engine-native only: generic `composition.crop` is unsupported, and an explicit crop module is
-allowed only alongside `composition.decision=preserve_existing_crop`.
+The demosaic method is an allowlist of the 5.4.1 enum values, not an arbitrary integer range.
+Unknown operations, fields, enum values, stale XMP versions, non-finite numbers, out-of-range
+values, NUL-containing strings, and unsafe `replace`/`multi_priority` values raise a codec error
+before any XMP or output is written.  `modules_from_global_adjustments()` maps only exposure,
+black point, contrast and saturation, and emits `replace=true` for those singleton adjustment
+modules so an old instance cannot be silently duplicated.
+
+`crop` remains engine-native only: generic `composition.crop` is unsupported, and an explicit
+crop module is allowed only alongside `composition.decision=preserve_existing_crop`.  `ashift`
+covers the verified rotate/lens-shift/shear/perspective path; the separate `rotatepixels` module
+is not claimed.
+
+### Output contract
+
+`render_raw.build_darktable_command()` has a separate bounded export contract.  It requires the
+output suffix to agree with `output_format`, selects only these combinations, and rejects the
+rest before invoking the CLI.  The same contract is exposed by `scripts/render_raw.py` through
+`--output-format`, `--bit-depth`, `--icc-type`, `--icc-intent`, `--max-width` and `--max-height`:
+
+| format | accepted depth | darktable container check |
+| --- | --- | --- |
+| JPEG | 8-bit | `mjpeg` |
+| PNG | 8/16-bit | `rgb24` / `rgb48be` |
+| TIFF | 8/16/32-bit | `rgb24` / `rgb48le` / `rgbf32le` |
+| OpenEXR | 16/32-bit HALF/FLOAT | `gbrpf16le` / `gbrpf32le` |
+
+The OpenEXR `bpp` values are source-pinned enum selectors (`16` for HALF and `32` for FLOAT),
+not `256`/`512` byte counts.  Built-in ICC type and rendering intent are allowlisted to the
+stable `--icc-type`/`--icc-intent` CLI values; arbitrary profile paths, display profiles and
+soft-proof controls are rejected.  A live test reads back the output container and pixel format
+with `ffprobe`, and verifies an embedded sRGB ICC profile for JPEG.
+
+Local blending/masks are deliberately not part of this contract.  darktable's
+`src/develop/masks.c` representation combines history IDs, geometry, points and blend parameters;
+the repository has no stable, version-pinned fixture for those structures.  Until such a fixture
+and a real-RAW delta test exist, the compiler rejects local adjustments and emits no guessed mask
+XML.  This is a blocker for local selective edits, not a claim that masks are impossible in the
+darktable GUI.
 
 For example, a dynamic EditIntent can request verified module fields like this (the normal
 authorization/source/preview fields are omitted here):
@@ -143,15 +189,25 @@ non-empty output fingerprint for every RAW:
 | `P1034748.RW2` | `40ff5e34965e5252ffab02244d2b336f69f5c8c7681ff0a1e2203ae30d52443a` | asserted by the live test |
 | `P1034812.RW2` | `e62187c516083dd31797021bc81c853c6650e2b0e6945b109936177bd0503b02` | asserted by the live test |
 
-This evidence promotes dynamic compilation only for the listed module fields. Denoise, lens
-correction, rotate/perspective, local blending/masks, output profile/bit-depth options, and
-catalog writes remain unsupported and fail closed.
+This evidence promotes dynamic compilation only for the listed module fields.  The source-sidecar
+free live test also passed for all three copied Bangkok RAWs: it rendered a preview from an
+external `base_profile` XMP, compiled the module plan from `preview_basis.state_inputs`, and
+executed the embedded-XMP plan through darktable-cli 5.4.1.  The three source SHA-256 values
+above remained unchanged and no adjacent XMP was created.
 
-The no-source-sidecar live path passed for all three copied Bangkok RAWs. Each test copied the
-RAW into a temporary directory, rendered a preview from an external `base_profile` XMP, compiled
-the module plan from `preview_basis.state_inputs`, and executed the embedded-XMP plan through
-darktable-cli 5.4.1. The three source SHA-256 values above were unchanged and no adjacent XMP was
-created.
+The Phase 2 live contract is:
+
+```bash
+LUMENFLOW_DARKTABLE_LIVE_RAW_DIR=/private/tmp/lumenflow-raw-fixtures/bangkok-2026 \
+  python3 -m unittest tests.test_darktable_common_modules_live -v
+```
+
+It has three independent checks: all nine new modules change decoded pixels relative to the
+minimal base while repeated renders are pixel-deterministic for all three RAWs; each new module
+has an independent delta against the same minimal base; and every JPEG/PNG/TIFF/OpenEXR depth
+creates the requested suffix/container/pixel format.  The output test completed in 50.189s after
+the EXR enum selector was corrected.  The full module test uses fresh config/cache/library
+directories per render and never writes beside a copied RAW.
 
 ### Crash regression verification
 
@@ -196,8 +252,8 @@ was produced, all copied RAW fingerprints stayed unchanged, and no source sideca
 
 ## Promotion work still required
 
-1. Expand the codec one module at a time (denoise, lens, rotate/perspective, blending/masks and
-   output profiles) with a version-pinned fixture and real-RAW evidence for every field.
+1. Build a version-pinned mask/blend fixture and real-RAW pixel-delta proof before exposing local
+   selective edits.  Until then local adjustments remain unsupported and fail closed.
 2. Keep catalog writes and develop-state writes unsupported; the verified path only reads an XMP
    snapshot and renders through an in-memory library.
 3. Add review-loop and benchmark evidence comparable to the RawTherapee path.

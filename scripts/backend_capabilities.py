@@ -206,7 +206,7 @@ def rawtherapee_capabilities() -> BackendCapabilities:
 def darktable_capabilities() -> BackendCapabilities:
     return _contract(
         "darktable",
-        "darktable-module-codec-v1",
+        "darktable-module-codec-v2",
         {
             "preview.state_bound": _supported(
                 "A real RAW preview passed with an explicit fingerprinted XMP and isolated darktable runtime",
@@ -222,18 +222,21 @@ def darktable_capabilities() -> BackendCapabilities:
             "plan.compile.v1": _unsupported("adjustment_plan.v1 is not compiled to darktable modules"),
             "intent.compile.v2": _supported(
                 "EditIntent v2 compiles a verified subset of darktable 5.4.1 module structs and replays them through darktable-cli",
-                "compiler=lumenflow.darktable-xmp-modules@1",
-                "modules=exposure,temperature,sigmoid,filmicrgb,colorbalancergb,engine-native-crop",
+                "compiler=lumenflow.darktable-xmp-modules@2",
+                "modules=exposure@7,temperature@4,sigmoid@3,filmicrgb@6,colorbalancergb@5,crop@3,"
+                "highlights@4,demosaic@6,denoiseprofile@12,lens@10,sharpen@1,diffuse@2,"
+                "toneequal@2,colorequal@4,ashift@5",
+                "base=lumenflow.darktable_codec.v2",
             ),
             "render": _supported(
-                "darktable-cli passed isolated real-RAW exports with source and sidecar preservation",
+                "darktable-cli passed isolated real-RAW exports with source and sidecar preservation; bounded JPEG/PNG/TIFF/OpenEXR output is available through the direct renderer",
                 "executor=execution_plan.v1",
                 "darktable-cli=5.4.1",
                 "probe=darktable_probe_7a4a7a02494044ceb2141c26199a8805",
             ),
             "render.legacy": _supported("Legacy style or XMP command construction remains available"),
             "export.verified": _supported(
-                "A real XMP-replay execution emitted a successful v1 receipt with source/output fingerprints",
+                "A real XMP-replay execution emitted a successful v1 receipt with source/output fingerprints; direct exports verify JPEG/PNG/TIFF and OpenEXR half/float containers",
                 "receipt=execution_receipt.v1",
                 "darktable-cli=5.4.1",
                 "sentinel_sha256=b8979553ec61b579c2600787e62d9e10885645358e07bafbd6c58cddc84cce4e",
@@ -245,8 +248,8 @@ def darktable_capabilities() -> BackendCapabilities:
             ),
             "mask.ai": _unsupported("AI mask compilation is not implemented"),
             "adjustments.advanced_color": _supported(
-                "Explicit filmic RGB, sigmoid and color balance RGB module structs are version-checked",
-                "modules=filmicrgb@6,sigmoid@3,colorbalancergb@5",
+                "Explicit tone/color module structs are version-checked and fail closed",
+                "modules=sigmoid@3,filmicrgb@6,colorbalancergb@5,toneequal@2,colorequal@4",
             ),
         },
     )
