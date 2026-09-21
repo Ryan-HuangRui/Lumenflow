@@ -5,9 +5,9 @@ Lumenflow is a portable agent-skill workflow for personal RAW photo development 
 ## Principles
 
 - Agent first: the user interacts with an agent host, not a complex CLI.
-- Local first: photos, cookies, source lists, transcripts, and generated style libraries stay on the user's machine.
+- Local first: photos, cookies, source lists, transcripts, source maps, and video-level evidence stay on the user's machine.
 - Guidance over presets: style cards guide reasoning; the agent generates concrete parameters per photo.
-- Public-safe defaults: the repository ships code, templates, schemas, tests, and hand-authored starter cards, not third-party-derived style data.
+- Public-safe defaults: the repository ships code, templates, schemas, tests, starter cards, and source-clean reusable knowledge, never original tutorial identity or transcript content.
 - Small scripts: deterministic work belongs in `scripts/`; judgment belongs in the agent.
 
 ## Current Public Shape
@@ -21,10 +21,11 @@ The repository should expose:
 - `scripts/` helpers for scanning, previewing, rendering, subtitle fetching, tutorial ingestion, and local style-library generation
 - `knowledge/schemas/`
 - hand-authored starter style cards under `knowledge/style_cards/*.json`
-- empty generated-data directories:
+- private generated-data placeholders:
   - `knowledge/style_cards/tutorial_recipes/`
   - `knowledge/style_cards/tutorial_derived/`
-  - `knowledge/style_families/`
+- source-clean reusable knowledge under `knowledge/style_families/`
+- the source-clean runtime index `knowledge/style_library_index.json`
 - examples:
   - `config/lumenflow.local.example.json`
   - `knowledge/source_records/tutorial_sources.example.json`
@@ -39,7 +40,7 @@ The repository should not expose:
 - full generated transcripts
 - generated tutorial recipes
 - generated tutorial-derived cards
-- generated style-family indexes
+- private style provenance maps
 - downloaded audio, ASR cache, or local render outputs
 
 ## Phase 0: Trusted Lightroom Boundary
@@ -143,8 +144,8 @@ Implemented foundation:
 - Bilibili subtitle fetcher.
 - Local FunASR fallback script.
 - Tutorial ingestion into local recipe files.
-- Video-level style-card generation.
-- Layer 1 family/index generation.
+- Private video-level evidence generation.
+- Source-clean semantic merge and reusable index generation.
 - Example source and hotword configs.
 
 Next work:
@@ -152,7 +153,7 @@ Next work:
 - Add provider abstraction for YouTube captions and user-provided transcript files.
 - Add stricter quality flags for weak ASR, non-tutorial content, and low-signal transcripts.
 - Add a review workflow for accepting or rejecting generated cards.
-- Keep generated outputs ignored by default for public/plugin distributions.
+- Keep source-bearing outputs ignored; validate and commit only source-clean reusable knowledge.
 
 ## Phase 4: Social Source Records
 

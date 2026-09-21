@@ -20,9 +20,8 @@ knowledge/style_cards/tutorial_recipes/*
 !knowledge/style_cards/tutorial_recipes/.gitkeep
 knowledge/style_cards/tutorial_derived/*
 !knowledge/style_cards/tutorial_derived/.gitkeep
-knowledge/style_families/*
-!knowledge/style_families/.gitkeep
-knowledge/style_library_index.json
+knowledge/private_provenance/*
+!knowledge/private_provenance/.gitkeep
 
 # Local source credentials/config should use example files as templates.
 knowledge/source_records/x_sources.json
