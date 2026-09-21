@@ -565,7 +565,7 @@ def _compile_darktable_intent(
             )
         except darktable_codec.DarktableCodecError as error:
             raise IntentValidationError(str(error)) from error
-        compiler = {"id": "lumenflow.darktable-xmp-modules", "version": "1"}
+        compiler = {"id": "lumenflow.darktable-xmp-modules", "version": "2"}
         profile_sha256 = hashlib.sha256(profile_content.encode("utf-8")).hexdigest()
         starting_state_payload = {
             **_darktable_starting_state(xmp_fingerprint),
@@ -936,7 +936,7 @@ def _validate_execution_plan(
         "rawtherapee": [{"id": "lumenflow.rawtherapee", "version": "1"}],
         "darktable": [
             {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
-            {"id": "lumenflow.darktable-xmp-modules", "version": "1"},
+            {"id": "lumenflow.darktable-xmp-modules", "version": "2"},
         ],
     }[backend_id]
     if plan.get("compiler") not in allowed_compilers:

@@ -124,6 +124,45 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertIn("false", command)
             self.assertIn("--disable-opencl", command)
             self.assertIn("--threads", command)
+            self.assertIn("--out-ext", command)
+            self.assertIn("jpg", command)
+
+            icc_command = render_raw.build_darktable_command(
+                raw,
+                output,
+                icc_type="SRGB",
+                icc_intent="PERCEPTUAL",
+            )
+            self.assertIn("--icc-type", icc_command)
+            self.assertIn("SRGB", icc_command)
+            self.assertIn("--icc-intent", icc_command)
+            self.assertIn("PERCEPTUAL", icc_command)
+
+    def test_build_darktable_command_supports_bounded_output_contract(self) -> None:
+        raw = Path("IMG_0003.RW2")
+        for output_format, suffix, depth, expected in (
+            ("png", "png", 16, "plugins/imageio/format/png/bpp=16"),
+            ("tiff", "tif", 32, "plugins/imageio/format/tiff/bpp=32"),
+            ("openexr", "exr", 16, "plugins/imageio/format/exr/bpp=16"),
+        ):
+            command = render_raw.build_darktable_command(
+                raw,
+                Path(f"out.{suffix}"),
+                output_format=output_format,
+                bit_depth=depth,
+            )
+            self.assertIn(expected, command)
+            self.assertIn("--out-ext", command)
+        with self.assertRaises(ValueError):
+            render_raw.build_darktable_command(raw, Path("out.jpg"), output_format="png")
+        with self.assertRaises(ValueError):
+            render_raw.build_darktable_command(raw, Path("out.jpg"), output_format="png", bit_depth=32)
+        with self.assertRaises(ValueError):
+            render_raw.build_darktable_command(raw, Path("out.exr"), output_format="openexr", bit_depth=8)
+        with self.assertRaises(ValueError):
+            render_raw.build_darktable_command(raw, Path("out.jpg"), icc_type="FILE")
+        with self.assertRaises(ValueError):
+            render_raw.build_darktable_command(raw, Path("out.jpg"), icc_intent="LAST")
 
     def test_build_rawtherapee_command_supports_final_export_container(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

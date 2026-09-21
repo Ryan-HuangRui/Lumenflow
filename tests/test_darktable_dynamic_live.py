@@ -93,6 +93,7 @@ class DarktableDynamicLiveTests(unittest.TestCase):
                     output_dir=root / "execution" / str(index),
                 )
                 self.assertEqual(plan["compiler"]["id"], "lumenflow.darktable-xmp-modules")
+                self.assertEqual(plan["compiler"]["version"], "2")
                 self.assertEqual(plan["starting_state"]["xmp_content"], base_text)
                 receipt = edit_intent.execute_plan(
                     plan,

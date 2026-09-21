@@ -68,7 +68,7 @@ class DarktableDynamicIntentTests(unittest.TestCase):
             )
             self.assertEqual(
                 plan["compiler"],
-                {"id": "lumenflow.darktable-xmp-modules", "version": "1"},
+                {"id": "lumenflow.darktable-xmp-modules", "version": "2"},
             )
             self.assertEqual(plan["starting_state"]["state_inputs"][0]["role"], "base_profile")
             self.assertEqual(

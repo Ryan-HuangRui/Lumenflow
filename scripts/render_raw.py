@@ -13,6 +13,14 @@ from pathlib import Path
 import lumenflow_config
 
 
+DARKTABLE_ICC_TYPES = frozenset(
+    {"SRGB", "ADOBERGB", "LIN_REC709", "LIN_REC2020", "REC709", "PROPHOTO_RGB", "DISPLAY_P3"}
+)
+DARKTABLE_ICC_INTENTS = frozenset(
+    {"PERCEPTUAL", "RELATIVE_COLORIMETRIC", "SATURATION", "ABSOLUTE_COLORIMETRIC"}
+)
+
+
 def build_rawtherapee_command(
     raw: Path,
     output: Path,
@@ -36,7 +44,8 @@ def build_rawtherapee_command(
 
     if output_format is not None and not isinstance(output_format, str):
         raise ValueError("RawTherapee output_format must be a string")
-    normalized_format = (output_format or output.suffix.lstrip(".") or "jpg").lower()
+    path_format = output.suffix.lstrip(".").lower()
+    normalized_format = (output_format or path_format or "jpg").lower()
     aliases = {"jpg": "jpeg", "tif": "tiff"}
     normalized_format = aliases.get(normalized_format, normalized_format)
     if normalized_format not in {"jpeg", "png", "tiff"}:
@@ -94,16 +103,80 @@ def build_darktable_command(
     xmp: Path | None = None,
     style_name: str | None = None,
     jpeg_quality: int = 95,
+    *,
+    output_format: str | None = None,
+    bit_depth: str | int | None = None,
+    icc_type: str | None = None,
+    icc_intent: str | None = None,
+    max_width: int | None = None,
+    max_height: int | None = None,
     configdir: Path | None = None,
     cachedir: Path | None = None,
     library: str | Path | None = ":memory:",
     write_sidecars: bool = False,
     executable: str = "darktable-cli",
 ) -> list[str]:
+    if isinstance(jpeg_quality, bool) or not isinstance(jpeg_quality, int) or not 1 <= jpeg_quality <= 100:
+        raise ValueError("darktable jpeg_quality must be an integer between 1 and 100")
+    if output_format is not None and not isinstance(output_format, str):
+        raise ValueError("darktable output_format must be a string")
+    path_format = output.suffix.lstrip(".").lower()
+    normalized_format = (output_format or path_format or "jpg").lower()
+    format_aliases = {
+        "jpg": "jpeg",
+        "jpe": "jpeg",
+        "tif": "tiff",
+        "openexr": "exr",
+    }
+    normalized_format = format_aliases.get(normalized_format, normalized_format)
+    if output_format is not None and path_format:
+        normalized_path_format = format_aliases.get(path_format, path_format)
+        if normalized_path_format != normalized_format:
+            raise ValueError("darktable output suffix must match output_format")
+    if normalized_format not in {"jpeg", "png", "tiff", "exr"}:
+        raise ValueError("darktable output_format must be jpeg, png, tiff, or openexr")
+    if bit_depth is not None:
+        if isinstance(bit_depth, bool) or not isinstance(bit_depth, (str, int)):
+            raise ValueError("darktable bit_depth must be 8, 16, or 32")
+        normalized_depth = str(bit_depth).lower()
+    else:
+        normalized_depth = {"jpeg": "8", "png": "8", "tiff": "8", "exr": "16"}[normalized_format]
+    if normalized_depth not in {"8", "16", "32"}:
+        raise ValueError("darktable bit_depth must be 8, 16, or 32")
+    supported_depths = {
+        "jpeg": {"8"},
+        "png": {"8", "16"},
+        "tiff": {"8", "16", "32"},
+        "exr": {"16", "32"},
+    }
+    if normalized_depth not in supported_depths[normalized_format]:
+        raise ValueError(f"darktable {normalized_format} output does not support {normalized_depth}-bit depth")
+    if icc_type is not None and icc_type not in DARKTABLE_ICC_TYPES:
+        raise ValueError(
+            "darktable icc_type must be one of " + ", ".join(sorted(DARKTABLE_ICC_TYPES))
+        )
+    if icc_intent is not None and icc_intent not in DARKTABLE_ICC_INTENTS:
+        raise ValueError(
+            "darktable icc_intent must be one of " + ", ".join(sorted(DARKTABLE_ICC_INTENTS))
+        )
+    for name, value in (("max_width", max_width), ("max_height", max_height)):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            raise ValueError(f"darktable {name} must be a positive integer")
+
+    out_ext = {"jpeg": "jpg", "png": "png", "tiff": "tif", "exr": "exr"}[normalized_format]
     command = [executable, str(raw)]
     if xmp is not None:
         command.append(str(xmp))
     command.append(str(output))
+    command.extend(["--out-ext", out_ext])
+    if max_width is not None:
+        command.extend(["--width", str(max_width)])
+    if max_height is not None:
+        command.extend(["--height", str(max_height)])
+    if icc_type is not None:
+        command.extend(["--icc-type", icc_type])
+    if icc_intent is not None:
+        command.extend(["--icc-intent", icc_intent])
     if style_name:
         command.extend(["--style", style_name])
     # Keep headless renders independent of user-installed custom presets.  The
@@ -122,6 +195,20 @@ def build_darktable_command(
     if not write_sidecars:
         command.extend(["--conf", "write_sidecar_files=never"])
     command.extend(["--conf", f"plugins/imageio/format/jpeg/quality={jpeg_quality}"])
+    if normalized_format == "png":
+        command.extend(["--conf", f"plugins/imageio/format/png/bpp={normalized_depth}"])
+    elif normalized_format == "tiff":
+        command.extend(["--conf", f"plugins/imageio/format/tiff/bpp={normalized_depth}"])
+        # 16-bit integer is the portable/common TIFF contract; 32-bit TIFF
+        # is written as IEEE float by darktable's 5.4.1 format backend.
+        command.extend(["--conf", "plugins/imageio/format/tiff/pixelformat=false"])
+    elif normalized_format == "exr":
+        # darktable stores EXR's HALF/FLOAT selector as enum values shifted
+        # four bits: HALF (enum 1) -> 16 and FLOAT (enum 2) -> 32.  These
+        # happen to equal the advertised bit depths, but are not arbitrary
+        # output sizes; keep the mapping explicit and source-pinned.
+        exr_bpp = normalized_depth
+        command.extend(["--conf", f"plugins/imageio/format/exr/bpp={exr_bpp}"])
     return command
 
 
@@ -158,6 +245,12 @@ def main() -> None:
     parser.add_argument("--engine", choices=["rawtherapee", "darktable"], default="rawtherapee")
     parser.add_argument("--xmp", type=Path)
     parser.add_argument("--style-name")
+    parser.add_argument("--output-format", choices=["jpeg", "jpg", "png", "tiff", "tif", "openexr", "exr"])
+    parser.add_argument("--bit-depth")
+    parser.add_argument("--icc-type")
+    parser.add_argument("--icc-intent")
+    parser.add_argument("--max-width", type=int)
+    parser.add_argument("--max-height", type=int)
     parser.add_argument("--jpeg-quality", type=int, default=95)
     parser.add_argument("--timeout", type=int)
     parser.add_argument("--dry-run", action="store_true")
@@ -170,9 +263,27 @@ def main() -> None:
         raise SystemExit(f"{executable} not found. Install it or use --dry-run.")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    output = args.output_dir / (args.output_name or f"{args.raw.stem}.jpg")
+    requested_format = (args.output_format or "jpeg").lower()
+    output_suffix = {
+        "jpeg": "jpg",
+        "jpg": "jpg",
+        "png": "png",
+        "tiff": "tif",
+        "tif": "tif",
+        "openexr": "exr",
+        "exr": "exr",
+    }[requested_format]
+    output = args.output_dir / (args.output_name or f"{args.raw.stem}.{output_suffix}")
     if args.engine == "rawtherapee":
-        command = build_rawtherapee_command(args.raw, output, args.profile, executable=executable)
+        command = build_rawtherapee_command(
+            args.raw,
+            output,
+            args.profile,
+            executable=executable,
+            output_format=args.output_format,
+            bit_depth=args.bit_depth,
+            jpeg_quality=args.jpeg_quality,
+        )
     else:
         command = build_darktable_command(
             args.raw,
@@ -180,6 +291,12 @@ def main() -> None:
             xmp=args.xmp,
             style_name=args.style_name,
             jpeg_quality=args.jpeg_quality,
+            output_format=args.output_format,
+            bit_depth=args.bit_depth,
+            icc_type=args.icc_type,
+            icc_intent=args.icc_intent,
+            max_width=args.max_width,
+            max_height=args.max_height,
             executable=executable,
         )
     run_command(command, dry_run=args.dry_run, timeout=args.timeout)
