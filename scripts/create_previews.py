@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import darktable_codec
 import lumenflow_config
 import preview_provider
 import render_raw
@@ -42,6 +43,47 @@ def build_preview_command(
     )
 
 
+def resolve_preview_base_profile(
+    *,
+    provider_name: str,
+    base_profile: Path | None,
+    output_dir: Path,
+) -> Path | None:
+    """Return an explicit preview state without ever writing beside the RAW.
+
+    Dynamic darktable compilation requires a complete XMP starting state.  A
+    new RAW normally has no sidecar, so materialize the codec's version-pinned
+    empty history under the output directory and bind the preview to it.
+    """
+
+    if base_profile is not None:
+        if not base_profile.is_file() or base_profile.is_symlink():
+            raise ValueError(f"Preview base profile does not exist: {base_profile}")
+        return base_profile
+    if provider_name != "darktable":
+        return None
+
+    managed_profile = (
+        output_dir
+        / ".lumenflow-state"
+        / f"darktable-{darktable_codec.DARKTABLE_VERSION}-empty-history.xmp"
+    )
+    expected = darktable_codec.minimal_xmp()
+    if managed_profile.exists():
+        if (
+            managed_profile.is_symlink()
+            or not managed_profile.is_file()
+            or managed_profile.read_text(encoding="utf-8") != expected
+        ):
+            raise ValueError(
+                f"Managed darktable base profile is not the expected codec state: {managed_profile}"
+            )
+    else:
+        managed_profile.parent.mkdir(parents=True, exist_ok=True)
+        managed_profile.write_text(expected, encoding="utf-8")
+    return managed_profile
+
+
 def run(
     *,
     source_dir: Path,
@@ -51,7 +93,7 @@ def run(
     limit: int | None,
     dry_run: bool,
     render_timeout: int,
-    base_profile: Path | None = Path("knowledge/raw_profiles/base.pp3"),
+    base_profile: Path | None = None,
     local_config: dict[str, Any] | None = None,
     provider_name: str = "rawtherapee",
 ) -> dict[str, Any]:
@@ -65,6 +107,11 @@ def run(
         selected_raws = selected_raws[:limit]
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    resolved_base_profile = resolve_preview_base_profile(
+        provider_name=provider_name,
+        base_profile=base_profile,
+        output_dir=output_dir,
+    )
     records = []
     for raw_item in selected_raws:
         raw_path = Path(raw_item["path"])
@@ -73,7 +120,7 @@ def run(
             preview_provider.PreviewRequest(
                 source=raw_path,
                 output=preview_path,
-                base_profile=base_profile,
+                base_profile=resolved_base_profile,
                 dry_run=dry_run,
                 timeout=render_timeout,
                 selection_reason=raw_item.get("selection_reason", ""),
@@ -111,7 +158,7 @@ def main() -> None:
         choices=["rawtherapee", "darktable", "lightroom"],
         default="rawtherapee",
     )
-    parser.add_argument("--base-profile", type=Path, default=Path("knowledge/raw_profiles/base.pp3"))
+    parser.add_argument("--base-profile", type=Path)
     parser.add_argument("--local-config", type=Path, default=lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH)
     args = parser.parse_args()
     local_config = lumenflow_config.read_local_config(args.local_config)

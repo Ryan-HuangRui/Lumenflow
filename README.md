@@ -4,7 +4,7 @@
 
 Lumenflow 把“审美判断”交给具备视觉能力的 agent，把扫描、预览、合同校验、渲染和审计交给确定性代码。它不是另一个照片管理器，也不是一组固定滤镜；它是一套可移植的 agent skills、JSON 合同和本地工具链。
 
-> 当前状态：可用于本地实验和个人工作流。RawTherapee 是目前唯一支持动态 EditIntent 参数编译的一等后端；darktable 提供经过真实 RAW 验证的受限 XMP 重放链路；Lightroom 仍处于 fail-closed 验证阶段。项目尚未发布稳定版本。
+> 当前状态：可用于本地实验和个人工作流。RawTherapee 5.11 与 darktable 5.4.1 都支持状态绑定预览、动态 EditIntent 编译、隔离渲染和验证收据；能力严格限制在逐模块真实 RAW 验证过的范围。Lightroom 仍处于 fail-closed 验证阶段。项目尚未发布稳定版本。
 
 ## 目录
 
@@ -63,7 +63,7 @@ curate-photos：扫描 → 内嵌预览 → 联系表
         ↓
 develop-photos：预览证据 → EditIntent → ExecutionPlan
         ↓
-RawTherapee 渲染 → ExecutionReceipt
+RawTherapee / darktable 渲染 → ExecutionReceipt
         ↓
 视觉模型复核成片 → 接受或有限修订
         ↓
@@ -109,12 +109,13 @@ python -m pip install -r requirements-asr.txt
 
 ### 3. 安装外部工具
 
-当前完整照片主路径需要：
+当前完整照片主路径需要 ExifTool，以及至少一个 RAW 后端：
 
 - [ExifTool](https://exiftool.org/)：读取元数据并提取 RAW 内嵌预览。
-- [RawTherapee](https://rawtherapee.com/)：提供 `rawtherapee-cli`，用于状态绑定预览和一等 RAW 渲染。
+- [RawTherapee](https://rawtherapee.com/) 5.11：提供 `rawtherapee-cli`。
+- [darktable](https://www.darktable.org/) 5.4.1：提供 `darktable-cli`；只在使用 darktable 后端时必需。
 
-可选工具包括 `darktable-cli`、Lightroom CLI Bridge、`ffmpeg`、`ffprobe` 和 `yt-dlp`。只有启用对应功能时才需要安装。
+可选工具包括 Lightroom CLI Bridge、`ffmpeg`、`ffprobe` 和 `yt-dlp`。只有启用对应功能时才需要安装。
 
 ### 4. 创建本机配置
 
@@ -184,7 +185,7 @@ python scripts/curate_photos.py finalize \
 - 模型实际查看过的 `PreviewArtifact`；
 - 生成预览时的起始状态哈希。
 
-编译为 RawTherapee 执行计划：
+编译为 RawTherapee 或 darktable 执行计划：
 
 ```bash
 python scripts/edit_intent.py compile /path/to/photo.edit_intent.json \
@@ -226,8 +227,8 @@ python scripts/review_loop.py advance \
 
 | 后端 | 当前定位 | 预览 | EditIntent v2 | 真实执行 |
 | --- | --- | --- | --- | --- |
-| RawTherapee | 推荐的一等后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 | 支持 |
-| darktable | 受限的一等 XMP 重放后端 | 支持显式 XMP 状态绑定 | 仅支持精确重放预览绑定的 XMP | 支持隔离执行和验证收据 |
+| RawTherapee | 默认动态后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 vendor-neutral 基础调整和 allowlisted PP3 模块 | 支持隔离执行和验证收据 |
+| darktable | 动态模块后端 | 支持；裸 RAW 自动使用输出目录内的显式最小 XMP | 支持 vendor-neutral 子集和 15 个版本固定模块 | 支持隔离执行和验证收据 |
 | Lightroom Classic | 交互式兼容路径 | 尚未完成可信状态绑定 | 仍使用旧 `adjustment_plan.v1` 路径 | 默认 fail-closed；当前只应 dry-run |
 
 后端能力由 `lumenflow.backend_capabilities.v1` 明确声明为 `supported`、`unsupported` 或 `unverified`。命令存在不等于能力已经安全可用：
@@ -238,7 +239,7 @@ python scripts/backend_capabilities.py darktable
 python scripts/backend_capabilities.py lightroom --probe
 ```
 
-darktable 的隔离验证方法和真实 RAW 证据见 [`docs/darktable_backend_spike.md`](docs/darktable_backend_spike.md)。它尚不能把新的曝光、颜色、裁剪或蒙版意图编译为 darktable 模块；这些能力会明确拒绝，而不是退回隐式参数。Lightroom 只有在 CLI Bridge 对对象级读取、写入、导出和状态绑定预览完成真机验证后，才会开放非 dry-run 自动写入。
+两个无头后端的逐类能力、限制和 Agent 闭环见 [`docs/raw_engine_autonomy.md`](docs/raw_engine_autonomy.md)。darktable 的模块结构与真实 RAW 证据见 [`docs/darktable_backend_spike.md`](docs/darktable_backend_spike.md)。未验证模块、darktable 蒙版、通用像素裁剪和 catalog 写入都会明确拒绝，而不是退回隐式参数。Lightroom 只有在 CLI Bridge 对对象级读取、写入、导出和状态绑定预览完成真机验证后，才会开放非 dry-run 自动写入。
 
 ## 架构与数据合同
 
@@ -357,7 +358,7 @@ Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“�
 
 ### 可以用 darktable 替代 RawTherapee 吗？
 
-可以用于一个经过验证的窄场景：状态绑定预览并精确重放已有 darktable XMP，通过隔离 CLI 执行后生成验证收据。它仍不能替代 RawTherapee 的动态修图主路径，因为新的曝光、颜色、裁剪和蒙版意图尚未映射为 darktable 模块。
+可以。darktable 5.4.1 已能从状态绑定预览生成新的版本固定模块，覆盖基础显影、曝光/色调、颜色、镜头、降噪/锐化、透视和引擎原生裁剪，并通过隔离 CLI 生成验证收据。它仍不支持局部蒙版/混合和 vendor-neutral 像素裁剪；这些请求会 fail closed。完整对比见 [`docs/raw_engine_autonomy.md`](docs/raw_engine_autonomy.md)。
 
 ### 依赖检查通过，但某个可选流程仍不可用？
 
@@ -374,7 +375,7 @@ Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“�
 - benchmark/回归合同与本地个人编辑范例库。
 - 可公开的语义风格层与私有来源证据分离。
 
-当前重点是扩大 RawTherapee 参数覆盖、完成 clean-clone/host packaging、验证真实 Lightroom 安全边界，并在满足 provider/compiler/receipt 条件后评估其他后端。详见 [`docs/roadmap.md`](docs/roadmap.md)。
+当前重点是补齐安全的局部选择能力、把高位深最终导出纳入 EditIntent 收据合同、完成 clean-clone/host packaging，并继续验证真实 Lightroom 安全边界。详见 [`docs/roadmap.md`](docs/roadmap.md)。
 
 ## 参与贡献
 

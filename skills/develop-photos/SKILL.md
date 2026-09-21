@@ -20,7 +20,7 @@ into:
 1. A confirmed selection plan or an explicit user-specified photo set.
 2. JPEG previews that the host agent can inspect visually.
 3. Agent-authored per-photo `EditIntent v2` documents based on reusable style knowledge.
-4. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
+4. Rendered JPG outputs through RawTherapee CLI by default, or the bounded darktable module compiler when explicitly selected.
 5. Agent review of rendered outputs, with revised plans when needed.
 6. A processing report explaining what happened.
 
@@ -89,15 +89,21 @@ With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-
 
 Default to RawTherapee unless the user explicitly asks for Lightroom, the plan requires executable Lightroom AI masks, or the source workflow is already organized around Lightroom catalog selections.
 
-The `EditIntent v2` compiler currently supports RawTherapee only. Lightroom inputs remain on the fail-closed `adjustment_plan.v1` compatibility path until the Lightroom v2 compiler and state-bound preview probe are implemented; do not silently translate a v2 intent into legacy Lightroom commands.
+The `EditIntent v2` compiler supports RawTherapee and the version-pinned darktable module slice. Lightroom inputs remain on the fail-closed `adjustment_plan.v1` compatibility path until the Lightroom v2 compiler and state-bound preview probe are implemented; do not silently translate a v2 intent into legacy Lightroom commands.
 
-darktable has a first-class but deliberately narrow exact-XMP-replay path. It can produce a state-bound preview from an explicit XMP, compile an EditIntent that requests no dynamic adjustments and preserves the existing crop, then render the same fingerprinted XMP through an isolated execution plan and verified receipt. It does not generate darktable module parameters. Reject non-empty global adjustments, crop changes, local adjustments, masks, and catalog writes. Do not infer capability from command availability alone; retain the real-RAW probe and live integration evidence described in `docs/darktable_backend_spike.md`.
+darktable has a first-class, version-pinned dynamic module path. For a bare RAW, `create_previews.py --provider darktable` creates a codec-owned minimal XMP under the preview output directory so the starting state is complete without writing beside the RAW. `EditIntent v2` may use the verified vendor-neutral exposure/contrast/saturation mapping and allowlisted `style.darktable.modules`. Unlisted modules, local masks/blends, vendor-neutral pixel crop, and catalog writes fail closed. See `docs/raw_engine_autonomy.md` and `docs/darktable_backend_spike.md` for the exact matrix.
 
 Use RawTherapee when:
 
 - The user wants unattended local RAW rendering.
 - The source photos are just files in a folder and may not be in a Lightroom catalog.
 - The plan needs executable crop through the current Lumenflow profile path.
+
+Use darktable when:
+
+- The desired look benefits from scene-referred tone/color modules such as sigmoid, filmic RGB, color balance RGB, tone equalizer, or color equalizer.
+- The plan needs the verified darktable denoise, lens, diffuse/sharpen, or perspective modules.
+- The model can express any crop through the validated engine-native normalized module; generic pixel crop and local masks remain unsupported.
 
 Use Lightroom only when all of these are true:
 
@@ -187,7 +193,7 @@ Use this exact retrieval order:
 - Do not execute a plan without an explicit allowed output root. Refuse source fingerprint drift, path escape, command mismatch, profile hash mismatch, or an existing output file before invoking the backend.
 - Personal examples are references, not presets. Never batch-copy a retrieved example's exposure, white balance, crop, or local edits without inspecting the new photo; keep the store local and do not export it unless the user explicitly asks.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
-- RawTherapee is the default dynamic rendering backend. Use darktable only when the requested operation is an exact replay of the explicit XMP bound to the approved preview; dynamic darktable parameter generation remains unsupported. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
+- RawTherapee is the default dynamic rendering backend. darktable is also dynamic, but only for the exact version-pinned modules declared by its capability contract; never pass arbitrary module names or opaque parameter blobs. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.
 - Do not crop by default. Cropping is an agent decision and must include a reason.
 - Do not batch-copy crop geometry across photos unless each photo has been separately inspected and the report explains why the same geometry is correct for each frame.
@@ -197,7 +203,7 @@ Use this exact retrieval order:
 - Lightroom crop execution is not supported by the current backend. Use `preserve_existing_crop`, `no_crop`, or `manual_recommendation` for Lightroom plans unless crop support has been implemented and verified.
 - Lightroom `masks` through the current batch Bridge are disabled by default because AI masks can be written to the wrong active photo and sky/subject selections can be visibly wrong in low-contrast scenes. Use `mask_decision=manual_recommendation` unless the executor has explicit per-photo active-image validation and overlay review.
 - Experimental Lightroom AI batch execution is allowed only when the local config explicitly sets `lightroom.allow_unverified_ai_masks=true`, and the report must state that the masks still require human overlay verification in Lightroom.
-- Local brush/gradient/radial masks and people/landscape part-specific masks are not executable yet; record them as review notes or supporting rationale instead.
+- Arbitrary brush/radial/AI masks and people/landscape part-specific masks are not executable in the headless backends yet. RawTherapee's bounded whole-frame Gradient and PCVignette sections are available as engine-native regional effects; darktable mask/blend payloads remain fail-closed.
 - When using Lightroom `masks`, put global changes in `adjustments` and local changes in each mask's `settings`. Do not duplicate the same correction globally and locally unless that is intentional and explained in the rationale.
 - For Lightroom mask settings, use Lumenflow adjustment keys such as `exposure_compensation`, `highlights`, `shadows`, `contrast`, `clarity`, `dehaze`, `temperature`, and `saturation`; the renderer maps them to Lightroom develop setting names.
 - Lightroom global `adjustments` also support Lightroom-only advanced color controls: `hsl`, `color_mixer`, `tone_curve`, `color_grading`, and `calibration`. These are executable only by the Lightroom engine; RawTherapee currently ignores them except as recorded plan data.
