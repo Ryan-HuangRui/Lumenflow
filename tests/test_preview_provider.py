@@ -169,6 +169,13 @@ class PreviewProviderTests(unittest.TestCase):
             self.assertEqual(artifact["source"], str(raw))
             self.assertEqual(artifact["preview"], str(output))
 
+            basis = preview_provider.preview_basis_from_artifact(artifact)
+            self.assertEqual(basis["artifact_id"], artifact["artifact_id"])
+            self.assertEqual(
+                [item["role"] for item in basis["state_inputs"]],
+                ["base_profile", "source_sidecar"],
+            )
+
     def test_starting_state_hash_changes_when_sidecar_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -191,6 +198,21 @@ class PreviewProviderTests(unittest.TestCase):
 
             self.assertNotEqual(first.starting_state_hash, second.starting_state_hash)
             self.assertNotEqual(first.artifact_id, second.artifact_id)
+
+    def test_rawtherapee_base_profile_alone_is_a_complete_explicit_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "keeper.DNG"
+            base = root / "base.pp3"
+            raw.write_bytes(b"raw")
+            base.write_text("[Version]\nVersion=349\n", encoding="utf-8")
+
+            artifact = preview_provider.RawTherapeePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(raw, root / "preview.jpg", base, True, 10)
+            )
+
+            self.assertEqual(artifact.state_completeness, "complete")
+            self.assertEqual([item["role"] for item in artifact.state_inputs], ["base_profile"])
 
     def test_successful_preview_records_output_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

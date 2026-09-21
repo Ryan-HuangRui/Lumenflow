@@ -17,10 +17,72 @@ def build_rawtherapee_command(
     output: Path,
     profiles: list[Path],
     executable: str = "rawtherapee-cli",
+    *,
+    output_format: str | None = None,
+    bit_depth: str | int | None = None,
+    jpeg_quality: int | None = None,
+    jpeg_chroma: int | None = None,
+    tiff_compression: bool = False,
+    use_fast_export: bool = False,
 ) -> list[str]:
+    """Build a bounded RawTherapee CLI command.
+
+    PP3 files carry processing state; these flags select only the final
+    container.  Keeping the output selection here lets previews use JPEG while
+    final exports can request 16/32-bit TIFF or 16-bit PNG without changing
+    the profile compiler.
+    """
+
+    if output_format is not None and not isinstance(output_format, str):
+        raise ValueError("RawTherapee output_format must be a string")
+    normalized_format = (output_format or output.suffix.lstrip(".") or "jpg").lower()
+    aliases = {"jpg": "jpeg", "tif": "tiff"}
+    normalized_format = aliases.get(normalized_format, normalized_format)
+    if normalized_format not in {"jpeg", "png", "tiff"}:
+        raise ValueError("RawTherapee output_format must be jpeg, png, or tiff")
+    if bit_depth is not None:
+        if isinstance(bit_depth, bool) or not isinstance(bit_depth, (str, int)):
+            raise ValueError("RawTherapee bit_depth must be 8, 16, 16f, or 32")
+        normalized_depth = str(bit_depth).lower()
+        if normalized_depth not in {"8", "16", "16f", "32"}:
+            raise ValueError("RawTherapee bit_depth must be 8, 16, 16f, or 32")
+    else:
+        normalized_depth = None
+    if normalized_format == "jpeg" and normalized_depth not in {None, "8"}:
+        raise ValueError("RawTherapee JPEG output supports only 8-bit depth")
+    if normalized_format == "png" and normalized_depth not in {None, "8", "16"}:
+        raise ValueError("RawTherapee PNG output supports only 8-bit or 16-bit depth")
+    if jpeg_quality is not None and (
+        isinstance(jpeg_quality, bool)
+        or not isinstance(jpeg_quality, int)
+        or not 1 <= jpeg_quality <= 100
+    ):
+        raise ValueError("RawTherapee jpeg_quality must be an integer between 1 and 100")
+    if jpeg_chroma is not None and (
+        isinstance(jpeg_chroma, bool)
+        or not isinstance(jpeg_chroma, int)
+        or jpeg_chroma not in {1, 2, 3}
+    ):
+        raise ValueError("RawTherapee jpeg_chroma must be one of the integers 1, 2, or 3")
+
     command = [executable, "-o", str(output), "-Y"]
     for profile in profiles:
         command.extend(["-p", str(profile)])
+    if normalized_format == "jpeg":
+        quality = jpeg_quality if jpeg_quality is not None else 92
+        command.append(f"-j{quality}")
+        if jpeg_chroma is not None:
+            command.append(f"-js{jpeg_chroma}")
+    elif normalized_format == "tiff":
+        command.append("-tz" if tiff_compression else "-t")
+    else:
+        command.append("-n")
+    # RawTherapee's JPEG path is always 8-bit and -b8 is redundant.  Do not
+    # emit a misleading depth switch even when the caller explicitly chose 8.
+    if normalized_depth is not None and normalized_format != "jpeg":
+        command.append(f"-b{normalized_depth}")
+    if use_fast_export:
+        command.append("-f")
     command.extend(["-c", str(raw)])
     return command
 

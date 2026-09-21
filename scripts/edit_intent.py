@@ -19,6 +19,7 @@ import lumenflow_config
 import preview_provider
 import render_adjustment_plan
 import render_raw
+import rawtherapee_pp3
 import scan_raws
 
 
@@ -150,7 +151,7 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
     preview_basis = _require_object(intent.get("preview_basis"), "preview_basis")
     _reject_unknown(
         preview_basis,
-        {"artifact_id", "starting_state_hash", "state_completeness"},
+        {"artifact_id", "starting_state_hash", "state_completeness", "state_inputs"},
         "preview_basis",
     )
     if not re.fullmatch(r"preview_[0-9a-f]{32}", str(preview_basis.get("artifact_id", ""))):
@@ -159,6 +160,30 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
         raise IntentValidationError("preview_basis.starting_state_hash must be a SHA-256")
     if preview_basis.get("state_completeness") not in {"complete", "partial"}:
         raise IntentValidationError("preview_basis.state_completeness must be complete or partial")
+    state_inputs = preview_basis.get("state_inputs")
+    if state_inputs is not None:
+        if not isinstance(state_inputs, list):
+            raise IntentValidationError("preview_basis.state_inputs must be an array")
+        allowed_roles = {"base_profile", "source_sidecar"}
+        for index, item in enumerate(state_inputs):
+            item = _require_object(item, f"preview_basis.state_inputs[{index}]")
+            _reject_unknown(
+                item,
+                {"role", "path", "sha256", "size_bytes"},
+                f"preview_basis.state_inputs[{index}]",
+            )
+            if item.get("role") not in allowed_roles:
+                raise IntentValidationError(
+                    f"preview_basis.state_inputs[{index}].role is not supported"
+                )
+            if not str(item.get("path", "")).strip():
+                raise IntentValidationError(
+                    f"preview_basis.state_inputs[{index}].path is required"
+                )
+            _validate_fingerprint(
+                {"sha256": item.get("sha256"), "size_bytes": item.get("size_bytes")},
+                f"preview_basis.state_inputs[{index}]",
+            )
 
     if not str(intent.get("purpose", "")).strip():
         raise IntentValidationError("purpose is required")
@@ -258,6 +283,71 @@ def _legacy_composition(composition: dict[str, Any]) -> dict[str, Any]:
     if composition.get("decision") == "crop":
         payload["crop"] = {**composition["crop"], "enabled": True}
     return payload
+
+
+def _rawtherapee_profile_inputs(
+    intent: dict[str, Any],
+) -> list[tuple[str, Path]]:
+    """Resolve and verify the profile stack used by the approved preview.
+
+    Older EditIntent documents only contain the starting-state hash.  For
+    those documents we can still replay the source sidecar when present.  New
+    documents may carry the preview artifact's explicit ``state_inputs`` so a
+    base profile outside the RAW directory is also captured and replayed.
+    The compiled profile embeds the verified bytes, so execution never reads
+    a mutable NAS sidecar after compilation.
+    """
+
+    source_path = Path(intent["source"]["path"])
+    preview_basis = intent["preview_basis"]
+    raw_inputs = preview_basis.get("state_inputs")
+    inputs: list[tuple[str, Path]] = []
+    if raw_inputs is not None:
+        seen: set[Path] = set()
+        for item in raw_inputs:
+            path = Path(item["path"])
+            if path in seen:
+                raise ExecutionPreconditionError(
+                    "INVALID_PREVIEW_STATE",
+                    f"Duplicate RawTherapee profile input: {path}",
+                )
+            seen.add(path)
+            if not path.is_file() or path.is_symlink():
+                raise ExecutionPreconditionError(
+                    "PREVIEW_STATE_INPUT_MISSING",
+                    f"RawTherapee preview profile input is not a regular file: {path}",
+                )
+            if path.suffix.lower() != ".pp3":
+                raise ExecutionPreconditionError(
+                    "INVALID_PREVIEW_STATE",
+                    f"RawTherapee preview profile input must use .pp3: {path}",
+                )
+            actual = rawtherapee_pp3.file_fingerprint(path)
+            expected = {"sha256": item["sha256"], "size_bytes": item["size_bytes"]}
+            if actual != expected:
+                raise ExecutionPreconditionError(
+                    "PREVIEW_STATE_INPUT_MISMATCH",
+                    f"RawTherapee preview profile input changed: {path}",
+                )
+            inputs.append((str(item["role"]), path))
+    else:
+        sidecar = rawtherapee_pp3.discover_source_sidecar(source_path)
+        if sidecar is not None:
+            inputs.append(("source_sidecar", sidecar))
+
+    # If state inputs are explicit, the hash is a mandatory binding.  When a
+    # legacy intent discovers only the source sidecar, validate it when the
+    # preview hash is meaningful; old fixtures with no inputs remain backward
+    # compatible and are handled by the original neutral-state path.
+    if inputs:
+        starting_state, _state_inputs = rawtherapee_pp3.profile_stack_state(inputs)
+        expected_hash = rawtherapee_pp3.canonical_hash(starting_state)
+        if preview_basis["starting_state_hash"] != expected_hash:
+            raise ExecutionPreconditionError(
+                "STARTING_STATE_MISMATCH",
+                "The current RawTherapee PP3 profile stack no longer matches the preview basis",
+            )
+    return inputs
 
 
 def _darktable_xmp_input(source_path: Path) -> tuple[Path, str, dict[str, Any], str]:
@@ -449,9 +539,15 @@ def compile_intent(
     stem = f"{safe_source_stem}_{safe_intent_id}_r{intent['revision']}"
     profile_path = output_dir / "profiles" / f"{stem}.pp3"
     output_path = output_dir / f"{stem}.jpg"
-    profile_text = render_adjustment_plan.rawtherapee_profile_text(
-        _legacy_adjustments(intent["global_adjustments"]),
-        _legacy_composition(intent["composition"]),
+    profile_inputs = _rawtherapee_profile_inputs(intent)
+    profile_text = rawtherapee_pp3.compile_profile_text(
+        [path for _role, path in profile_inputs],
+        overrides=rawtherapee_pp3.semantic_overrides(
+            _legacy_adjustments(intent["global_adjustments"]),
+            composition=_legacy_composition(intent["composition"]),
+        ),
+        app_version="5.11",
+        profile_version=349,
     )
     executable = lumenflow_config.tool_command(
         local_config,
@@ -612,10 +708,15 @@ def _validate_execution_plan(
     ):
         raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Authorization evidence is invalid")
     preview_basis = plan.get("preview_basis")
-    if not isinstance(preview_basis, dict) or set(preview_basis) != {
+    if not isinstance(preview_basis, dict) or not {
         "artifact_id",
         "starting_state_hash",
         "state_completeness",
+    }.issubset(preview_basis) or set(preview_basis) - {
+        "artifact_id",
+        "starting_state_hash",
+        "state_completeness",
+        "state_inputs",
     }:
         raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Preview basis is invalid")
     if not re.fullmatch(r"preview_[0-9a-f]{32}", str(preview_basis.get("artifact_id", ""))):
@@ -624,6 +725,24 @@ def _validate_execution_plan(
         raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Starting-state hash is invalid")
     if preview_basis.get("state_completeness") not in {"complete", "partial"}:
         raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "State completeness is invalid")
+    state_inputs = preview_basis.get("state_inputs")
+    if state_inputs is not None:
+        if not isinstance(state_inputs, list):
+            raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Preview state inputs are invalid")
+        for item in state_inputs:
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"role", "path", "sha256", "size_bytes"}
+                or item.get("role") not in {"base_profile", "source_sidecar"}
+                or not isinstance(item.get("path"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("sha256", "")))
+                or not isinstance(item.get("size_bytes"), int)
+                or item["size_bytes"] < 0
+            ):
+                raise ExecutionPreconditionError(
+                    "INVALID_EXECUTION_PLAN",
+                    "Preview state inputs are invalid",
+                )
     required_capabilities = plan.get("required_capabilities")
     allowed_capabilities = {"intent.compile.v2", "render", "composition.crop", "mask.ai"}
     if (

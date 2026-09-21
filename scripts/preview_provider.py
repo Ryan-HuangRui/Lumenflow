@@ -77,6 +77,32 @@ class PreviewArtifact:
         return asdict(self)
 
 
+def preview_basis_from_artifact(
+    artifact: PreviewArtifact | dict[str, Any],
+    *,
+    include_state_inputs: bool = True,
+) -> dict[str, Any]:
+    """Build the execution binding carried into a user-approved EditIntent.
+
+    Keeping this conversion next to the artifact contract prevents callers
+    from accidentally dropping the explicit RawTherapee profile inputs that
+    are required to replay a preview created with a non-default base profile.
+    Darktable callers receive the same stable identity fields; its XMP state
+    remains validated by its dedicated compiler.
+    """
+
+    payload = artifact.to_dict() if isinstance(artifact, PreviewArtifact) else artifact
+    basis: dict[str, Any] = {
+        "artifact_id": payload["artifact_id"],
+        "starting_state_hash": payload["starting_state_hash"],
+        "state_completeness": payload["state_completeness"],
+    }
+    provider_id = payload.get("provider", {}).get("id") if isinstance(payload.get("provider"), dict) else None
+    if include_state_inputs and provider_id == "rawtherapee" and payload.get("state_inputs"):
+        basis["state_inputs"] = [dict(item) for item in payload["state_inputs"]]
+    return basis
+
+
 class PreviewProvider(Protocol):
     provider_id: str
 
@@ -89,7 +115,7 @@ CommandRunner = Callable[..., int]
 
 class RawTherapeePreviewProvider:
     provider_id = "rawtherapee"
-    adapter_version = "1"
+    adapter_version = "rawtherapee-profile-v2"
 
     def __init__(
         self,
@@ -131,11 +157,10 @@ class RawTherapeePreviewProvider:
             "profile_stack": profile_stack,
             "uses_engine_default": not profile_stack,
         }
-        completeness = (
-            "complete"
-            if any(item["role"] == "source_sidecar" for item in profile_stack)
-            else "partial"
-        )
+        # A supplied base profile is a complete, explicit starting state even
+        # when the RAW has no adjacent sidecar.  Only an engine-default render
+        # is partial because its effective defaults are not serialized here.
+        completeness = "complete" if profile_stack else "partial"
         return [path for _role, path in profile_inputs], starting_state, state_inputs, completeness
 
     def create_preview(self, request: PreviewRequest) -> PreviewArtifact:
