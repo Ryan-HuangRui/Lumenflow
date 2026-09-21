@@ -596,6 +596,35 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertEqual(receipt["status"], "success")
             self.assertTrue(receipt["source_unchanged"])
 
+    def test_rawtherapee_compiler_embeds_explicit_preview_profile_stack(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            base = root / "base.pp3"
+            sidecar = root / "bangkok.DNG.pp3"
+            raw.write_bytes(b"raw-bangkok")
+            base.write_text(
+                "[Exposure]\nCompensation=0.1\n[Future Module]\nOpaque=preserve\n",
+                encoding="utf-8",
+            )
+            sidecar.write_text("[Exposure]\nContrast=3\n[Future Sidecar]\nNative=keep\n", encoding="utf-8")
+            preview = preview_provider.RawTherapeePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(raw, root / "preview.jpg", base, True, 10)
+            )
+            intent = self._intent(raw)
+            intent["preview_basis"] = preview_provider.preview_basis_from_artifact(preview)
+            plan = edit_intent.compile_intent(intent, backend_id="rawtherapee", output_dir=root / "output")
+            content = plan["operations"][0]["payload"]["content"]
+            self.assertIn("Opaque=preserve", content)
+            self.assertIn("Native=keep", content)
+            self.assertIn("Compensation=0.35", content)
+            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v2", content)
+
+            sidecar.write_text("[Exposure]\nContrast=99\n", encoding="utf-8")
+            with self.assertRaises(edit_intent.ExecutionPreconditionError) as error:
+                edit_intent.compile_intent(intent, backend_id="rawtherapee", output_dir=root / "other-output")
+            self.assertEqual(error.exception.code, "PREVIEW_STATE_INPUT_MISMATCH")
+
     def test_contract_schemas_are_strict_and_versioned(self) -> None:
         expectations = {
             "edit_intent.schema.json": "lumenflow.edit_intent.v2",

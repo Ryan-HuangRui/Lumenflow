@@ -14,6 +14,7 @@ import backend_capabilities
 import lumenflow_config
 import render_lightroom
 import render_raw
+import rawtherapee_pp3
 import write_processing_report
 
 SCHEMA_VERSION = "lumenflow.adjustment_plan.v1"
@@ -137,48 +138,12 @@ def rawtherapee_profile_text(
     adjustments: dict[str, Any],
     composition: dict[str, Any] | None = None,
 ) -> str:
-    exposure_keys = {
-        "exposure_compensation": "Compensation",
-        "saturation": "Saturation",
-        "black": "Black",
-        "brightness": "Brightness",
-        "contrast": "Contrast",
-        "highlight_compression": "HighlightCompr",
-        "shadow_compression": "ShadowCompr",
-    }
-    exposure_lines = ["[Exposure]", "Enabled=true"]
-    for source_key, pp3_key in exposure_keys.items():
-        if source_key in adjustments and adjustments[source_key] is not None:
-            exposure_lines.append(f"{pp3_key}={pp3_value(adjustments[source_key])}")
-
-    sections = [
-        "[Version]",
-        "AppVersion=5.10",
-        "Version=349",
-        "",
-        *exposure_lines,
-    ]
-
-    white_balance_keys = {
-        "temperature": "Temperature",
-        "green": "Green",
-    }
-    white_balance_lines = ["", "[White Balance]", "Enabled=true", "Setting=Custom"]
-    has_white_balance = False
-    for source_key, pp3_key in white_balance_keys.items():
-        if source_key in adjustments and adjustments[source_key] is not None:
-            white_balance_lines.append(f"{pp3_key}={pp3_value(adjustments[source_key])}")
-            has_white_balance = True
-    if has_white_balance:
-        sections.extend(white_balance_lines)
-
-    sections.extend(crop_profile_lines(composition))
-
-    notes = adjustments.get("notes")
-    if notes:
-        sections.extend(["", "[Lumenflow]", f"Notes={str(notes).replace(chr(10), ' ')}"])
-
-    return "\n".join(sections) + "\n"
+    overrides = rawtherapee_pp3.semantic_overrides(adjustments, composition=composition)
+    return rawtherapee_pp3.compile_profile_text(
+        overrides=overrides,
+        app_version="5.11",
+        profile_version=349,
+    )
 
 
 def output_name(raw_path: Path, variant_id: str) -> str:

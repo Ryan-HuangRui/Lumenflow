@@ -17,10 +17,54 @@ def build_rawtherapee_command(
     output: Path,
     profiles: list[Path],
     executable: str = "rawtherapee-cli",
+    *,
+    output_format: str | None = None,
+    bit_depth: str | int | None = None,
+    jpeg_quality: int | None = None,
+    jpeg_chroma: int | None = None,
+    tiff_compression: bool = False,
+    use_fast_export: bool = False,
 ) -> list[str]:
+    """Build a bounded RawTherapee CLI command.
+
+    PP3 files carry processing state; these flags select only the final
+    container.  Keeping the output selection here lets previews use JPEG while
+    final exports can request 16/32-bit TIFF or 16-bit PNG without changing
+    the profile compiler.
+    """
+
+    normalized_format = (output_format or output.suffix.lstrip(".") or "jpg").lower()
+    aliases = {"jpg": "jpeg", "tif": "tiff"}
+    normalized_format = aliases.get(normalized_format, normalized_format)
+    if normalized_format not in {"jpeg", "png", "tiff"}:
+        raise ValueError("RawTherapee output_format must be jpeg, png, or tiff")
+    if bit_depth is not None:
+        normalized_depth = str(bit_depth).lower()
+        if normalized_depth not in {"8", "16", "16f", "32"}:
+            raise ValueError("RawTherapee bit_depth must be 8, 16, 16f, or 32")
+    else:
+        normalized_depth = None
+    if jpeg_quality is not None and not 1 <= int(jpeg_quality) <= 100:
+        raise ValueError("RawTherapee jpeg_quality must be between 1 and 100")
+    if jpeg_chroma is not None and int(jpeg_chroma) not in {1, 2, 3}:
+        raise ValueError("RawTherapee jpeg_chroma must be 1, 2, or 3")
+
     command = [executable, "-o", str(output), "-Y"]
     for profile in profiles:
         command.extend(["-p", str(profile)])
+    if normalized_format == "jpeg":
+        quality = int(jpeg_quality) if jpeg_quality is not None else 92
+        command.append(f"-j{quality}")
+        if jpeg_chroma is not None:
+            command.append(f"-js{int(jpeg_chroma)}")
+    elif normalized_format == "tiff":
+        command.append("-tz" if tiff_compression else "-t")
+    else:
+        command.append("-n")
+    if normalized_depth is not None:
+        command.append(f"-b{normalized_depth}")
+    if use_fast_export:
+        command.append("-f")
     command.extend(["-c", str(raw)])
     return command
 

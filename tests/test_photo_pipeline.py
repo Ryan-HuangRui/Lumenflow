@@ -120,6 +120,39 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertIn(":memory:", command)
             self.assertIn("write_sidecar_files=never", command)
 
+    def test_build_rawtherapee_command_supports_final_export_container(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "IMG_0003.RW2"
+            profile = root / "develop.pp3"
+            output = root / "out" / "IMG_0003.tif"
+
+            command = render_raw.build_rawtherapee_command(
+                raw,
+                output,
+                [profile],
+                output_format="tiff",
+                bit_depth="16",
+                tiff_compression=True,
+            )
+
+            self.assertEqual(command[:4], ["rawtherapee-cli", "-o", str(output), "-Y"])
+            self.assertIn("-p", command)
+            self.assertIn(str(profile), command)
+            self.assertIn("-tz", command)
+            self.assertIn("-b16", command)
+            self.assertEqual(command[-2:], ["-c", str(raw)])
+
+    def test_build_rawtherapee_command_rejects_unsupported_export_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "IMG_0003.RW2"
+            output = root / "out.jpg"
+            with self.assertRaises(ValueError):
+                render_raw.build_rawtherapee_command(raw, output, [], output_format="webp")
+            with self.assertRaises(ValueError):
+                render_raw.build_rawtherapee_command(raw, output, [], bit_depth="24")
+
     def test_build_command_uses_configured_rawtherapee_command(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             tmp_path = Path(directory)

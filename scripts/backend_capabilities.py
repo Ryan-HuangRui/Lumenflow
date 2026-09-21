@@ -165,19 +165,31 @@ def _contract(
 def rawtherapee_capabilities() -> BackendCapabilities:
     return _contract(
         "rawtherapee",
-        "rawtherapee-profile-v1",
+        "rawtherapee-profile-v2",
         {
             "preview.state_bound": _supported(
-                "Preview artifacts bind source bytes and the ordered PP3 profile stack"
+                "Preview artifacts bind source bytes and the ordered PP3 profile stack; explicit inputs can be embedded in the compiled PP3",
+                "rawtherapee-cli=5.11",
+                "compiler=lumenflow.rawtherapee-pp3.v2",
             ),
             "state.read": _supported("PP3 profile inputs can be fingerprinted without mutating RAW files"),
-            "plan.compile.v1": _supported("adjustment_plan.v1 compiles to temporary PP3 profiles"),
-            "intent.compile.v2": _supported(
-                "EditIntent v2 compiles to an isolated RawTherapee execution plan"
+            "plan.compile.v1": _supported(
+                "adjustment_plan.v1 compiles to bounded PP3 profiles while retaining starting-state fields",
+                "compiler=lumenflow.rawtherapee-pp3.v2",
             ),
-            "render": _supported("RawTherapee CLI renders isolated output files"),
+            "intent.compile.v2": _supported(
+                "EditIntent v2 compiles known semantic adjustments and verified PP3 state inputs to an isolated execution plan",
+                "compiler=lumenflow.rawtherapee-pp3.v2",
+            ),
+            "render": _supported(
+                "RawTherapee CLI renders isolated output files and supports JPEG, PNG, and 8/16/16f/32-bit TIFF selection",
+                "rawtherapee-cli=5.11",
+            ),
             "render.legacy": _unsupported("Use the first-class RawTherapee renderer"),
-            "export.verified": _unsupported("Final render receipts do not verify output fingerprints yet"),
+            "export.verified": _supported(
+                "ExecutionReceipt v1 records the final output fingerprint and verifies source preservation",
+                "receipt=execution_receipt.v1",
+            ),
             "develop.write.verified": _unsupported("RawTherapee does not write catalog develop state"),
             "composition.crop": _supported("Pixel crop compiles to the generated PP3 profile"),
             "mask.ai": _unsupported("RawTherapee AI mask compilation is not implemented"),

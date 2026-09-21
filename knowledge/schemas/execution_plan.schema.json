@@ -126,7 +126,22 @@
       "properties": {
         "artifact_id": {"type": "string", "pattern": "^preview_[0-9a-f]{32}$"},
         "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "state_completeness": {"enum": ["complete", "partial"]}
+        "state_completeness": {"enum": ["complete", "partial"]},
+        "state_inputs": {
+          "type": "array",
+          "description": "Optional explicit RawTherapee profile inputs captured by the preview artifact.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "path", "sha256", "size_bytes"],
+            "properties": {
+              "role": {"enum": ["base_profile", "source_sidecar"]},
+              "path": {"type": "string", "minLength": 1},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "size_bytes": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
       }
     },
     "materialize_profile_operation": {
