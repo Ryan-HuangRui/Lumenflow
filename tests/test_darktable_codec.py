@@ -47,6 +47,40 @@ class DarktableCodecTests(unittest.TestCase):
         self.assertIn("darktable:operation=\"crop\"", rendered)
         self.assertIn('darktable:history_end="4"', rendered)
 
+    def test_global_mapping_replaces_existing_adjustment_modules_only(self) -> None:
+        base = (ROOT / "tests" / "fixtures" / "darktable_profile.xmp").read_text(encoding="utf-8")
+        base, _ = darktable_codec.compile_xmp(
+            base,
+            [
+                {"operation": "exposure", "params": {"exposure": -1.0}},
+                {"operation": "colorbalancergb", "params": {"contrast": -0.2}},
+            ],
+        )
+        rendered, modules = darktable_codec.compile_xmp(
+            base,
+            darktable_codec.modules_from_global_adjustments(
+                {"exposure_ev": 0.4, "contrast": 12}
+            ),
+        )
+        self.assertTrue(all(item["replace"] for item in modules))
+        self.assertEqual(rendered.count('darktable:operation="exposure"'), 1)
+        self.assertEqual(rendered.count('darktable:operation="colorbalancergb"'), 1)
+        self.assertEqual(rendered.count('darktable:operation="basecurve"'), 1)
+
+    def test_replace_is_strict_boolean_and_priority_is_bounded(self) -> None:
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "replace must be boolean"):
+            darktable_codec.encode_module(
+                {"operation": "exposure", "params": {}, "replace": "false"}
+            )
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "multi_priority.*range"):
+            darktable_codec.encode_module(
+                {"operation": "exposure", "params": {}, "multi_priority": 1001}
+            )
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "multi_priority.*range"):
+            darktable_codec.encode_module(
+                {"operation": "exposure", "params": {}, "multi_priority": -1}
+            )
+
     def test_explicit_module_fields_are_encoded_deterministically(self) -> None:
         module = darktable_codec.encode_module(
             {

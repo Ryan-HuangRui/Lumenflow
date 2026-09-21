@@ -236,9 +236,9 @@ def darktable_capabilities() -> BackendCapabilities:
                 "sentinel_sha256=b8979553ec61b579c2600787e62d9e10885645358e07bafbd6c58cddc84cce4e",
             ),
             "develop.write.verified": _unsupported("Catalog develop writes are outside the legacy path"),
-            "composition.crop": _supported(
-                "Normalized crop module structs are compiled and live-verified with darktable-cli 5.4.1",
-                "module=crop@3",
+            "composition.crop": _unsupported(
+                "Vendor-neutral pixel crop is not compiled; only explicit engine-native crop modules "
+                "are allowed with composition=preserve_existing_crop",
             ),
             "mask.ai": _unsupported("AI mask compilation is not implemented"),
             "adjustments.advanced_color": _supported(

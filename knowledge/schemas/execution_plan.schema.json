@@ -89,6 +89,7 @@
         "version": {"type": "string", "minLength": 1}
       }
     },
+    "starting_state": {"$ref": "#/$defs/darktable_starting_state"},
     "created_at": {"type": "string", "format": "date-time"}
   },
   "$defs": {
@@ -142,6 +143,44 @@
             }
           }
         }
+      }
+    },
+    "darktable_state_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "sha256", "size_bytes"],
+      "properties": {
+        "role": {"enum": ["base_profile", "source_sidecar"]},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "darktable_starting_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "xmp",
+        "uses_engine_default",
+        "library",
+        "write_sidecars",
+        "state_inputs",
+        "xmp_content"
+      ],
+      "properties": {
+        "kind": {"const": "darktable_xmp"},
+        "xmp": {"$ref": "#/$defs/fingerprint"},
+        "uses_engine_default": {"const": false},
+        "library": {"const": ":memory:"},
+        "write_sidecars": {"const": false},
+        "state_inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {"$ref": "#/$defs/darktable_state_input"}
+        },
+        "xmp_content": {"type": "string", "minLength": 1, "maxLength": 1048576}
       }
     },
     "materialize_profile_operation": {

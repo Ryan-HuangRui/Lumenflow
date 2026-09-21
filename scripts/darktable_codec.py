@@ -27,6 +27,8 @@ from typing import Any, Callable, Mapping
 
 CODEC_SCHEMA_VERSION = "lumenflow.darktable_codec.v1"
 DARKTABLE_VERSION = "5.4.1"
+MULTI_PRIORITY_MIN = 0
+MULTI_PRIORITY_MAX = 1000
 
 DT_NS = "http://darktable.sf.net/"
 RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -362,6 +364,14 @@ def encode_module(module: Mapping[str, Any]) -> dict[str, Any]:
     multi_priority = module.get("multi_priority", 0)
     if isinstance(multi_priority, bool) or not isinstance(multi_priority, int):
         raise DarktableCodecError(f"darktable.{operation}.multi_priority must be an integer")
+    if not MULTI_PRIORITY_MIN <= multi_priority <= MULTI_PRIORITY_MAX:
+        raise DarktableCodecError(
+            f"darktable.{operation}.multi_priority must be in the safe range "
+            f"{MULTI_PRIORITY_MIN}..{MULTI_PRIORITY_MAX}"
+        )
+    replace = module.get("replace", spec.one_instance)
+    if not isinstance(replace, bool):
+        raise DarktableCodecError(f"darktable.{operation}.replace must be boolean")
     return {
         "operation": operation,
         "enabled": enabled,
@@ -371,7 +381,7 @@ def encode_module(module: Mapping[str, Any]) -> dict[str, Any]:
         "multi_priority": multi_priority,
         "blendop_version": 13,
         "blendop_params": NEUTRAL_BLEND_PARAMS,
-        "replace": bool(module.get("replace", spec.one_instance)),
+        "replace": replace,
     }
 
 
@@ -424,6 +434,12 @@ def _parse_xmp(text: str) -> ET.Element:
     _description(root)
     _history_seq(root)
     return root
+
+
+def validate_xmp(text: str) -> None:
+    """Validate that *text* is a darktable XMP document accepted by the codec."""
+
+    _parse_xmp(text)
 
 
 def _module_attr(name: str) -> str:
@@ -502,7 +518,7 @@ def modules_from_global_adjustments(adjustments: Mapping[str, Any]) -> list[dict
     if "black_point" in adjustments:
         exposure["black"] = adjustments["black_point"]
     if exposure:
-        modules.append({"operation": "exposure", "params": exposure})
+        modules.append({"operation": "exposure", "params": exposure, "replace": True})
     color: dict[str, Any] = {}
     if "contrast" in adjustments:
         # color balance RGB's contrast is a normalized scene-referred control.
@@ -510,7 +526,9 @@ def modules_from_global_adjustments(adjustments: Mapping[str, Any]) -> list[dict
     if "saturation" in adjustments:
         color["saturation_global"] = float(adjustments["saturation"]) / 100.0
     if color:
-        modules.append({"operation": "colorbalancergb", "params": color})
+        modules.append(
+            {"operation": "colorbalancergb", "params": color, "replace": True}
+        )
     if not modules:
         raise DarktableCodecError("no verified darktable global adjustments were requested")
     return modules

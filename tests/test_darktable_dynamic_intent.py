@@ -14,7 +14,12 @@ import preview_provider  # noqa: E402
 
 
 class DarktableDynamicIntentTests(unittest.TestCase):
-    def _intent(self, raw: Path, xmp: Path, preview: preview_provider.PreviewArtifact) -> dict:
+    def _intent(
+        self,
+        raw: Path,
+        xmp: Path,
+        preview: preview_provider.PreviewArtifact,
+    ) -> dict:
         return {
             "schema_version": "lumenflow.edit_intent.v2",
             "intent_id": "darktable-dynamic-001",
@@ -25,6 +30,7 @@ class DarktableDynamicIntentTests(unittest.TestCase):
                 "artifact_id": preview.artifact_id,
                 "starting_state_hash": preview.starting_state_hash,
                 "state_completeness": preview.state_completeness,
+                "state_inputs": [dict(preview.state_inputs[0])],
             },
             "purpose": "codec test",
             "style": {
@@ -39,9 +45,10 @@ class DarktableDynamicIntentTests(unittest.TestCase):
                 },
             },
             "global_adjustments": {"exposure_ev": 0.35},
-            "composition": {"decision": "crop", "reason": "fixture crop", "crop": {
-                "unit": "pixels", "x": 300, "y": 200, "width": 5400, "height": 3600
-            }},
+            "composition": {
+                "decision": "preserve_existing_crop",
+                "reason": "Use only an engine-native crop module when explicitly requested.",
+            },
             "local_adjustments": {"decision": "none", "reason": "none", "masks": []},
         }
 
@@ -67,10 +74,16 @@ class DarktableDynamicIntentTests(unittest.TestCase):
                 plan["compiler"],
                 {"id": "lumenflow.darktable-xmp-modules", "version": "1"},
             )
+            self.assertEqual(plan["starting_state"]["state_inputs"][0]["role"], "base_profile")
+            self.assertEqual(
+                plan["starting_state"]["xmp_content"],
+                xmp.read_text(encoding="utf-8"),
+            )
             content = plan["operations"][0]["payload"]["content"]
             self.assertIn('darktable:operation="filmicrgb"', content)
             self.assertIn('darktable:operation="colorbalancergb"', content)
             self.assertIn('darktable:operation="crop"', content)
+            xmp.write_text("mutated-after-preview", encoding="utf-8")
 
             def fake_runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
                 self.assertFalse(dry_run)

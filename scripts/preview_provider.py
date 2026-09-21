@@ -276,8 +276,9 @@ class DarktablePreviewProvider:
         if xmp is not None:
             fingerprint = file_fingerprint(xmp)
             xmp_state = fingerprint
+            role = "base_profile" if request.base_profile is not None else "source_sidecar"
             state_inputs.append(
-                {"role": "develop_xmp", "path": str(xmp), **fingerprint}
+                {"role": role, "path": str(xmp), **fingerprint}
             )
         starting_state = {
             "kind": "darktable_xmp",

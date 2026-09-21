@@ -43,7 +43,7 @@ class PreviewProviderTests(unittest.TestCase):
             self.assertEqual(artifact["state_completeness"], "complete")
             self.assertEqual(artifact["starting_state"]["kind"], "darktable_xmp")
             self.assertEqual(artifact["starting_state"]["xmp"]["sha256"], hashlib.sha256(xmp.read_bytes()).hexdigest())
-            self.assertEqual(artifact["state_inputs"][0]["role"], "develop_xmp")
+            self.assertEqual(artifact["state_inputs"][0]["role"], "base_profile")
             self.assertEqual(artifact["state_inputs"][0]["path"], str(xmp))
             self.assertEqual(artifact["command_argv"][:4], ["/custom/darktable-cli", str(raw), str(xmp), str(output)])
             self.assertIn("--configdir", artifact["command_argv"])
