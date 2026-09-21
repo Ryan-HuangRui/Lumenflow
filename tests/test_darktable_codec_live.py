@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import darktable_codec  # noqa: E402
 import preview_provider  # noqa: E402
+import render_raw  # noqa: E402
 
 
 RAW_DIR_ENV = "LUMENFLOW_DARKTABLE_LIVE_RAW_DIR"
@@ -33,9 +34,10 @@ class DarktableCodecLiveTests(unittest.TestCase):
         source_dir = Path(RAW_DIR).resolve()
         raws = sorted(source_dir.glob("*.RW2"))
         self.assertGreaterEqual(len(raws), 3)
-        base = (Path("/Applications/darktable.app/Contents/MacOS/profiling-shot.xmp")).read_text(
-            encoding="utf-8"
-        )
+        # Never use the app's bundled profiling-shot.xmp as a generic base:
+        # it is xmp_version=2 with stale module versions.  The codec owns the
+        # current 5.4.1 empty-history base used by both preview and execution.
+        base = darktable_codec.minimal_xmp()
         xmp, encoded = darktable_codec.compile_xmp(
             base,
             [
@@ -67,21 +69,15 @@ class DarktableCodecLiveTests(unittest.TestCase):
                 config.mkdir(parents=True)
                 cache.mkdir()
                 output = runtime / "output.jpg"
-                command = [
-                    "darktable-cli",
-                    str(raw),
-                    str(xmp_path),
-                    str(output),
-                    "--core",
-                    "--configdir",
-                    str(config),
-                    "--cachedir",
-                    str(cache),
-                    "--library",
-                    ":memory:",
-                    "--conf",
-                    "write_sidecar_files=never",
-                ]
+                command = render_raw.build_darktable_command(
+                    raw,
+                    output,
+                    xmp=xmp_path,
+                    configdir=config,
+                    cachedir=cache,
+                    library=":memory:",
+                    write_sidecars=False,
+                )
                 result = subprocess.run(command, capture_output=True, text=True, timeout=180)
                 self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
                 self.assertTrue(output.is_file())

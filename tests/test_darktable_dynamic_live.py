@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import edit_intent  # noqa: E402
+import darktable_codec  # noqa: E402
 import preview_provider  # noqa: E402
 
 
@@ -24,9 +25,10 @@ class DarktableDynamicLiveTests(unittest.TestCase):
         fixture_dir = Path(os.environ[LIVE_ENV]).resolve()
         raws = sorted(fixture_dir.glob("*.RW2"))
         self.assertGreaterEqual(len(raws), 3)
-        base_text = (ROOT / "tests" / "fixtures" / "darktable_profile.xmp").read_text(
-            encoding="utf-8"
-        )
+        # Use the codec's current empty-history XMP.  This keeps preview and
+        # execution bound to the same version-5 state and avoids stale app
+        # profiling/module payloads.
+        base_text = darktable_codec.minimal_xmp()
 
         with tempfile.TemporaryDirectory(prefix="lumenflow-darktable-dynamic-live-") as directory:
             root = Path(directory)

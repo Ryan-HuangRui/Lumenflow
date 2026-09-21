@@ -30,8 +30,30 @@ class DarktableCodecTests(unittest.TestCase):
             },
         )
 
+    def test_minimal_xmp_is_current_empty_history_base(self) -> None:
+        base = darktable_codec.minimal_xmp()
+
+        self.assertIn('darktable:xmp_version="5"', base)
+        self.assertIn('darktable:history_end="0"', base)
+        self.assertNotIn("darktable:operation=", base)
+        darktable_codec.validate_xmp(base)
+
+    def test_stale_darktable_xmp_version_is_rejected(self) -> None:
+        stale = darktable_codec.minimal_xmp().replace(
+            'darktable:xmp_version="5"', 'darktable:xmp_version="2"'
+        )
+
+        with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "xmp_version"):
+            darktable_codec.compile_xmp(
+                stale,
+                [{"operation": "exposure", "params": {}}],
+            )
+
     def test_compile_replaces_one_instance_and_preserves_other_history(self) -> None:
-        base = (ROOT / "tests" / "fixtures" / "darktable_profile.xmp").read_text(encoding="utf-8")
+        base, _ = darktable_codec.compile_xmp(
+            darktable_codec.minimal_xmp(),
+            [{"operation": "temperature", "params": {"red": 1.1, "green": 1.0, "blue": 0.9}}],
+        )
         rendered, modules = darktable_codec.compile_xmp(
             base,
             [
@@ -41,14 +63,14 @@ class DarktableCodecTests(unittest.TestCase):
             ],
         )
         self.assertEqual([item["operation"] for item in modules], ["exposure", "temperature", "crop"])
-        self.assertIn("darktable:operation=\"basecurve\"", rendered)
+        self.assertIn("darktable:operation=\"temperature\"", rendered)
         self.assertIn("darktable:operation=\"exposure\"", rendered)
         self.assertIn("darktable:operation=\"temperature\"", rendered)
         self.assertIn("darktable:operation=\"crop\"", rendered)
-        self.assertIn('darktable:history_end="4"', rendered)
+        self.assertIn('darktable:history_end="3"', rendered)
 
     def test_global_mapping_replaces_existing_adjustment_modules_only(self) -> None:
-        base = (ROOT / "tests" / "fixtures" / "darktable_profile.xmp").read_text(encoding="utf-8")
+        base = darktable_codec.minimal_xmp()
         base, _ = darktable_codec.compile_xmp(
             base,
             [
@@ -65,7 +87,7 @@ class DarktableCodecTests(unittest.TestCase):
         self.assertTrue(all(item["replace"] for item in modules))
         self.assertEqual(rendered.count('darktable:operation="exposure"'), 1)
         self.assertEqual(rendered.count('darktable:operation="colorbalancergb"'), 1)
-        self.assertEqual(rendered.count('darktable:operation="basecurve"'), 1)
+        self.assertIn('darktable:history_end="2"', rendered)
 
     def test_replace_is_strict_boolean_and_priority_is_bounded(self) -> None:
         with self.assertRaisesRegex(darktable_codec.DarktableCodecError, "replace must be boolean"):

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 import backend_capabilities
+import darktable_codec
 import driver_adapter
 import lumenflow_config
 import render_raw
@@ -241,6 +242,21 @@ class DarktablePreviewProvider:
         )
 
     @staticmethod
+    def _validate_xmp(path: Path) -> None:
+        if path.stat().st_size > 1024 * 1024:
+            raise PreviewProviderError("darktable base XMP exceeds the 1 MiB plan limit")
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            raise PreviewProviderError("darktable base XMP must be readable UTF-8") from error
+        try:
+            darktable_codec.validate_xmp(content)
+        except darktable_codec.DarktableCodecError as error:
+            raise PreviewProviderError(
+                "darktable base XMP is not a current 5.4.1 codec-valid document"
+            ) from error
+
+    @staticmethod
     def _xmp_state(
         request: PreviewRequest,
     ) -> tuple[Path | None, dict[str, Any], list[dict[str, Any]], str]:
@@ -271,6 +287,7 @@ class DarktablePreviewProvider:
         state_inputs: list[dict[str, Any]] = []
         xmp_state: dict[str, Any] | None = None
         if xmp is not None:
+            DarktablePreviewProvider._validate_xmp(xmp)
             fingerprint = file_fingerprint(xmp)
             xmp_state = fingerprint
             role = "base_profile" if request.base_profile is not None else "source_sidecar"

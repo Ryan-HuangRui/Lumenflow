@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import backend_capabilities  # noqa: E402
+import darktable_codec  # noqa: E402
 import edit_intent  # noqa: E402
 import preview_provider  # noqa: E402
 
@@ -122,7 +123,7 @@ class EditIntentExecutionTests(unittest.TestCase):
             xmp = root / "bangkok.DNG.xmp"
             output_dir = root / "output"
             raw.write_bytes(b"raw-bangkok")
-            xmp.write_text("<x:xmpmeta>history</x:xmpmeta>", encoding="utf-8")
+            xmp.write_text(darktable_codec.minimal_xmp(), encoding="utf-8")
             preview = preview_provider.DarktablePreviewProvider().create_preview(
                 preview_provider.PreviewRequest(
                     source=raw,
@@ -179,7 +180,7 @@ class EditIntentExecutionTests(unittest.TestCase):
             raw = root / "bangkok.DNG"
             xmp = root / "bangkok.DNG.xmp"
             raw.write_bytes(b"raw-bangkok")
-            xmp.write_text("<x:xmpmeta>history</x:xmpmeta>", encoding="utf-8")
+            xmp.write_text(darktable_codec.minimal_xmp(), encoding="utf-8")
             preview = preview_provider.DarktablePreviewProvider().create_preview(
                 preview_provider.PreviewRequest(raw, root / "preview.jpg", xmp, True, 10)
             )

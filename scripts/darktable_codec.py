@@ -27,6 +27,7 @@ from typing import Any, Callable, Mapping
 
 CODEC_SCHEMA_VERSION = "lumenflow.darktable_codec.v1"
 DARKTABLE_VERSION = "5.4.1"
+DARKTABLE_XMP_VERSION = "5"
 MULTI_PRIORITY_MIN = 0
 MULTI_PRIORITY_MAX = 1000
 
@@ -393,7 +394,7 @@ def _new_xmp() -> ET.Element:
         f"{{{RDF_NS}}}Description",
         {
             f"{{{XMP_NS}}}Rating": "0",
-            f"{{{DT_NS}}}xmp_version": "5",
+            f"{{{DT_NS}}}xmp_version": DARKTABLE_XMP_VERSION,
             f"{{{DT_NS}}}raw_params": "0",
             f"{{{DT_NS}}}auto_presets_applied": "0",
             f"{{{DT_NS}}}history_end": "0",
@@ -404,6 +405,18 @@ def _new_xmp() -> ET.Element:
         property_node = ET.SubElement(desc, f"{{{DT_NS}}}{name}")
         ET.SubElement(property_node, f"{{{RDF_NS}}}Seq")
     return root
+
+
+def minimal_xmp() -> str:
+    """Return a current 5.4.1 empty-history XMP starting state.
+
+    The app bundle's ``profiling-shot.xmp`` is a user-facing sample from an
+    older XMP schema and contains module payloads that are not safe generic
+    defaults.  Dynamic plans and live verification use this codec-owned
+    version-5 state instead, then append only verified module structs.
+    """
+
+    return ET.tostring(_new_xmp(), encoding="unicode", short_empty_elements=True) + "\n"
 
 
 def _description(root: ET.Element) -> ET.Element:
@@ -431,7 +444,11 @@ def _parse_xmp(text: str) -> ET.Element:
     # it may be a Lightroom sidecar with no darktable history semantics.
     if root.tag != "{adobe:ns:meta/}xmpmeta":
         raise DarktableCodecError("base profile is not a darktable xmpmeta document")
-    _description(root)
+    desc = _description(root)
+    if desc.get(_module_attr("xmp_version")) != DARKTABLE_XMP_VERSION:
+        raise DarktableCodecError(
+            f"darktable XMP xmp_version must be {DARKTABLE_XMP_VERSION} for {DARKTABLE_VERSION}"
+        )
     _history_seq(root)
     return root
 

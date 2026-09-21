@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import preview_provider  # noqa: E402
+import darktable_codec  # noqa: E402
 
 
 class PreviewProviderTests(unittest.TestCase):
@@ -23,7 +24,7 @@ class PreviewProviderTests(unittest.TestCase):
             xmp = root / "keeper.DNG.xmp"
             output = root / "previews" / "keeper.jpg"
             raw.write_bytes(b"raw-v1")
-            xmp.write_text("<x:xmpmeta>develop-v1</x:xmpmeta>", encoding="utf-8")
+            xmp.write_text(darktable_codec.minimal_xmp(), encoding="utf-8")
 
             provider = preview_provider.DarktablePreviewProvider(
                 local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}}
@@ -59,7 +60,7 @@ class PreviewProviderTests(unittest.TestCase):
             xmp = root / "keeper.DNG.xmp"
             output = root / "previews" / "keeper.jpg"
             raw.write_bytes(b"raw-v1")
-            xmp.write_text("develop-v1", encoding="utf-8")
+            xmp.write_text(darktable_codec.minimal_xmp(), encoding="utf-8")
 
             def fake_runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
                 del command, dry_run, timeout
@@ -80,6 +81,24 @@ class PreviewProviderTests(unittest.TestCase):
             self.assertEqual(artifact.status, "failed")
             self.assertIn("state changed", artifact.failure_reason)
             self.assertIsNone(artifact.preview_fingerprint)
+
+    def test_darktable_preview_rejects_stale_xmp_before_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "keeper.DNG"
+            xmp = root / "keeper.DNG.xmp"
+            raw.write_bytes(b"raw-v1")
+            xmp.write_text(
+                darktable_codec.minimal_xmp().replace(
+                    'darktable:xmp_version="5"', 'darktable:xmp_version="2"'
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(preview_provider.PreviewProviderError, "current 5.4.1"):
+                preview_provider.DarktablePreviewProvider().create_preview(
+                    preview_provider.PreviewRequest(raw, root / "preview.jpg", xmp, True, 10)
+                )
 
     def test_darktable_preview_refuses_to_overwrite_existing_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
