@@ -135,9 +135,17 @@ class PP3Document:
         )
 
     def set(self, section: str, key: str, value: Any) -> None:
-        if not isinstance(section, str) or not section.strip() or "\n" in section or "\r" in section:
+        if (
+            not isinstance(section, str)
+            or not section.strip()
+            or any(character in section for character in ("[", "]", "=", "\n", "\r", "\x00"))
+        ):
             raise PP3UnsupportedValue("PP3 section names must be non-empty single-line strings")
-        if not isinstance(key, str) or not key.strip() or "=" in key or "\n" in key or "\r" in key:
+        if (
+            not isinstance(key, str)
+            or not key.strip()
+            or any(character in key for character in ("[", "]", "=", "\n", "\r", "\x00"))
+        ):
             raise PP3UnsupportedValue("PP3 field names must be non-empty single-line strings")
         fields = self.sections.setdefault(section.strip(), OrderedDict())
         fields[key.strip()] = _format_value(value)
@@ -280,7 +288,7 @@ def semantic_overrides(
         "temperature": ("White Balance", "Temperature"),
         "green": ("White Balance", "Green"),
     }
-    unsupported = set(adjustments) - set(mapping) - {"notes", "rawtherapee_native"}
+    unsupported = set(adjustments) - set(mapping) - {"notes"}
     if unsupported:
         raise PP3UnsupportedValue(
             "RawTherapee semantic fields are not mapped: " + ", ".join(sorted(unsupported))
@@ -316,23 +324,6 @@ def semantic_overrides(
                     sections["Crop"][{"fixed_ratio": "FixedRatio", "ratio": "Ratio"}[key]] = crop[key]
     if "notes" in adjustments and adjustments["notes"]:
         sections.setdefault("Lumenflow", {})["Notes"] = str(adjustments["notes"]).replace("\n", " ")
-    native = adjustments.get("rawtherapee_native")
-    if native is not None:
-        if not isinstance(native, Mapping):
-            raise PP3UnsupportedValue("rawtherapee_native must be an object of PP3 sections")
-        for section, fields in native.items():
-            if not isinstance(fields, Mapping):
-                raise PP3UnsupportedValue(
-                    f"rawtherapee_native section must be an object: {section}"
-                )
-            if not str(section).strip():
-                raise PP3UnsupportedValue("rawtherapee_native section names may not be empty")
-            target = sections.setdefault(str(section), {})
-            for key, value in fields.items():
-                # RawTherapee serializes a few curves as opaque semicolon
-                # strings.  Preserve those values, but reject structures and
-                # non-finite numbers that cannot be represented in PP3.
-                target[str(key)] = _format_value(value)
     return sections
 
 

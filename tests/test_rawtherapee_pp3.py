@@ -77,6 +77,23 @@ Compiler=test
         with self.assertRaises(rawtherapee_pp3.PP3ParseError):
             rawtherapee_pp3.PP3Document.parse("[Exposure]\nnot-a-field\n")
 
+    def test_set_rejects_container_syntax_in_section_and_key(self) -> None:
+        document = rawtherapee_pp3.PP3Document.empty()
+        for section in ("[bad", "bad]", "bad=section", "bad\n", "bad\r", "bad\x00"):
+            with self.subTest(section=section), self.assertRaises(
+                rawtherapee_pp3.PP3UnsupportedValue
+            ):
+                document.set(section, "Key", "value")
+        for key in ("[bad", "bad]", "bad=key", "bad\n", "bad\r", "bad\x00"):
+            with self.subTest(key=key), self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
+                document.set("Section", key, "value")
+
+    def test_semantic_mapping_does_not_expose_unverified_native_fields(self) -> None:
+        with self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
+            rawtherapee_pp3.semantic_overrides(
+                {"rawtherapee_native": {"Exposure": {"Compensation": 1}}}
+            )
+
     def test_semantic_mapping_rejects_unknown_fields(self) -> None:
         with self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
             rawtherapee_pp3.semantic_overrides({"exposure_compensation": 1, "invented": 2})
@@ -107,34 +124,6 @@ Compiler=test
         self.assertEqual(overrides["Crop"]["W"], 1200)
         self.assertEqual(overrides["Crop"]["FixedRatio"], True)
         self.assertEqual(overrides["Crop"]["Ratio"], "3:2")
-
-    def test_fixture_validated_native_sections_can_extend_common_modules(self) -> None:
-        overrides = rawtherapee_pp3.semantic_overrides(
-            {
-                "rawtherapee_native": {
-                    "LensProfile": {
-                        "LcMode": "lfauto",
-                        "UseDistortion": True,
-                        "UseVignette": True,
-                    },
-                    "Directional Pyramid Denoising": {
-                        "Enabled": True,
-                        "Luma": 25,
-                        "Chroma": 10,
-                    },
-                    "Exposure": {
-                        "Curve": "3;0;0;0.5;0.4;1;1;",
-                    },
-                }
-            }
-        )
-        self.assertEqual(overrides["LensProfile"]["LcMode"], "lfauto")
-        self.assertEqual(overrides["Directional Pyramid Denoising"]["Luma"], "25")
-        self.assertEqual(overrides["Exposure"]["Curve"], "3;0;0;0.5;0.4;1;1;")
-        with self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
-            rawtherapee_pp3.semantic_overrides(
-                {"rawtherapee_native": {"Exposure": {"Bad": {"nested": True}}}}
-            )
 
     def test_profile_state_fingerprint_is_ordered_and_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -44,16 +44,16 @@ wrong image.
 
 The lower-level `compile_profile_text()` API can merge a complete, fixture-
 verified section/key mapping for additional RawTherapee modules while retaining
-the starting profile fields.  Candidate modules should be promoted to the
-vendor-neutral intent only after a real 5.11 profile fixture and CLI render
-test exist.
+the starting profile fields.  This is a profile-import/merge primitive, not an
+agent-facing native-module API: preserving unknown fields from an input PP3 does
+not verify that an agent-authored value is correct for RawTherapee 5.11.
 
-For an already fixture-validated native module recipe, the adjustment payload
-may also carry a `rawtherapee_native` object keyed by exact PP3 section and
-field names.  Values are still bounded and serialized through the PP3 parser;
-arbitrary Python objects and non-finite numbers are rejected.  This escape
-valve is intentionally separate from the vendor-neutral fields so an agent
-cannot silently treat an unverified GUI label as a supported semantic control.
+`EditIntent v2` currently exposes only the vendor-neutral fields in the table
+above.  It does not expose `rawtherapee_native`, `style.rawtherapee.sections`,
+or any other arbitrary PP3 escape hatch.  Full native-module authoring remains
+future work and must first define a strict bounded schema (for example,
+`style.rawtherapee.sections`) backed by versioned 5.11 fixtures and CLI render
+tests before it is exposed to agents.
 
 ## Output containers
 
