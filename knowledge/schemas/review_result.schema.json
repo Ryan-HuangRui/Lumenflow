@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/review_result.schema.json",
+  "title": "Lumenflow ReviewResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "review_id", "intent_id", "intent_revision", "plan_id", "receipt_id",
+    "output_fingerprint", "decision", "summary", "issues", "changes"
+  ],
+  "properties": {
+    "schema_version": {"const": "lumenflow.review_result.v1"},
+    "review_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "intent_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "intent_revision": {"type": "integer", "minimum": 1},
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]{32}$"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[0-9a-f]{32}$"},
+    "output_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "decision": {"enum": ["accept", "revise", "reject"]},
+    "summary": {"type": "string", "minLength": 1},
+    "issues": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {"$ref": "#/$defs/issue"}
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": {"$ref": "edit_intent.schema.json#/properties/style"},
+        "global_adjustments": {"$ref": "edit_intent.schema.json#/properties/global_adjustments"},
+        "composition": {"$ref": "edit_intent.schema.json#/properties/composition"},
+        "local_adjustments": {"$ref": "edit_intent.schema.json#/properties/local_adjustments"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"decision": {"const": "revise"}}},
+      "then": {
+        "properties": {
+          "issues": {"minItems": 1},
+          "changes": {"minProperties": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"decision": {"enum": ["accept", "reject"]}}},
+      "then": {"properties": {"changes": {"maxProperties": 0}}}
+    },
+    {
+      "if": {"properties": {"decision": {"const": "reject"}}},
+      "then": {"properties": {"issues": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "severity", "observation", "recommendation"],
+      "properties": {
+        "category": {"enum": ["exposure", "highlights", "shadows", "color", "style", "composition", "artifact", "other"]},
+        "severity": {"enum": ["minor", "major", "blocking"]},
+        "observation": {"type": "string", "minLength": 1},
+        "recommendation": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

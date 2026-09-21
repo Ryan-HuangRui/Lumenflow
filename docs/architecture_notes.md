@@ -103,6 +103,10 @@ The new runtime path separates model judgment from backend mechanics:
 
 The first compiler targets RawTherapee. It never invokes a shell, refuses output paths outside the caller-approved root, refuses existing output replacement, and rejects a plan whose command or profile payload was modified. `adjustment_plan.v1` remains available as a compatibility renderer while callers migrate; it is not extended with new runtime responsibilities.
 
+### Review and bounded refinement
+
+Visual review remains a host-model responsibility. The model inspects the rendered JPEG and emits `lumenflow.review_result.v1`; deterministic code binds that judgment to the current intent revision, plan, successful receipt, and still-matching output bytes. A persisted `lumenflow.review_session.v1` permits only editable intent fields to change, defaults to two revisions, and records review ids plus semantic intent hashes to stop replay, no-op revisions, budget resets, and cycles. Accept, reject, and revision-limit outcomes close the session.
+
 ## Style Library
 
 Tutorial ingestion separates public reusable knowledge from private evidence:

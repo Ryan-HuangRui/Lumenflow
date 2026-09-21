@@ -97,6 +97,7 @@ Implemented foundation:
 - Vendor-neutral `EditIntent v2` plus RawTherapee `ExecutionPlan` and verified `ExecutionReceipt` contracts.
 - RawTherapee and isolated legacy darktable command construction.
 - A versioned darktable real-RAW feasibility probe that fails closed on source, sidecar, or output-integrity violations.
+- Model-authored `ReviewResult` evidence bound to verified output bytes, plus a persisted two-revision refinement loop with replay and cycle protection.
 - `adjustment_plan.json` schema.
 - Rendering from an agent-authored plan.
 - Processing records and Markdown reporting.
@@ -107,7 +108,7 @@ Maintenance work:
 - Expand RawTherapee `.pp3` parameter coverage.
 - Add EditIntent v2 compilers only after each backend advertises the required capabilities.
 - Rerun the darktable feasibility probe after a trusted Gatekeeper-compatible installation is available; keep the backend legacy-only until the provider/compiler/receipt gates also pass.
-- Improve render-review notes and revision-loop output.
+- Expand review categories only when benchmark evidence shows the current contract is insufficient.
 - Add more fixture coverage for adjustment-plan edge cases.
 - Improve failure messages when external tools are missing.
 
