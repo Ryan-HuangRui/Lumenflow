@@ -260,6 +260,151 @@ def _legacy_composition(composition: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _darktable_xmp_input(source_path: Path) -> tuple[Path, str, dict[str, Any], str]:
+    candidates = {
+        source_path.with_suffix(".xmp"),
+        source_path.with_name(source_path.name + ".xmp"),
+    }
+    existing = sorted(path for path in candidates if path.is_file() and not path.is_symlink())
+    if len(existing) != 1:
+        raise IntentValidationError(
+            "darktable XMP replay requires exactly one regular source sidecar"
+        )
+    xmp_path = existing[0]
+    if xmp_path.stat().st_size > 1024 * 1024:
+        raise IntentValidationError("darktable XMP sidecar exceeds the 1 MiB plan limit")
+    try:
+        content = xmp_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise IntentValidationError("darktable XMP sidecar must be UTF-8") from error
+    fingerprint = preview_provider.file_fingerprint(xmp_path)
+    starting_state = {
+        "kind": "darktable_xmp",
+        "xmp": fingerprint,
+        "uses_engine_default": False,
+        "library": ":memory:",
+        "write_sidecars": False,
+    }
+    return xmp_path, content, fingerprint, preview_provider.canonical_hash(starting_state)
+
+
+def _compile_darktable_intent(
+    intent: dict[str, Any],
+    *,
+    output_dir: Path,
+    local_config: dict[str, Any],
+    capabilities: backend_capabilities.BackendCapabilities,
+) -> dict[str, Any]:
+    if intent["global_adjustments"]:
+        raise IntentValidationError(
+            "The darktable XMP replay compiler does not map dynamic adjustments"
+        )
+    if intent["composition"]["decision"] != "preserve_existing_crop":
+        raise IntentValidationError(
+            "The darktable XMP replay compiler requires composition.decision=preserve_existing_crop"
+        )
+    if intent["local_adjustments"]["decision"] != "none":
+        raise IntentValidationError(
+            "The darktable XMP replay compiler does not map local adjustments"
+        )
+
+    source_path = Path(intent["source"]["path"])
+    _xmp_path, xmp_content, xmp_fingerprint, starting_state_hash = _darktable_xmp_input(
+        source_path
+    )
+    if intent["preview_basis"]["state_completeness"] != "complete":
+        raise ExecutionPreconditionError(
+            "PREVIEW_STATE_INCOMPLETE",
+            "darktable execution requires a complete, explicit XMP preview state",
+        )
+    if intent["preview_basis"]["starting_state_hash"] != starting_state_hash:
+        raise ExecutionPreconditionError(
+            "STARTING_STATE_MISMATCH",
+            "The current darktable XMP no longer matches the preview basis",
+        )
+
+    safe_source_stem = _safe_name(source_path.stem)
+    safe_intent_id = _safe_name(str(intent["intent_id"]))
+    stem = f"{safe_source_stem}_{safe_intent_id}_r{intent['revision']}"
+    profile_path = output_dir / "profiles" / f"{stem}.xmp"
+    output_path = output_dir / f"{stem}.jpg"
+    runtime_key = _canonical_hash(
+        {
+            "source": intent["source"],
+            "preview_basis": intent["preview_basis"],
+            "intent_id": intent["intent_id"],
+            "revision": intent["revision"],
+        }
+    )[:24]
+    runtime_root = output_dir / ".darktable-runtime" / runtime_key
+    executable = lumenflow_config.tool_command(local_config, "darktable_cli", "darktable-cli")
+    command = render_raw.build_darktable_command(
+        source_path,
+        output_path,
+        xmp=profile_path,
+        configdir=runtime_root / "config",
+        cachedir=runtime_root / "cache",
+        library=":memory:",
+        write_sidecars=False,
+        executable=executable,
+    )
+    required_capabilities = ["intent.compile.v2", "render"]
+    identity = {
+        "intent_id": intent["intent_id"],
+        "intent_revision": intent["revision"],
+        "authorization": intent["authorization"],
+        "backend_id": "darktable",
+        "source": intent["source"],
+        "preview_basis": intent["preview_basis"],
+        "required_capabilities": required_capabilities,
+        "profile_path": str(profile_path),
+        "profile_sha256": xmp_fingerprint["sha256"],
+        "output_path": str(output_path),
+        "command_argv": command,
+    }
+    plan_id = "plan_" + _canonical_hash(identity)[:32]
+    return {
+        "schema_version": EXECUTION_PLAN_SCHEMA_VERSION,
+        "plan_id": plan_id,
+        "intent_id": intent["intent_id"],
+        "intent_revision": intent["revision"],
+        "authorization": intent["authorization"],
+        "backend": {
+            "id": "darktable",
+            "adapter_version": capabilities.adapter_version,
+            "capability_contract_version": capabilities.schema_version,
+        },
+        "source": intent["source"],
+        "preview_basis": intent["preview_basis"],
+        "output_root": str(output_dir),
+        "required_capabilities": required_capabilities,
+        "artifacts": {
+            "profile": {"path": str(profile_path), "sha256": xmp_fingerprint["sha256"]},
+            "output": {"path": str(output_path), "format": "JPEG"},
+        },
+        "operations": [
+            {
+                "operation_id": f"{plan_id}:profile",
+                "kind": "materialize_profile",
+                "payload": {
+                    "path": str(profile_path),
+                    "content": xmp_content,
+                    "sha256": xmp_fingerprint["sha256"],
+                },
+                "command_argv": [],
+            },
+            {
+                "operation_id": f"{plan_id}:render",
+                "kind": "render",
+                "payload": {"output_path": str(output_path)},
+                "command_argv": command,
+            },
+        ],
+        "compiler": {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
+        "created_at": _now(),
+    }
+
+
 def compile_intent(
     intent: dict[str, Any],
     *,
@@ -275,11 +420,7 @@ def compile_intent(
         required_capabilities.append("composition.crop")
     if intent["local_adjustments"]["decision"] == "use_masks":
         required_capabilities.append("mask.ai")
-    for capability in required_capabilities:
-        capabilities.require(capability)
-
-    if backend_id != "rawtherapee":
-        raise IntentValidationError(f"No EditIntent v2 compiler is registered for {backend_id}")
+    capabilities.require("intent.compile.v2")
 
     source_path = Path(intent["source"]["path"])
     actual_source_fingerprint = preview_provider.file_fingerprint(source_path)
@@ -288,6 +429,20 @@ def compile_intent(
             "SOURCE_FINGERPRINT_MISMATCH",
             "The source bytes no longer match the EditIntent fingerprint",
         )
+
+    if backend_id == "darktable":
+        return _compile_darktable_intent(
+            intent,
+            output_dir=output_dir,
+            local_config=local_config,
+            capabilities=capabilities,
+        )
+
+    for capability in required_capabilities[1:]:
+        capabilities.require(capability)
+
+    if backend_id != "rawtherapee":
+        raise IntentValidationError(f"No EditIntent v2 compiler is registered for {backend_id}")
 
     safe_source_stem = _safe_name(source_path.stem)
     safe_intent_id = _safe_name(str(intent["intent_id"]))
@@ -425,14 +580,15 @@ def _validate_execution_plan(
             "OUTPUT_ROOT_MISMATCH",
             "Execution plan output_root does not match the explicitly allowed output directory",
         )
-    if plan.get("backend", {}).get("id") != "rawtherapee":
+    backend_id = plan.get("backend", {}).get("id")
+    if backend_id not in {"rawtherapee", "darktable"}:
         raise ExecutionPreconditionError(
             "UNSUPPORTED_EXECUTION_BACKEND",
-            "Only RawTherapee execution plans are supported by this executor",
+            "The execution backend is not supported by this executor",
         )
-    capabilities = backend_capabilities.backend_capabilities_for("rawtherapee")
+    capabilities = backend_capabilities.backend_capabilities_for(backend_id)
     expected_backend = {
-        "id": "rawtherapee",
+        "id": backend_id,
         "adapter_version": capabilities.adapter_version,
         "capability_contract_version": capabilities.schema_version,
     }
@@ -480,7 +636,11 @@ def _validate_execution_plan(
             "INVALID_EXECUTION_PLAN",
             "Required capabilities are invalid",
         )
-    if plan.get("compiler") != {"id": "lumenflow.rawtherapee", "version": "1"}:
+    expected_compiler = {
+        "rawtherapee": {"id": "lumenflow.rawtherapee", "version": "1"},
+        "darktable": {"id": "lumenflow.darktable-xmp-replay", "version": "1"},
+    }[backend_id]
+    if plan.get("compiler") != expected_compiler:
         raise ExecutionPreconditionError(
             "COMPILER_CONTRACT_MISMATCH",
             "Execution plan compiler does not match the active compiler contract",
@@ -541,7 +701,7 @@ def _validate_execution_plan(
     if len(operations) != 2:
         raise ExecutionPreconditionError(
             "INVALID_EXECUTION_PLAN",
-            "RawTherapee execution plans must contain exactly two operations",
+            "Execution plans must contain exactly two operations",
         )
     profile_operation, render_operation = operations
     expected_operation_fields = {"operation_id", "kind", "payload", "command_argv"}
@@ -578,13 +738,56 @@ def _validate_execution_plan(
             "INVALID_EXECUTION_PLAN",
             "Render payload does not match the declared output artifact",
         )
-    executable = lumenflow_config.tool_command(local_config, "rawtherapee_cli", "rawtherapee-cli")
-    expected_command = render_raw.build_rawtherapee_command(
-        Path(source["path"]),
-        output_path,
-        [profile_path],
-        executable=executable,
-    )
+    if backend_id == "rawtherapee":
+        executable = lumenflow_config.tool_command(local_config, "rawtherapee_cli", "rawtherapee-cli")
+        expected_command = render_raw.build_rawtherapee_command(
+            Path(source["path"]),
+            output_path,
+            [profile_path],
+            executable=executable,
+        )
+    else:
+        fingerprint = {
+            "sha256": profile["sha256"],
+            "size_bytes": len(profile_payload["content"].encode("utf-8")),
+        }
+        expected_state_hash = preview_provider.canonical_hash(
+            {
+                "kind": "darktable_xmp",
+                "xmp": fingerprint,
+                "uses_engine_default": False,
+                "library": ":memory:",
+                "write_sidecars": False,
+            }
+        )
+        if (
+            preview_basis["state_completeness"] != "complete"
+            or preview_basis["starting_state_hash"] != expected_state_hash
+        ):
+            raise ExecutionPreconditionError(
+                "STARTING_STATE_MISMATCH",
+                "The materialized darktable XMP does not match the preview basis",
+            )
+        runtime_key = _canonical_hash(
+            {
+                "source": source,
+                "preview_basis": preview_basis,
+                "intent_id": plan["intent_id"],
+                "revision": plan["intent_revision"],
+            }
+        )[:24]
+        runtime_root = allowed_output_dir / ".darktable-runtime" / runtime_key
+        executable = lumenflow_config.tool_command(local_config, "darktable_cli", "darktable-cli")
+        expected_command = render_raw.build_darktable_command(
+            Path(source["path"]),
+            output_path,
+            xmp=profile_path,
+            configdir=runtime_root / "config",
+            cachedir=runtime_root / "cache",
+            library=":memory:",
+            write_sidecars=False,
+            executable=executable,
+        )
     if render_operation["command_argv"] != expected_command:
         raise ExecutionPreconditionError(
             "PLAN_COMMAND_MISMATCH",
@@ -634,7 +837,12 @@ def execute_plan(
             "Execution plan structure is invalid",
         ) from error
     capabilities = backend_capabilities.backend_capabilities_for(plan["backend"]["id"])
-    for capability in plan["required_capabilities"]:
+    capabilities_to_require = (
+        [capability for capability in plan["required_capabilities"] if capability != "render"]
+        if dry_run
+        else plan["required_capabilities"]
+    )
+    for capability in capabilities_to_require:
         capabilities.require(capability)
 
     source_path = Path(plan["source"]["path"])
@@ -670,6 +878,10 @@ def execute_plan(
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(operation["payload"]["content"], encoding="utf-8")
                 elif operation["kind"] == "render":
+                    if plan["backend"]["id"] == "darktable":
+                        command = operation["command_argv"]
+                        for flag in ("--configdir", "--cachedir"):
+                            Path(command[command.index(flag) + 1]).mkdir(parents=True, exist_ok=True)
                     runner(operation["command_argv"], dry_run=False, timeout=timeout)
                 else:
                     raise RuntimeError(f"Unsupported execution operation: {operation['kind']}")

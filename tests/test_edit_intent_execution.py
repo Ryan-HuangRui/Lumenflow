@@ -115,6 +115,90 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertEqual(first["operations"][1]["command_argv"][0], "/custom/rawtherapee-cli")
             self.assertFalse(output_dir.exists())
 
+    def test_compile_darktable_replays_only_the_preview_bound_xmp(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            xmp = root / "bangkok.DNG.xmp"
+            output_dir = root / "output"
+            raw.write_bytes(b"raw-bangkok")
+            xmp.write_text("<x:xmpmeta>history</x:xmpmeta>", encoding="utf-8")
+            preview = preview_provider.DarktablePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(
+                    source=raw,
+                    output=root / "preview.jpg",
+                    base_profile=xmp,
+                    dry_run=True,
+                    timeout=10,
+                )
+            )
+            intent = self._intent(raw)
+            intent["global_adjustments"] = {}
+            intent["composition"] = {
+                "decision": "preserve_existing_crop",
+                "reason": "Replay the approved darktable history stack.",
+            }
+            intent["preview_basis"] = {
+                "artifact_id": preview.artifact_id,
+                "starting_state_hash": preview.starting_state_hash,
+                "state_completeness": preview.state_completeness,
+            }
+
+            plan = edit_intent.compile_intent(
+                intent,
+                backend_id="darktable",
+                output_dir=output_dir,
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+            )
+
+            self.assertEqual(plan["backend"]["id"], "darktable")
+            self.assertEqual(plan["compiler"], {"id": "lumenflow.darktable-xmp-replay", "version": "1"})
+            self.assertEqual(plan["required_capabilities"], ["intent.compile.v2", "render"])
+            self.assertEqual(plan["operations"][0]["payload"]["content"], xmp.read_text(encoding="utf-8"))
+            command = plan["operations"][1]["command_argv"]
+            self.assertEqual(command[0], "/custom/darktable-cli")
+            self.assertEqual(command[1], str(raw))
+            self.assertEqual(command[2], plan["artifacts"]["profile"]["path"])
+            self.assertIn(":memory:", command)
+            self.assertIn("write_sidecar_files=never", command)
+            self.assertFalse(output_dir.exists())
+
+            receipt = edit_intent.execute_plan(
+                plan,
+                dry_run=True,
+                timeout=10,
+                allowed_output_dir=output_dir,
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+            )
+            self.assertEqual(receipt["status"], "dry_run")
+            self.assertFalse(output_dir.exists())
+
+    def test_darktable_compiler_rejects_unmapped_adjustments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            xmp = root / "bangkok.DNG.xmp"
+            raw.write_bytes(b"raw-bangkok")
+            xmp.write_text("<x:xmpmeta>history</x:xmpmeta>", encoding="utf-8")
+            preview = preview_provider.DarktablePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(raw, root / "preview.jpg", xmp, True, 10)
+            )
+            intent = self._intent(raw)
+            intent["composition"] = {
+                "decision": "preserve_existing_crop",
+                "reason": "Keep existing crop.",
+            }
+            intent["preview_basis"] = {
+                "artifact_id": preview.artifact_id,
+                "starting_state_hash": preview.starting_state_hash,
+                "state_completeness": preview.state_completeness,
+            }
+
+            with self.assertRaises(edit_intent.IntentValidationError) as error:
+                edit_intent.compile_intent(intent, backend_id="darktable", output_dir=root / "output")
+
+            self.assertIn("does not map dynamic adjustments", str(error.exception))
+
     def test_execute_plan_dry_run_writes_nothing_and_returns_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -223,7 +307,7 @@ class EditIntentExecutionTests(unittest.TestCase):
             with self.assertRaises(backend_capabilities.UnsupportedCapabilityError) as error:
                 edit_intent.compile_intent(
                     self._intent(raw),
-                    backend_id="darktable",
+                    backend_id="lightroom",
                     output_dir=root / "output",
                 )
 

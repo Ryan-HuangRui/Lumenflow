@@ -198,6 +198,168 @@ class RawTherapeePreviewProvider:
         )
 
 
+class DarktablePreviewProvider:
+    """Render previews against explicit XMP/default state in an isolated darktable runtime."""
+
+    provider_id = "darktable"
+    adapter_version = "darktable-isolated-xmp-v1"
+
+    def __init__(
+        self,
+        *,
+        local_config: dict[str, Any] | None = None,
+        runner: CommandRunner = render_raw.run_command,
+    ) -> None:
+        self.local_config = local_config or {}
+        self.runner = runner
+        self.executable = lumenflow_config.tool_command(
+            self.local_config,
+            "darktable_cli",
+            "darktable-cli",
+        )
+
+    @staticmethod
+    def _xmp_state(
+        request: PreviewRequest,
+    ) -> tuple[Path | None, dict[str, Any], list[dict[str, Any]], str]:
+        xmp: Path | None = None
+        if request.base_profile is not None and request.base_profile.exists():
+            if (
+                request.base_profile.suffix.lower() != ".xmp"
+                or request.base_profile.is_symlink()
+                or not request.base_profile.is_file()
+            ):
+                raise PreviewProviderError(
+                    "darktable base_profile must be an existing regular XMP file"
+                )
+            xmp = request.base_profile
+        else:
+            candidates = {
+                request.source.with_suffix(".xmp"),
+                request.source.with_name(request.source.name + ".xmp"),
+            }
+            existing = sorted(path for path in candidates if path.is_file() and not path.is_symlink())
+            if len(existing) > 1:
+                raise PreviewProviderError(
+                    "Multiple darktable XMP sidecars exist; pass base_profile explicitly"
+                )
+            if existing:
+                xmp = existing[0]
+
+        state_inputs: list[dict[str, Any]] = []
+        xmp_state: dict[str, Any] | None = None
+        if xmp is not None:
+            fingerprint = file_fingerprint(xmp)
+            xmp_state = fingerprint
+            state_inputs.append(
+                {"role": "develop_xmp", "path": str(xmp), **fingerprint}
+            )
+        starting_state = {
+            "kind": "darktable_xmp",
+            "xmp": xmp_state,
+            "uses_engine_default": xmp is None,
+            "library": ":memory:",
+            "write_sidecars": False,
+        }
+        return xmp, starting_state, state_inputs, "complete" if xmp is not None else "partial"
+
+    @staticmethod
+    def _sidecar_snapshot(source: Path) -> dict[str, dict[str, Any]]:
+        candidates = {
+            source.with_suffix(".xmp"),
+            source.with_name(source.name + ".xmp"),
+        }
+        return {str(path): file_fingerprint(path) for path in sorted(candidates) if path.is_file()}
+
+    def create_preview(self, request: PreviewRequest) -> PreviewArtifact:
+        if request.source.is_symlink() or not request.source.is_file():
+            raise PreviewProviderError("Preview source must be an existing regular file")
+        source_fingerprint = file_fingerprint(request.source)
+        xmp, starting_state, state_inputs, completeness = self._xmp_state(request)
+        starting_state_hash = canonical_hash(starting_state)
+        artifact_id = "preview_" + canonical_hash(
+            {
+                "schema_version": PREVIEW_ARTIFACT_SCHEMA_VERSION,
+                "provider_id": self.provider_id,
+                "source_fingerprint": source_fingerprint,
+                "starting_state_hash": starting_state_hash,
+                "preview_path": str(request.output),
+            }
+        )[:32]
+        runtime_root = request.output.parent / ".lumenflow-darktable" / artifact_id
+        command = render_raw.build_darktable_command(
+            request.source,
+            request.output,
+            xmp=xmp,
+            configdir=runtime_root / "config",
+            cachedir=runtime_root / "cache",
+            library=":memory:",
+            write_sidecars=False,
+            executable=self.executable,
+        )
+
+        status = "dry_run" if request.dry_run else "pending"
+        failure_reason = ""
+        preview_fingerprint = None
+        sidecars_before = self._sidecar_snapshot(request.source)
+        try:
+            if not request.dry_run:
+                if request.output.exists():
+                    raise PreviewProviderError(
+                        f"Refusing to overwrite existing preview: {request.output}"
+                    )
+                if runtime_root.exists():
+                    raise PreviewProviderError(
+                        f"Refusing to reuse existing darktable runtime: {runtime_root}"
+                    )
+                request.output.parent.mkdir(parents=True, exist_ok=True)
+                (runtime_root / "config").mkdir(parents=True)
+                (runtime_root / "cache").mkdir()
+            self.runner(command, dry_run=request.dry_run, timeout=request.timeout)
+            if not request.dry_run:
+                if file_fingerprint(request.source) != source_fingerprint:
+                    raise PreviewProviderError("Source changed during darktable preview rendering")
+                if self._sidecar_snapshot(request.source) != sidecars_before:
+                    raise PreviewProviderError(
+                        "darktable XMP state changed during preview rendering"
+                    )
+                if not request.output.is_file():
+                    raise PreviewProviderError(
+                        f"Preview command did not create output: {request.output}"
+                    )
+                preview_fingerprint = file_fingerprint(request.output)
+                status = "success"
+        except (PreviewProviderError, subprocess.SubprocessError, OSError) as error:
+            status = "failed"
+            failure_reason = str(error)
+            preview_fingerprint = None
+
+        return PreviewArtifact(
+            schema_version=PREVIEW_ARTIFACT_SCHEMA_VERSION,
+            artifact_id=artifact_id,
+            provider={
+                "id": self.provider_id,
+                "adapter_version": self.adapter_version,
+                "executable": self.executable,
+                "capability_contract_version": backend_capabilities.BACKEND_CAPABILITIES_SCHEMA_VERSION,
+            },
+            source=str(request.source),
+            preview=str(request.output),
+            source_fingerprint=source_fingerprint,
+            preview_fingerprint=preview_fingerprint,
+            starting_state=starting_state,
+            starting_state_hash=starting_state_hash,
+            state_inputs=state_inputs,
+            state_completeness=completeness,
+            command=shlex.join(command),
+            command_argv=command,
+            selection_reason=request.selection_reason,
+            status=status,
+            failure_reason=failure_reason,
+            generated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+
 class LightroomPreviewProvider:
     """Fail-closed placeholder for a future verified Lightroom preview adapter."""
 
@@ -252,6 +414,14 @@ def create_preview_provider(
 ) -> PreviewProvider:
     if name == "rawtherapee":
         return RawTherapeePreviewProvider(local_config=local_config)
+    if name == "darktable":
+        try:
+            backend_capabilities.backend_capabilities_for("darktable").require(
+                "preview.state_bound"
+            )
+        except backend_capabilities.CapabilityContractError as error:
+            raise PreviewCapabilityError(str(error)) from error
+        return DarktablePreviewProvider(local_config=local_config)
     if name == "lightroom":
         return LightroomPreviewProvider(local_config=local_config)
     raise ValueError(f"Unsupported preview provider: {name}")

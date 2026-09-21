@@ -91,7 +91,7 @@ Default to RawTherapee unless the user explicitly asks for Lightroom, the plan r
 
 The `EditIntent v2` compiler currently supports RawTherapee only. Lightroom inputs remain on the fail-closed `adjustment_plan.v1` compatibility path until the Lightroom v2 compiler and state-bound preview probe are implemented; do not silently translate a v2 intent into legacy Lightroom commands.
 
-darktable is also legacy-only. Do not infer first-class capability from an installed command. Before considering backend promotion, run `scripts/darktable_probe.py` against a disposable sentinel RAW and require a `passed` `lumenflow.darktable_probe.v1` report. Probe success is necessary but not sufficient: the state-bound preview provider and EditIntent compiler must also exist.
+darktable has a first-class but deliberately narrow exact-XMP-replay path. It can produce a state-bound preview from an explicit XMP, compile an EditIntent that requests no dynamic adjustments and preserves the existing crop, then render the same fingerprinted XMP through an isolated execution plan and verified receipt. It does not generate darktable module parameters. Reject non-empty global adjustments, crop changes, local adjustments, masks, and catalog writes. Do not infer capability from command availability alone; retain the real-RAW probe and live integration evidence described in `docs/darktable_backend_spike.md`.
 
 Use RawTherapee when:
 
@@ -187,7 +187,7 @@ Use this exact retrieval order:
 - Do not execute a plan without an explicit allowed output root. Refuse source fingerprint drift, path escape, command mismatch, profile hash mismatch, or an existing output file before invoking the backend.
 - Personal examples are references, not presets. Never batch-copy a retrieved example's exposure, white balance, crop, or local edits without inspecting the new photo; keep the store local and do not export it unless the user explicitly asks.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
-- RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
+- RawTherapee is the default dynamic rendering backend. Use darktable only when the requested operation is an exact replay of the explicit XMP bound to the approved preview; dynamic darktable parameter generation remains unsupported. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.
 - Do not crop by default. Cropping is an agent decision and must include a reason.
 - Do not batch-copy crop geometry across photos unless each photo has been separately inspected and the report explains why the same geometry is correct for each frame.

@@ -54,6 +54,40 @@
       ]
     },
     "starting_state": {
+      "oneOf": [
+        {"$ref": "#/$defs/rawtherapee_starting_state"},
+        {"$ref": "#/$defs/darktable_starting_state"}
+      ]
+    },
+    "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "state_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256", "size_bytes"],
+        "properties": {
+          "role": {"enum": ["base_profile", "source_sidecar", "develop_xmp"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "state_completeness": {"enum": ["complete", "partial"]},
+    "command": {"type": "string", "minLength": 1},
+    "command_argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "selection_reason": {"type": "string"},
+    "status": {"enum": ["dry_run", "success", "failed"]},
+    "failure_reason": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "rawtherapee_starting_state": {
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "profile_stack", "uses_engine_default"],
@@ -75,34 +109,23 @@
         "uses_engine_default": {"type": "boolean"}
       }
     },
-    "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "state_inputs": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["role", "path", "sha256", "size_bytes"],
-        "properties": {
-          "role": {"enum": ["base_profile", "source_sidecar"]},
-          "path": {"type": "string", "minLength": 1},
-          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-          "size_bytes": {"type": "integer", "minimum": 0}
-        }
+    "darktable_starting_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "xmp", "uses_engine_default", "library", "write_sidecars"],
+      "properties": {
+        "kind": {"const": "darktable_xmp"},
+        "xmp": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/file_fingerprint"}
+          ]
+        },
+        "uses_engine_default": {"type": "boolean"},
+        "library": {"const": ":memory:"},
+        "write_sidecars": {"const": false}
       }
     },
-    "state_completeness": {"enum": ["complete", "partial"]},
-    "command": {"type": "string", "minLength": 1},
-    "command_argv": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"type": "string"}
-    },
-    "selection_reason": {"type": "string"},
-    "status": {"enum": ["dry_run", "success", "failed"]},
-    "failure_reason": {"type": "string"},
-    "generated_at": {"type": "string", "format": "date-time"}
-  },
-  "$defs": {
     "file_fingerprint": {
       "type": "object",
       "additionalProperties": false,

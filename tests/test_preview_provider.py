@@ -16,6 +16,105 @@ import preview_provider  # noqa: E402
 
 
 class PreviewProviderTests(unittest.TestCase):
+    def test_darktable_preview_binds_explicit_xmp_and_isolates_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "keeper.DNG"
+            xmp = root / "keeper.DNG.xmp"
+            output = root / "previews" / "keeper.jpg"
+            raw.write_bytes(b"raw-v1")
+            xmp.write_text("<x:xmpmeta>develop-v1</x:xmpmeta>", encoding="utf-8")
+
+            provider = preview_provider.DarktablePreviewProvider(
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}}
+            )
+            artifact = provider.create_preview(
+                preview_provider.PreviewRequest(
+                    source=raw,
+                    output=output,
+                    base_profile=xmp,
+                    dry_run=True,
+                    timeout=10,
+                    selection_reason="rating>=3",
+                )
+            ).to_dict()
+
+            self.assertEqual(artifact["provider"]["id"], "darktable")
+            self.assertEqual(artifact["state_completeness"], "complete")
+            self.assertEqual(artifact["starting_state"]["kind"], "darktable_xmp")
+            self.assertEqual(artifact["starting_state"]["xmp"]["sha256"], hashlib.sha256(xmp.read_bytes()).hexdigest())
+            self.assertEqual(artifact["state_inputs"][0]["role"], "develop_xmp")
+            self.assertEqual(artifact["state_inputs"][0]["path"], str(xmp))
+            self.assertEqual(artifact["command_argv"][:4], ["/custom/darktable-cli", str(raw), str(xmp), str(output)])
+            self.assertIn("--configdir", artifact["command_argv"])
+            self.assertIn("--cachedir", artifact["command_argv"])
+            self.assertIn(":memory:", artifact["command_argv"])
+            self.assertIn("write_sidecar_files=never", artifact["command_argv"])
+            self.assertFalse(output.parent.exists())
+
+    def test_darktable_preview_fails_if_source_sidecar_changes_during_render(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "keeper.DNG"
+            xmp = root / "keeper.DNG.xmp"
+            output = root / "previews" / "keeper.jpg"
+            raw.write_bytes(b"raw-v1")
+            xmp.write_text("develop-v1", encoding="utf-8")
+
+            def fake_runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
+                del command, dry_run, timeout
+                xmp.write_text("develop-v2", encoding="utf-8")
+                output.write_bytes(b"jpeg-result")
+                return 0
+
+            artifact = preview_provider.DarktablePreviewProvider(runner=fake_runner).create_preview(
+                preview_provider.PreviewRequest(
+                    source=raw,
+                    output=output,
+                    base_profile=xmp,
+                    dry_run=False,
+                    timeout=10,
+                )
+            )
+
+            self.assertEqual(artifact.status, "failed")
+            self.assertIn("state changed", artifact.failure_reason)
+            self.assertIsNone(artifact.preview_fingerprint)
+
+    def test_darktable_preview_refuses_to_overwrite_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "keeper.DNG"
+            output = root / "keeper.jpg"
+            raw.write_bytes(b"raw")
+            output.write_bytes(b"existing")
+            calls: list[list[str]] = []
+
+            def fake_runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
+                del dry_run, timeout
+                calls.append(command)
+                return 0
+
+            artifact = preview_provider.DarktablePreviewProvider(runner=fake_runner).create_preview(
+                preview_provider.PreviewRequest(
+                    source=raw,
+                    output=output,
+                    base_profile=None,
+                    dry_run=False,
+                    timeout=10,
+                )
+            )
+
+            self.assertEqual(artifact.status, "failed")
+            self.assertIn("overwrite", artifact.failure_reason.lower())
+            self.assertEqual(output.read_bytes(), b"existing")
+            self.assertEqual(calls, [])
+
+    def test_darktable_factory_returns_the_live_verified_provider(self) -> None:
+        provider = preview_provider.create_preview_provider("darktable")
+
+        self.assertIsInstance(provider, preview_provider.DarktablePreviewProvider)
+
     def test_rawtherapee_artifact_binds_source_and_starting_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

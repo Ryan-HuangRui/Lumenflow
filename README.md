@@ -4,7 +4,7 @@
 
 Lumenflow 把“审美判断”交给具备视觉能力的 agent，把扫描、预览、合同校验、渲染和审计交给确定性代码。它不是另一个照片管理器，也不是一组固定滤镜；它是一套可移植的 agent skills、JSON 合同和本地工具链。
 
-> 当前状态：可用于本地实验和个人工作流。RawTherapee 是目前唯一的一等渲染后端；darktable 与 Lightroom 仍处于受限兼容/验证阶段。项目尚未发布稳定版本。
+> 当前状态：可用于本地实验和个人工作流。RawTherapee 是目前唯一支持动态 EditIntent 参数编译的一等后端；darktable 提供经过真实 RAW 验证的受限 XMP 重放链路；Lightroom 仍处于 fail-closed 验证阶段。项目尚未发布稳定版本。
 
 ## 目录
 
@@ -227,7 +227,7 @@ python scripts/review_loop.py advance \
 | 后端 | 当前定位 | 预览 | EditIntent v2 | 真实执行 |
 | --- | --- | --- | --- | --- |
 | RawTherapee | 推荐的一等后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 | 支持 |
-| darktable | legacy/实验路径 | 尚无一等状态绑定 provider | 尚无编译器 | 仅在隔离探针通过后评估，不自动升级能力 |
+| darktable | 受限的一等 XMP 重放后端 | 支持显式 XMP 状态绑定 | 仅支持精确重放预览绑定的 XMP | 支持隔离执行和验证收据 |
 | Lightroom Classic | 交互式兼容路径 | 尚未完成可信状态绑定 | 仍使用旧 `adjustment_plan.v1` 路径 | 默认 fail-closed；当前只应 dry-run |
 
 后端能力由 `lumenflow.backend_capabilities.v1` 明确声明为 `supported`、`unsupported` 或 `unverified`。命令存在不等于能力已经安全可用：
@@ -238,7 +238,7 @@ python scripts/backend_capabilities.py darktable
 python scripts/backend_capabilities.py lightroom --probe
 ```
 
-darktable 的隔离验证方法见 [`docs/darktable_backend_spike.md`](docs/darktable_backend_spike.md)。Lightroom 只有在 CLI Bridge 对对象级读取、写入、导出和状态绑定预览完成真机验证后，才会开放非 dry-run 自动写入。
+darktable 的隔离验证方法和真实 RAW 证据见 [`docs/darktable_backend_spike.md`](docs/darktable_backend_spike.md)。它尚不能把新的曝光、颜色、裁剪或蒙版意图编译为 darktable 模块；这些能力会明确拒绝，而不是退回隐式参数。Lightroom 只有在 CLI Bridge 对对象级读取、写入、导出和状态绑定预览完成真机验证后，才会开放非 dry-run 自动写入。
 
 ## 架构与数据合同
 
@@ -357,7 +357,7 @@ Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“�
 
 ### 可以用 darktable 替代 RawTherapee 吗？
 
-目前不能作为等价的一等后端。仓库提供隔离 RAW 导出探针和 legacy 命令路径，但还缺少状态绑定预览 provider、EditIntent 编译器和完整收据能力。
+可以用于一个经过验证的窄场景：状态绑定预览并精确重放已有 darktable XMP，通过隔离 CLI 执行后生成验证收据。它仍不能替代 RawTherapee 的动态修图主路径，因为新的曝光、颜色、裁剪和蒙版意图尚未映射为 darktable 模块。
 
 ### 依赖检查通过，但某个可选流程仍不可用？
 

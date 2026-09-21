@@ -95,12 +95,15 @@ class BackendCapabilitiesTests(unittest.TestCase):
         self.assertEqual(contract.capability("preview.state_bound").state, "unverified")
         self.assertIn("unsupported bridge protocol", contract.capability("preview.state_bound").reason)
 
-    def test_darktable_contract_is_explicitly_legacy_only(self) -> None:
+    def test_darktable_contract_exposes_only_the_live_verified_xmp_replay_slice(self) -> None:
         contract = backend_capabilities.backend_capabilities_for("darktable")
 
         self.assertEqual(contract.require("render.legacy").state, "supported")
-        self.assertEqual(contract.capability("intent.compile.v2").state, "unsupported")
-        self.assertEqual(contract.capability("preview.state_bound").state, "unsupported")
+        self.assertEqual(contract.require("intent.compile.v2").state, "supported")
+        self.assertEqual(contract.require("preview.state_bound").state, "supported")
+        self.assertEqual(contract.require("state.read").state, "supported")
+        self.assertEqual(contract.require("render").state, "supported")
+        self.assertEqual(contract.require("export.verified").state, "supported")
 
     def test_contract_schema_is_strict_and_versioned(self) -> None:
         schema = json.loads(

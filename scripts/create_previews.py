@@ -106,7 +106,11 @@ def main() -> None:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--render-timeout", type=int, default=300)
-    parser.add_argument("--provider", choices=["rawtherapee", "lightroom"], default="rawtherapee")
+    parser.add_argument(
+        "--provider",
+        choices=["rawtherapee", "darktable", "lightroom"],
+        default="rawtherapee",
+    )
     parser.add_argument("--base-profile", type=Path, default=Path("knowledge/raw_profiles/base.pp3"))
     parser.add_argument("--local-config", type=Path, default=lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH)
     args = parser.parse_args()

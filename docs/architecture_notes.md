@@ -91,11 +91,11 @@ Preview generation is a backend boundary, not a loose JPEG helper. A downstream 
 
 ### Backend capability boundary
 
-Every backend publishes `lumenflow.backend_capabilities.v1` before later compiler and execution layers make a decision. Capability names and states are closed sets. `supported` permits execution, `unsupported` is a deterministic product limitation, and `unverified` requires runtime evidence rather than fallback or optimistic execution. RawTherapee, Lightroom, and the legacy darktable path declare the same capability keys so orchestration can compare them without backend-specific conditionals.
+Every backend publishes `lumenflow.backend_capabilities.v1` before later compiler and execution layers make a decision. Capability names and states are closed sets. `supported` permits execution, `unsupported` is a deterministic product limitation, and `unverified` requires runtime evidence rather than fallback or optimistic execution. RawTherapee, Lightroom, and the narrow darktable XMP-replay adapter declare the same capability keys so orchestration can compare them without backend-specific conditionals.
 
 Lightroom capabilities are derived from the live versioned bridge contract. Protocol or version mismatch invalidates all runtime evidence even when individual capability flags are true. RawTherapee capabilities are static for the current profile-based adapter. Darktable intentionally advertises only `render.legacy` until the isolated dynamic-module spike succeeds.
 
-The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe.v1`. It runs a real RAW export with a temporary config/cache, an in-memory library, and sidecar writes disabled, then compares RAW and sidecar state and fingerprints the output. A command/version check alone is inconclusive. Probe success is necessary evidence but does not itself promote a capability; the state-bound preview provider, compiler, receipt adapter, and regression fixtures must exist before the static contract changes.
+The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe.v1`. It runs a real RAW export with a temporary config/cache, an in-memory library, and sidecar writes disabled, then compares RAW and sidecar state and fingerprints the output. A command/version check alone is inconclusive. The verified adapter also includes a state-bound preview provider, an exact-XMP-replay compiler, a receipt adapter, and live regression evidence. Only that narrow slice is promoted; dynamic exposure/color modules, crop, masks, and catalog writes remain unsupported.
 
 ### Intent, compilation, and execution
 

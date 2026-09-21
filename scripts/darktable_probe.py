@@ -10,7 +10,7 @@ import re
 import subprocess
 import tempfile
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -47,7 +47,7 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _fingerprint(path: Path) -> dict[str, Any]:

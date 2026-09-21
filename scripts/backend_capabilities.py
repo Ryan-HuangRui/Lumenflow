@@ -191,15 +191,37 @@ def rawtherapee_capabilities() -> BackendCapabilities:
 def darktable_capabilities() -> BackendCapabilities:
     return _contract(
         "darktable",
-        "darktable-legacy-v1",
+        "darktable-isolated-xmp-v1",
         {
-            "preview.state_bound": _unsupported("No state-bound darktable preview provider exists yet"),
-            "state.read": _unsupported("Full darktable history-stack reads are not implemented"),
+            "preview.state_bound": _supported(
+                "A real RAW preview passed with an explicit fingerprinted XMP and isolated darktable runtime",
+                "adapter=darktable-isolated-xmp-v1",
+                "darktable-cli=5.4.1",
+                "probe=darktable_probe_7a4a7a02494044ceb2141c26199a8805",
+            ),
+            "state.read": _supported(
+                "Explicit darktable XMP inputs were fingerprinted and remained unchanged across a real RAW preview",
+                "state=explicit-xmp-or-engine-default",
+                "darktable-cli=5.4.1",
+            ),
             "plan.compile.v1": _unsupported("adjustment_plan.v1 is not compiled to darktable modules"),
-            "intent.compile.v2": _unsupported("EditIntent v2 compiler is not implemented yet"),
-            "render": _unsupported("First-class isolated darktable rendering is not implemented"),
+            "intent.compile.v2": _supported(
+                "EditIntent v2 can safely replay an exact preview-bound XMP; dynamic module compilation is rejected",
+                "compiler=lumenflow.darktable-xmp-replay@1",
+            ),
+            "render": _supported(
+                "darktable-cli passed isolated real-RAW exports with source and sidecar preservation",
+                "executor=execution_plan.v1",
+                "darktable-cli=5.4.1",
+                "probe=darktable_probe_7a4a7a02494044ceb2141c26199a8805",
+            ),
             "render.legacy": _supported("Legacy style or XMP command construction remains available"),
-            "export.verified": _unsupported("Legacy exports do not emit verified receipts"),
+            "export.verified": _supported(
+                "A real XMP-replay execution emitted a successful v1 receipt with source/output fingerprints",
+                "receipt=execution_receipt.v1",
+                "darktable-cli=5.4.1",
+                "sentinel_sha256=b8979553ec61b579c2600787e62d9e10885645358e07bafbd6c58cddc84cce4e",
+            ),
             "develop.write.verified": _unsupported("Catalog develop writes are outside the legacy path"),
             "composition.crop": _unsupported("Dynamic crop compilation is not implemented"),
             "mask.ai": _unsupported("AI mask compilation is not implemented"),
