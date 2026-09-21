@@ -95,6 +95,93 @@
               }
             }
           }
+        },
+        "rawtherapee": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile_version", "sections"],
+          "properties": {
+            "profile_version": {"const": 349},
+            "sections": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "properties": {
+                "RAW": {
+                  "$ref": "#/$defs/native_sections/RAW"
+                },
+                "RAW Bayer": {
+                  "$ref": "#/$defs/native_sections/RAW_Bayer"
+                },
+                "HLRecovery": {
+                  "$ref": "#/$defs/native_sections/HLRecovery"
+                },
+                "Exposure": {
+                  "$ref": "#/$defs/native_sections/Exposure"
+                },
+                "White Balance": {
+                  "$ref": "#/$defs/native_sections/White_Balance"
+                },
+                "Color appearance": {
+                  "$ref": "#/$defs/native_sections/Color_appearance"
+                },
+                "Directional Pyramid Denoising": {
+                  "$ref": "#/$defs/native_sections/Directional_Pyramid_Denoising"
+                },
+                "Vibrance": {
+                  "$ref": "#/$defs/native_sections/Vibrance"
+                },
+                "Shadows & Highlights": {
+                  "$ref": "#/$defs/native_sections/Shadows_Highlights"
+                },
+                "Sharpening": {
+                  "$ref": "#/$defs/native_sections/Sharpening"
+                },
+                "SharpenEdge": {
+                  "$ref": "#/$defs/native_sections/SharpenEdge"
+                },
+                "SharpenMicro": {
+                  "$ref": "#/$defs/native_sections/SharpenMicro"
+                },
+                "PostDemosaicSharpening": {
+                  "$ref": "#/$defs/native_sections/PostDemosaicSharpening"
+                },
+                "LensProfile": {
+                  "$ref": "#/$defs/native_sections/LensProfile"
+                },
+                "Distortion": {
+                  "$ref": "#/$defs/native_sections/Distortion"
+                },
+                "CACorrection": {
+                  "$ref": "#/$defs/native_sections/CACorrection"
+                },
+                "Rotation": {
+                  "$ref": "#/$defs/native_sections/Rotation"
+                },
+                "Perspective": {
+                  "$ref": "#/$defs/native_sections/Perspective"
+                },
+                "Crop": {
+                  "$ref": "#/$defs/native_sections/Crop"
+                },
+                "Resize": {
+                  "$ref": "#/$defs/native_sections/Resize"
+                },
+                "Color Management": {
+                  "$ref": "#/$defs/native_sections/Color_Management"
+                },
+                "Coarse Transformation": {
+                  "$ref": "#/$defs/native_sections/Coarse_Transformation"
+                },
+                "Impulse Denoising": {
+                  "$ref": "#/$defs/native_sections/Impulse_Denoising"
+                },
+                "EPD": {
+                  "$ref": "#/$defs/native_sections/EPD"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -160,6 +247,336 @@
     }
   },
   "$defs": {
+    "native_bool": {"type": "boolean"},
+    "native_curve": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 256,
+      "pattern": "^[0-3](?:;[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)){0,34};$"
+    },
+    "native_sections": {
+      "RAW": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "CA": {"$ref": "#/$defs/native_bool"},
+          "CAAvoidColourshift": {"$ref": "#/$defs/native_bool"},
+          "CAAutoIterations": {"type": "integer", "minimum": 0, "maximum": 20},
+          "CARed": {"type": "number", "minimum": -100, "maximum": 100},
+          "CABlue": {"type": "number", "minimum": -100, "maximum": 100},
+          "HotPixelFilter": {"$ref": "#/$defs/native_bool"},
+          "DeadPixelFilter": {"$ref": "#/$defs/native_bool"},
+          "HotDeadPixelThresh": {"type": "integer", "minimum": 0, "maximum": 10000},
+          "PreExposure": {"type": "number", "minimum": 0, "maximum": 10}
+        }
+      },
+      "RAW_Bayer": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Method": {"enum": ["amaze", "ahd", "eahd", "hphd", "dcb", "lmmse", "igv", "vng4", "rcd", "pixelshift"]},
+          "Border": {"type": "integer", "minimum": 0, "maximum": 64},
+          "DCBIterations": {"type": "integer", "minimum": 0, "maximum": 10},
+          "DCBEnhance": {"$ref": "#/$defs/native_bool"},
+          "LMMSEIterations": {"type": "integer", "minimum": 0, "maximum": 10},
+          "DualDemosaicAutoContrast": {"$ref": "#/$defs/native_bool"},
+          "DualDemosaicContrast": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "HLRecovery": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Method": {"enum": ["Coloropp", "Luminance", "Inpaint", "Inpaint opposed"]},
+          "Hlbl": {"type": "number", "minimum": 0, "maximum": 100},
+          "Hlth": {"type": "number", "minimum": 0, "maximum": 100}
+        }
+      },
+      "Exposure": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Compensation": {"type": "number", "minimum": -5, "maximum": 5},
+          "Brightness": {"type": "number", "minimum": -100, "maximum": 100},
+          "Contrast": {"type": "number", "minimum": -100, "maximum": 100},
+          "Saturation": {"type": "number", "minimum": -100, "maximum": 100},
+          "Black": {"type": "number", "minimum": -1000, "maximum": 1000},
+          "HighlightCompr": {"type": "number", "minimum": 0, "maximum": 100},
+          "HighlightComprThreshold": {"type": "number", "minimum": 0, "maximum": 100},
+          "ShadowCompr": {"type": "number", "minimum": -100, "maximum": 100},
+          "CurveMode": {"$ref": "#/$defs/native_curve_mode"},
+          "CurveMode2": {"$ref": "#/$defs/native_curve_mode"},
+          "Curve": {"$ref": "#/$defs/native_curve"},
+          "Curve2": {"$ref": "#/$defs/native_curve"},
+          "Auto": {"$ref": "#/$defs/native_bool"},
+          "HistogramMatching": {"$ref": "#/$defs/native_bool"},
+          "ClampOOG": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "White_Balance": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Setting": {"enum": ["Camera", "Auto", "Custom"]},
+          "Temperature": {"type": "number", "minimum": 1000, "maximum": 50000},
+          "Green": {"type": "number", "minimum": 0, "maximum": 5},
+          "TemperatureBias": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "Color_appearance": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Degree": {"type": "number", "minimum": 0, "maximum": 360},
+          "AutoDegree": {"$ref": "#/$defs/native_bool"},
+          "Degreeout": {"type": "number", "minimum": 0, "maximum": 360},
+          "AutoDegreeout": {"$ref": "#/$defs/native_bool"},
+          "AdaptLum": {"type": "number", "minimum": 0, "maximum": 100},
+          "Badpixsl": {"type": "number", "minimum": 0, "maximum": 100},
+          "J-Light": {"type": "number", "minimum": -100, "maximum": 100},
+          "Q-Bright": {"type": "number", "minimum": -100, "maximum": 100},
+          "C-Chroma": {"type": "number", "minimum": -100, "maximum": 100},
+          "S-Chroma": {"type": "number", "minimum": -100, "maximum": 100},
+          "M-Chroma": {"type": "number", "minimum": -100, "maximum": 100},
+          "J-Contrast": {"type": "number", "minimum": -100, "maximum": 100},
+          "Q-Contrast": {"type": "number", "minimum": -100, "maximum": 100},
+          "H-Hue": {"type": "number", "minimum": -100, "maximum": 100},
+          "RSTProtection": {"type": "number", "minimum": 0, "maximum": 100},
+          "AdaptScene": {"type": "number", "minimum": 0, "maximum": 10000},
+          "AutoAdapscen": {"$ref": "#/$defs/native_bool"},
+          "YbScene": {"type": "number", "minimum": 0, "maximum": 100},
+          "Autoybscen": {"$ref": "#/$defs/native_bool"},
+          "Gamut": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Directional_Pyramid_Denoising": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Enhance": {"$ref": "#/$defs/native_bool"},
+          "Median": {"$ref": "#/$defs/native_bool"},
+          "Luma": {"type": "number", "minimum": 0, "maximum": 100},
+          "Ldetail": {"type": "number", "minimum": 0, "maximum": 100},
+          "Chroma": {"type": "number", "minimum": 0, "maximum": 100},
+          "AutoGain": {"$ref": "#/$defs/native_bool"},
+          "Gamma": {"type": "number", "minimum": 0.1, "maximum": 10},
+          "Passes": {"type": "integer", "minimum": 1, "maximum": 5}
+        }
+      },
+      "Vibrance": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Pastels": {"type": "number", "minimum": -100, "maximum": 100},
+          "Saturated": {"type": "number", "minimum": -100, "maximum": 100},
+          "ProtectSkins": {"$ref": "#/$defs/native_bool"},
+          "AvoidColorShift": {"$ref": "#/$defs/native_bool"},
+          "PastSatTog": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Shadows_Highlights": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Highlights": {"type": "number", "minimum": -100, "maximum": 100},
+          "HighlightTonalWidth": {"type": "number", "minimum": 0, "maximum": 100},
+          "Shadows": {"type": "number", "minimum": -100, "maximum": 100},
+          "ShadowTonalWidth": {"type": "number", "minimum": 0, "maximum": 100},
+          "Radius": {"type": "number", "minimum": 0, "maximum": 100},
+          "Lab": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Sharpening": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Contrast": {"type": "number", "minimum": 0, "maximum": 100},
+          "Method": {"enum": ["usm", "rl", "deconv"]},
+          "Radius": {"type": "number", "minimum": 0, "maximum": 10},
+          "BlurRadius": {"type": "number", "minimum": 0, "maximum": 10},
+          "Amount": {"type": "number", "minimum": 0, "maximum": 1000},
+          "OnlyEdges": {"$ref": "#/$defs/native_bool"},
+          "EdgedetectionRadius": {"type": "number", "minimum": 0, "maximum": 20},
+          "EdgeTolerance": {"type": "number", "minimum": 0, "maximum": 10000},
+          "HalocontrolEnabled": {"$ref": "#/$defs/native_bool"},
+          "HalocontrolAmount": {"type": "number", "minimum": 0, "maximum": 100},
+          "DeconvRadius": {"type": "number", "minimum": 0, "maximum": 10},
+          "DeconvAmount": {"type": "number", "minimum": 0, "maximum": 1000},
+          "DeconvDamping": {"type": "number", "minimum": 0, "maximum": 100},
+          "DeconvIterations": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      },
+      "SharpenEdge": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Passes": {"type": "integer", "minimum": 1, "maximum": 10},
+          "Strength": {"type": "number", "minimum": 0, "maximum": 100},
+          "ThreeChannels": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "SharpenMicro": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Matrix": {"$ref": "#/$defs/native_bool"},
+          "Strength": {"type": "number", "minimum": 0, "maximum": 100},
+          "Contrast": {"type": "number", "minimum": 0, "maximum": 100},
+          "Uniformity": {"type": "number", "minimum": 0, "maximum": 10}
+        }
+      },
+      "PostDemosaicSharpening": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Contrast": {"type": "number", "minimum": 0, "maximum": 100},
+          "AutoContrast": {"$ref": "#/$defs/native_bool"},
+          "AutoRadius": {"$ref": "#/$defs/native_bool"},
+          "DeconvRadius": {"type": "number", "minimum": 0, "maximum": 10},
+          "DeconvRadiusOffset": {"type": "number", "minimum": -10, "maximum": 10},
+          "DeconvIterCheck": {"$ref": "#/$defs/native_bool"},
+          "DeconvIterations": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      },
+      "LensProfile": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "LcMode": {"enum": ["none", "lfauto", "lfmanual", "lcp", "metadata"]},
+          "UseDistortion": {"$ref": "#/$defs/native_bool"},
+          "UseVignette": {"$ref": "#/$defs/native_bool"},
+          "UseCA": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Distortion": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {"Amount": {"type": "number", "minimum": -100, "maximum": 100}}
+      },
+      "CACorrection": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Red": {"type": "number", "minimum": -100, "maximum": 100},
+          "Blue": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "Rotation": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {"Degree": {"type": "number", "minimum": -180, "maximum": 180}}
+      },
+      "Perspective": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Method": {"enum": ["simple", "camera_based", "control_lines"]},
+          "Horizontal": {"type": "number", "minimum": -100, "maximum": 100},
+          "Vertical": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "Crop": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "X": {"type": "integer", "minimum": -1, "maximum": 100000},
+          "Y": {"type": "integer", "minimum": -1, "maximum": 100000},
+          "W": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "H": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "FixedRatio": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Resize": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Scale": {"type": "number", "minimum": 0.01, "maximum": 10},
+          "Width": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "Height": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "LongEdge": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "ShortEdge": {"type": "integer", "minimum": 1, "maximum": 100000},
+          "AllowUpscaling": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Color_Management": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Gamut": {"$ref": "#/$defs/native_bool"},
+          "OutputProfile": {"enum": ["RTv4_sRGB"]},
+          "OutputProfileIntent": {"enum": ["Relative", "Perceptual", "Saturation", "Absolute"]},
+          "OutputBPC": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Coarse_Transformation": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Rotate": {"enum": [0, 90, 180, 270]},
+          "HorizontalFlip": {"$ref": "#/$defs/native_bool"},
+          "VerticalFlip": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Impulse_Denoising": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Threshold": {"type": "number", "minimum": 0, "maximum": 100}
+        }
+      },
+      "EPD": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Strength": {"type": "number", "minimum": 0, "maximum": 10},
+          "Gamma": {"type": "number", "minimum": 0.1, "maximum": 10},
+          "EdgeStopping": {"type": "number", "minimum": 0, "maximum": 10},
+          "Scale": {"type": "number", "minimum": 0, "maximum": 10},
+          "ReweightingIterates": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      }
+    },
+    "native_curve_mode": {
+      "enum": ["Standard", "FilmLike", "SatAndValueBlending", "WeightedStd", "Luminance", "Perceptual"]
+    },
     "fingerprint": {
       "type": "object",
       "additionalProperties": false,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -93,6 +94,203 @@ Compiler=test
             rawtherapee_pp3.semantic_overrides(
                 {"rawtherapee_native": {"Exposure": {"Compensation": 1}}}
             )
+
+    def test_native_contract_accepts_only_fixture_verified_sections(self) -> None:
+        contract = {
+            "profile_version": 349,
+            "sections": {
+                "RAW": {
+                    "CA": True,
+                    "CAAutoIterations": 2,
+                    "CAAvoidColourshift": True,
+                },
+                "RAW Bayer": {"Method": "rcd"},
+                "HLRecovery": {"Enabled": True, "Method": "Luminance"},
+                "Exposure": {
+                    "Compensation": 0.35,
+                    "Brightness": 4,
+                    "Contrast": 12,
+                    "Saturation": -4,
+                    "Black": 20,
+                    "HighlightCompr": 24,
+                    "HighlightComprThreshold": 18,
+                    "ShadowCompr": 18,
+                    "CurveMode": "Standard",
+                    "Curve": "3;0;0;0.35;0.2;0.7;0.85;1;1;",
+                },
+                "White Balance": {
+                    "Enabled": True,
+                    "Setting": "Custom",
+                    "Temperature": 5200,
+                    "Green": 1.01,
+                },
+                "Color appearance": {
+                    "Enabled": True,
+                    "Q-Contrast": 20,
+                    "Q-Bright": -10,
+                    "J-Light": 10,
+                    "C-Chroma": 12,
+                },
+                "Directional Pyramid Denoising": {
+                    "Enabled": True,
+                    "Luma": 35,
+                    "Ldetail": 20,
+                    "Chroma": 25,
+                    "Gamma": 2.0,
+                    "Passes": 1,
+                },
+                "Vibrance": {"Enabled": True, "Pastels": 20, "Saturated": 10},
+                "Shadows & Highlights": {
+                    "Enabled": True,
+                    "Highlights": 15,
+                    "HighlightTonalWidth": 70,
+                    "Shadows": 20,
+                    "ShadowTonalWidth": 30,
+                    "Radius": 20,
+                },
+                "Sharpening": {
+                    "Enabled": True,
+                    "Contrast": 50,
+                    "Radius": 1.0,
+                    "Amount": 250,
+                },
+                "Distortion": {"Amount": 35},
+                "LensProfile": {
+                    "LcMode": "lfauto",
+                    "UseDistortion": True,
+                    "UseVignette": True,
+                    "UseCA": True,
+                },
+                "Rotation": {"Degree": 2.0},
+                "Perspective": {"Horizontal": 5.0, "Vertical": -3.0},
+                "Coarse Transformation": {"Rotate": 90, "HorizontalFlip": False},
+                "Crop": {"Enabled": True, "X": 0, "Y": 0, "W": 4000, "H": 3000},
+                "Resize": {"Enabled": True, "Scale": 0.5, "AllowUpscaling": False},
+                "Color Management": {
+                    "Gamut": True,
+                    "OutputProfile": "RTv4_sRGB",
+                    "OutputProfileIntent": "Relative",
+                    "OutputBPC": True,
+                },
+            },
+        }
+
+        normalized = rawtherapee_pp3.validate_native_sections(contract)
+        overrides = rawtherapee_pp3.native_sections_to_overrides(normalized)
+
+        self.assertEqual(normalized["profile_version"], 349)
+        self.assertEqual(overrides["RAW"]["CA"], True)
+        self.assertEqual(overrides["Exposure"]["Curve"], contract["sections"]["Exposure"]["Curve"])
+        self.assertEqual(overrides["White Balance"]["Temperature"], 5200)
+        self.assertEqual(overrides["Vibrance"]["Pastels"], 20)
+        self.assertEqual(overrides["Shadows & Highlights"]["Highlights"], 15)
+        self.assertEqual(overrides["Perspective"]["Horizontal"], 5.0)
+        self.assertEqual(overrides["Coarse Transformation"]["Rotate"], 90)
+        self.assertEqual(overrides["Resize"]["Scale"], 0.5)
+
+    def test_native_contract_fails_closed_for_unknown_fields_and_bad_values(self) -> None:
+        base = {"profile_version": 349, "sections": {"RAW": {"CA": True}}}
+        cases = [
+            {**base, "profile_version": 348},
+            {"profile_version": 349, "sections": {"Unknown": {"Enabled": True}}},
+            {"profile_version": 349, "sections": {"RAW": {"Unknown": True}}},
+            {"profile_version": 349, "sections": {"RAW": {"CA": 1}}},
+            {"profile_version": 349, "sections": {"RAW": {"CAAutoIterations": 21}}},
+            {
+                "profile_version": 349,
+                "sections": {"Exposure": {"CurveMode": "invented"}},
+            },
+            {
+                "profile_version": 349,
+                "sections": {"Exposure": {"Curve": "3;0;2;1;1;"}},
+            },
+            {
+                "profile_version": 349,
+                "sections": {"Coarse Transformation": {"Rotate": 45}},
+            },
+        ]
+        for case in cases:
+            with self.subTest(case=case), self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
+                rawtherapee_pp3.validate_native_sections(case)
+
+    def test_native_boundary_values_match_schema_and_runtime(self) -> None:
+        schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "edit_intent.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        section_properties = schema["properties"]["style"]["properties"]["rawtherapee"][
+            "properties"
+        ]["sections"]["properties"]
+        boundaries = {
+            ("Directional Pyramid Denoising", "Gamma"): 0.1,
+            ("Resize", "Scale"): 0.01,
+            ("EPD", "Gamma"): 0.1,
+            ("EPD", "Scale"): 0.0,
+        }
+        for (section, key), minimum in boundaries.items():
+            with self.subTest(section=section, key=key):
+                runtime_spec = rawtherapee_pp3.RAWTHERAPEE_NATIVE_FIELD_SPECS[section][key]
+                self.assertEqual(runtime_spec.minimum, minimum)
+
+                section_schema = schema
+                ref_path = section_properties[section]["$ref"].removeprefix("#/")
+                for component in ref_path.split("/"):
+                    section_schema = section_schema[component]
+                field_schema = section_schema["properties"][key]
+                self.assertEqual(field_schema["minimum"], minimum)
+                self.assertNotIn("exclusiveMinimum", field_schema)
+
+                contract = {
+                    "profile_version": 349,
+                    "sections": {section: {key: minimum}},
+                }
+                normalized = rawtherapee_pp3.validate_native_sections(contract)
+                self.assertEqual(normalized["sections"][section][key], minimum)
+
+    def test_output_profile_allowlist_matches_live_verified_icc_name(self) -> None:
+        schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "edit_intent.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        color_management_ref = schema["properties"]["style"]["properties"]["rawtherapee"][
+            "properties"
+        ]["sections"]["properties"]["Color Management"]["$ref"]
+        color_management_schema = schema
+        for component in color_management_ref.removeprefix("#/").split("/"):
+            color_management_schema = color_management_schema[component]
+
+        expected = ("RTv4_sRGB",)
+        runtime_spec = rawtherapee_pp3.RAWTHERAPEE_NATIVE_FIELD_SPECS["Color Management"][
+            "OutputProfile"
+        ]
+        self.assertEqual(runtime_spec.choices, expected)
+        self.assertEqual(
+            tuple(color_management_schema["properties"]["OutputProfile"]["enum"]),
+            expected,
+        )
+        for unsupported in ("sRGB", "Adobe RGB", "ProPhoto", "Rec2020"):
+            with self.subTest(unsupported=unsupported), self.assertRaises(
+                rawtherapee_pp3.PP3UnsupportedValue
+            ):
+                rawtherapee_pp3.validate_native_sections(
+                    {
+                        "profile_version": 349,
+                        "sections": {"Color Management": {"OutputProfile": unsupported}},
+                    }
+                )
+
+    def test_native_contract_rejects_empty_and_mutually_conflicting_input_shapes(self) -> None:
+        for value in (
+            None,
+            {},
+            {"profile_version": 349},
+            {"profile_version": 349, "sections": {}},
+            {"profile_version": 349, "sections": {"RAW": {}}},
+        ):
+            with self.subTest(value=value), self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
+                rawtherapee_pp3.validate_native_sections(value)
 
     def test_semantic_mapping_rejects_unknown_fields(self) -> None:
         with self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
