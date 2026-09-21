@@ -61,9 +61,9 @@ tests before it is exposed to agents.
 options:
 
 - JPEG quality 1–100 and chroma subsampling 1/2/3;
-- PNG 8/16-bit;
+- PNG 8/16-bit integer;
 - uncompressed or deflate-compressed TIFF;
-- TIFF/PNG 8-bit integer, 16-bit integer, 16-bit float, or 32-bit float.
+- TIFF 8-bit integer, 16-bit integer, 16-bit float, or 32-bit float.
 
 The current `EditIntent v2` default remains JPEG for compatibility.  Final
 export callers can request the other containers through the renderer command
