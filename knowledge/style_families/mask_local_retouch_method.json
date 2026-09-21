@@ -1,0 +1,67 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "mask_local_retouch_method",
+  "style_name": "蒙版局部修图方法论",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "method_family",
+  "parent_family": "editing_method",
+  "active_for_photo_matching": false,
+  "description": "蒙版、画笔、径向、渐变等局部调整方法，用于辅助视觉风格落地。",
+  "suitable_scenes": [
+    "需要主体提亮",
+    "背景压暗",
+    "局部色彩修正",
+    "质感增强"
+  ],
+  "avoid_scenes": [
+    "全局调整已足够的照片"
+  ],
+  "visual_features": {
+    "tone": "local tone correction",
+    "color": "local color cleanup",
+    "contrast": "selective contrast",
+    "texture": "localized detail control"
+  },
+  "tone_guidance": {
+    "overall": "local tone correction",
+    "contrast": "selective contrast",
+    "texture": "localized detail control"
+  },
+  "color_guidance": {
+    "overall": "local color cleanup",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "hsl_color_cleanup",
+    "local_adjustments",
+    "exposure_and_basic_tone",
+    "detail_and_texture",
+    "tone_curve",
+    "color_grading",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "蒙版是执行手段，不应替代风格判断。",
+    "每个局部调整都应记录作用对象和原因。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 3,
+    "category_counts": {
+      "basic_tone": 29,
+      "color_grading": 1,
+      "hsl_color": 39,
+      "mask_local": 34,
+      "presence_detail": 11,
+      "tone_curve": 6
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

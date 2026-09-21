@@ -1,0 +1,65 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "forest_moss_green",
+  "style_name": "森系墨绿低饱和",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "moody_nature",
+  "active_for_photo_matching": true,
+  "description": "森系、墨绿、低饱和黄绿和深色自然氛围，适合森林、旅行生活方式照片。",
+  "suitable_scenes": [
+    "森林",
+    "草地",
+    "户外生活方式",
+    "旅行故事"
+  ],
+  "avoid_scenes": [
+    "城市霓虹",
+    "高饱和花海",
+    "需要鲜亮绿色的照片"
+  ],
+  "visual_features": {
+    "tone": "deep natural mood",
+    "color": "moss green, muted yellow-green, warm skin",
+    "contrast": "medium with dark greens",
+    "texture": "organic and calm"
+  },
+  "tone_guidance": {
+    "overall": "deep natural mood",
+    "contrast": "medium with dark greens",
+    "texture": "organic and calm"
+  },
+  "color_guidance": {
+    "overall": "moss green, muted yellow-green, warm skin",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "绿色要从鲜绿压向墨绿或黄绿，但不要让植物变成死黑。",
+    "如果有人像，优先保护肤色和脸部亮度。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 1,
+    "category_counts": {
+      "basic_tone": 23,
+      "hsl_color": 12,
+      "mask_local": 1,
+      "tone_curve": 4
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

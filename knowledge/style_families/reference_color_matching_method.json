@@ -1,0 +1,64 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "reference_color_matching_method",
+  "style_name": "综合仿色方法论",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "method_family",
+  "parent_family": "editing_method",
+  "active_for_photo_matching": false,
+  "description": "大师仿色、参考图拆解和色彩底层逻辑的通用方法，不对应单一风格。",
+  "suitable_scenes": [
+    "有明确参考方向的照片",
+    "摄影师风格拆解",
+    "多案例总结"
+  ],
+  "avoid_scenes": [
+    "没有参考目标却强行套色"
+  ],
+  "visual_features": {
+    "tone": "reference-driven",
+    "color": "match dominant reference palette",
+    "contrast": "case-specific",
+    "texture": "case-specific photographer texture"
+  },
+  "tone_guidance": {
+    "overall": "reference-driven",
+    "contrast": "case-specific",
+    "texture": "case-specific photographer texture"
+  },
+  "color_guidance": {
+    "overall": "match dominant reference palette",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "hsl_color_cleanup",
+    "tone_curve",
+    "exposure_and_basic_tone",
+    "color_grading",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先分析参考图的光线、色相和明暗关系，再生成参数。",
+    "参考图思路只能迁移到题材和光线相近的照片。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 3,
+    "category_counts": {
+      "basic_tone": 27,
+      "color_grading": 4,
+      "hsl_color": 52,
+      "mask_local": 1,
+      "tone_curve": 36
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

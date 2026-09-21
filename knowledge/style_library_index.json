@@ -1,0 +1,203 @@
+{
+  "schema_version": "lumenflow.style_library_index.v2",
+  "knowledge_dir": "knowledge/style_families",
+  "styles": [
+    {
+      "style_id": "black_white_street_grain",
+      "style_name": "黑白街头颗粒",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 2,
+      "path": "knowledge/style_families/black_white_street_grain.json"
+    },
+    {
+      "style_id": "blue_hour_travel_night",
+      "style_name": "蓝调时刻旅拍夜景",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 1,
+      "path": "knowledge/style_families/blue_hour_travel_night.json"
+    },
+    {
+      "style_id": "cyan_blue_story_portrait",
+      "style_name": "青蓝故事感人像",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 6,
+      "path": "knowledge/style_families/cyan_blue_story_portrait.json"
+    },
+    {
+      "style_id": "dark_low_saturation_moody",
+      "style_name": "低饱暗调质感",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 6,
+      "path": "knowledge/style_families/dark_low_saturation_moody.json"
+    },
+    {
+      "style_id": "dreamy_pastel_anime",
+      "style_name": "梦幻粉紫动漫感",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 10,
+      "path": "knowledge/style_families/dreamy_pastel_anime.json"
+    },
+    {
+      "style_id": "forest_moss_green",
+      "style_name": "森系墨绿低饱和",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 1,
+      "path": "knowledge/style_families/forest_moss_green.json"
+    },
+    {
+      "style_id": "fuji_kodak_film_simulation",
+      "style_name": "富士柯达胶片模拟",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 8,
+      "path": "knowledge/style_families/fuji_kodak_film_simulation.json"
+    },
+    {
+      "style_id": "japanese_clean_portrait",
+      "style_name": "日系干净人像",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 13,
+      "path": "knowledge/style_families/japanese_clean_portrait.json"
+    },
+    {
+      "style_id": "japanese_film_gray",
+      "style_name": "日系胶片灰",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 15,
+      "path": "knowledge/style_families/japanese_film_gray.json"
+    },
+    {
+      "style_id": "japanese_transparent_backlight",
+      "style_name": "日系通透逆光",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 9,
+      "path": "knowledge/style_families/japanese_transparent_backlight.json"
+    },
+    {
+      "style_id": "korean_soft_portrait",
+      "style_name": "韩系柔和人像",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 4,
+      "path": "knowledge/style_families/korean_soft_portrait.json"
+    },
+    {
+      "style_id": "landscape_blue_green_epic",
+      "style_name": "风光蓝绿大片",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 4,
+      "path": "knowledge/style_families/landscape_blue_green_epic.json"
+    },
+    {
+      "style_id": "landscape_mask_light_rebuild",
+      "style_name": "风光蒙版光影重塑",
+      "role": "method_family",
+      "active_for_photo_matching": false,
+      "tutorial_count": 2,
+      "path": "knowledge/style_families/landscape_mask_light_rebuild.json"
+    },
+    {
+      "style_id": "mask_local_retouch_method",
+      "style_name": "蒙版局部修图方法论",
+      "role": "method_family",
+      "active_for_photo_matching": false,
+      "tutorial_count": 3,
+      "path": "knowledge/style_families/mask_local_retouch_method.json"
+    },
+    {
+      "style_id": "photographer_reference_texture",
+      "style_name": "摄影师仿色质感",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 30,
+      "path": "knowledge/style_families/photographer_reference_texture.json"
+    },
+    {
+      "style_id": "rainy_cinematic_street",
+      "style_name": "雨夜电影街拍",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 3,
+      "path": "knowledge/style_families/rainy_cinematic_street.json"
+    },
+    {
+      "style_id": "reference_color_matching_method",
+      "style_name": "综合仿色方法论",
+      "role": "method_family",
+      "active_for_photo_matching": false,
+      "tutorial_count": 3,
+      "path": "knowledge/style_families/reference_color_matching_method.json"
+    },
+    {
+      "style_id": "rgb_curve_method",
+      "style_name": "RGB曲线方法论",
+      "role": "method_family",
+      "active_for_photo_matching": false,
+      "tutorial_count": 4,
+      "path": "knowledge/style_families/rgb_curve_method.json"
+    },
+    {
+      "style_id": "street_light_shadow_cinematic",
+      "style_name": "街头光影电影感",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 21,
+      "path": "knowledge/style_families/street_light_shadow_cinematic.json"
+    },
+    {
+      "style_id": "urban_neon_night",
+      "style_name": "都市霓虹夜景",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 4,
+      "path": "knowledge/style_families/urban_neon_night.json"
+    },
+    {
+      "style_id": "warm_family_lifestyle",
+      "style_name": "暖调家庭生活",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 2,
+      "path": "knowledge/style_families/warm_family_lifestyle.json"
+    },
+    {
+      "style_id": "warm_sunset_portrait",
+      "style_name": "暖调日落人像",
+      "role": "visual_style",
+      "active_for_photo_matching": true,
+      "tutorial_count": 7,
+      "path": "knowledge/style_families/warm_sunset_portrait.json"
+    }
+  ],
+  "inactive_styles": [
+    "landscape_mask_light_rebuild",
+    "mask_local_retouch_method",
+    "reference_color_matching_method",
+    "rgb_curve_method"
+  ],
+  "counts": {
+    "reusable_knowledge_cards": 22,
+    "source_tutorials_merged": 162,
+    "active_styles": 18,
+    "inactive_styles": 4,
+    "by_role": {
+      "method_family": 4,
+      "visual_style": 18
+    }
+  },
+  "retrieval_policy": {
+    "default": "Choose one reusable semantic style card by scene fit, visual intent, and avoid-scene constraints.",
+    "parameter_policy": "The develop-photos agent must infer concrete parameters after inspecting the target photo; knowledge cards are not fixed presets.",
+    "inactive_policy": "Knowledge with active_for_photo_matching=false is method/workflow/reference material and cannot be selected as the direct visual style."
+  }
+}

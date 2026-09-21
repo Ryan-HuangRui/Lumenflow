@@ -81,13 +81,26 @@ class StyleFamilyLayerTests(unittest.TestCase):
             "non_tutorial_reference",
         )
 
-    def test_build_layer_preserves_existing_card_fields(self) -> None:
+    def test_classification_preserves_an_existing_semantic_family(self) -> None:
+        card = make_card("摄影参考案例")
+        card["style_family"] = {
+            "style_id": "blue_hour_travel_night",
+            "style_name": "蓝调时刻旅拍夜景",
+        }
+
+        self.assertEqual(
+            build_style_family_layer.classify_card(card),
+            "blue_hour_travel_night",
+        )
+
+    def test_build_layer_emits_sanitized_reusable_knowledge_and_private_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             recipe_dir = root / "recipes"
             card_dir = root / "cards"
             family_dir = root / "families"
             index_path = root / "style_library_index.json"
+            provenance_path = root / "private" / "style_source_map.json"
             summary_path = root / "summary.md"
             recipe_dir.mkdir()
             card_dir.mkdir()
@@ -115,16 +128,71 @@ class StyleFamilyLayerTests(unittest.TestCase):
                 card_dir=card_dir,
                 family_dir=family_dir,
                 index_path=index_path,
+                provenance_path=provenance_path,
                 summary_path=summary_path,
             )
 
             self.assertEqual(result["tutorial_variants"], 1)
             self.assertTrue((family_dir / "japanese_transparent_backlight.json").exists())
             self.assertTrue(index_path.exists())
+            self.assertTrue(provenance_path.exists())
             updated = json.loads((card_dir / "tutorial_bilibili_BV1abc.json").read_text(encoding="utf-8"))
             self.assertEqual(updated["style_family"]["style_id"], "japanese_transparent_backlight")
             self.assertEqual(updated["tone_guidance"]["overall"], "existing")
             self.assertEqual(updated["coarse_style_family"]["style_id"], "master_reference_texture")
+
+            reusable = json.loads(
+                (family_dir / "japanese_transparent_backlight.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(reusable["schema_version"], "lumenflow.reusable_style_knowledge.v1")
+            self.assertEqual(reusable["style_id"], "japanese_transparent_backlight")
+            self.assertEqual(reusable["source_evidence"]["tutorial_count"], 1)
+            self.assertEqual(reusable["source_evidence"]["category_counts"], {"basic_tone": 1})
+            self.assertIn("operation_order", reusable)
+            self.assertIn("tone_guidance", reusable)
+            self.assertIn("color_guidance", reusable)
+
+            public_text = json.dumps(reusable, ensure_ascii=False) + index_path.read_text(encoding="utf-8")
+            for source_noise in (
+                "BV1abc",
+                "bilibili",
+                "逆光调出日系感？掌握这3个技巧！",
+                "https://",
+                "逆光脸黑",
+                "提高曝光",
+            ):
+                self.assertNotIn(source_noise, public_text)
+
+            provenance_text = provenance_path.read_text(encoding="utf-8")
+            self.assertIn("BV1abc", provenance_text)
+            self.assertIn("逆光调出日系感？掌握这3个技巧！", provenance_text)
+
+    def test_family_payload_merges_duplicate_video_cards_without_source_identity(self) -> None:
+        first = make_card("日系通透逆光教程", "tutorial_bilibili_BV1first")
+        first["evidence"] = {"category_counts": {"basic_tone": 2, "hsl": 1}}
+        second = make_card("另一个逆光教程", "tutorial_bilibili_BV1second")
+        second["evidence"] = {"category_counts": {"basic_tone": 1, "mask": 2}}
+
+        payload = build_style_family_layer.build_family_payload(
+            "japanese_transparent_backlight",
+            [first, second],
+        )
+
+        self.assertEqual(payload["source_evidence"]["tutorial_count"], 2)
+        self.assertEqual(
+            payload["source_evidence"]["category_counts"],
+            {"basic_tone": 3, "hsl": 1, "mask": 2},
+        )
+        serialized = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("BV1first", serialized)
+        self.assertNotIn("BV1second", serialized)
+        self.assertNotIn("另一个逆光教程", serialized)
+
+    def test_only_reusable_style_and_method_families_are_publishable(self) -> None:
+        self.assertTrue(build_style_family_layer.is_publishable_family("japanese_clean_portrait"))
+        self.assertTrue(build_style_family_layer.is_publishable_family("rgb_curve_method"))
+        self.assertFalse(build_style_family_layer.is_publishable_family("tool_workflow_non_style"))
+        self.assertFalse(build_style_family_layer.is_publishable_family("non_tutorial_reference"))
 
 
 if __name__ == "__main__":
