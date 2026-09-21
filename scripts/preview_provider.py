@@ -113,7 +113,7 @@ CommandRunner = Callable[..., int]
 
 class RawTherapeePreviewProvider:
     provider_id = "rawtherapee"
-    adapter_version = "rawtherapee-profile-v3"
+    adapter_version = "rawtherapee-profile-v4"
 
     def __init__(
         self,

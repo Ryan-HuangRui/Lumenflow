@@ -165,23 +165,24 @@ def _contract(
 def rawtherapee_capabilities() -> BackendCapabilities:
     return _contract(
         "rawtherapee",
-        "rawtherapee-profile-v3",
+        "rawtherapee-profile-v4",
         {
             "preview.state_bound": _supported(
                 "Preview artifacts bind source bytes and the ordered PP3 profile stack; explicit inputs can be embedded in the compiled PP3",
                 "rawtherapee-cli=5.11",
-                "compiler=lumenflow.rawtherapee-pp3.v3",
+                "compiler=lumenflow.rawtherapee-pp3.v4",
             ),
             "state.read": _supported("PP3 profile inputs can be fingerprinted without mutating RAW files"),
             "plan.compile.v1": _supported(
                 "adjustment_plan.v1 compiles to bounded PP3 profiles while retaining starting-state fields",
-                "compiler=lumenflow.rawtherapee-pp3.v3",
+                "compiler=lumenflow.rawtherapee-pp3.v4",
             ),
             "intent.compile.v2": _supported(
                 "EditIntent v2 compiles vendor-neutral adjustments plus the versioned, allowlisted style.rawtherapee sections and verified PP3 state inputs to an isolated execution plan",
-                "compiler=lumenflow.rawtherapee-pp3.v3",
-                "native_schema=lumenflow.rawtherapee-native.v1",
+                "compiler=lumenflow.rawtherapee-pp3.v4",
+                "native_schema=lumenflow.rawtherapee-native.v2",
                 "native_profile_version=349",
+                "advanced_native=local-contrast,retinex,tone-equalizer,curves,channel-mixer,bw,hsv,gradient,pcvignette",
             ),
             "render": _supported(
                 "RawTherapee CLI renders isolated output files and supports JPEG, PNG, and 8/16/16f/32-bit TIFF selection",

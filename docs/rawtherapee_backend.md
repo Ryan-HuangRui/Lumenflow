@@ -7,7 +7,7 @@ profile stack, and final output container.
 
 ## State and safety model
 
-`scripts/rawtherapee_pp3.py` implements `lumenflow.rawtherapee-pp3.v3`:
+`scripts/rawtherapee_pp3.py` implements `lumenflow.rawtherapee-pp3.v4`:
 
 - profiles are parsed with bounded UTF-8 validation;
 - later profiles override only fields they contain;
@@ -92,10 +92,20 @@ control in that module.
 | Color appearance | enabled, light/brightness/chroma/contrast controls, scene adaptation and gamut flag |
 | Vibrance / Shadows & Highlights | enable, vibrance amounts/protection, highlight/shadow amounts and tonal widths, radius |
 | Directional Pyramid Denoising / Impulse Denoising / EPD | enable and bounded strength/noise controls |
+| Local Contrast / Retinex / Tone Equalizer | bounded local contrast, Retinex strength/scale/iterations, and six EV bands |
+| Luminance / RGB Curves | bounded tone curves for luminance and RGB channels |
+| Channel Mixer / Black & White / HSV Equalizer | bounded RGB matrices, B&W channel controls, and H/S/V curves |
 | Sharpening / SharpenEdge / SharpenMicro / PostDemosaicSharpening | enable, method, radius, amount, contrast, iteration and edge controls |
 | Lens / geometry | lens profile mode/toggles, distortion, chromatic-aberration correction, rotation, perspective, coarse transforms |
 | Crop / Resize | bounded pixel crop, scale/dimensions, and upscaling flag |
+| Gradient / PCVignette | bounded full-image graduated exposure and parametric vignette filters |
 | Color Management | gamut, the live-verified `RTv4_sRGB` output profile, output intent, black-point compensation |
+
+Phase 3 adds bounded advanced controls for local contrast, Retinex, Tone
+Equalizer, Luminance/RGB curves, Channel Mixer, Black & White, HSV Equalizer,
+and the full-image Gradient and PCVignette regional filters.  These are
+versioned under `lumenflow.rawtherapee-native.v2`; each field remains
+allowlisted and range-checked.
 
 `Color Management.OutputProfile` is deliberately restricted to the exact
 bundled ICC base name `RTv4_sRGB`.  Generic labels such as `sRGB`, `Adobe RGB`,
@@ -107,11 +117,15 @@ The fixture test combines these sections in one immutable PP3 and renders all
 three local Bangkok RW2 copies.  It checks decoded-pixel difference from the
 base profile, repeat pixel-fingerprint equality, and unchanged source bytes.
 
-Agent-authored local adjustments (`Locallab`, masks, spot removal), Retinex,
-Local Contrast, Channel Mixer, Black & White, Luminance/RGB curves, Tone
-Equalizer, film simulation, wavelet, and other sections not listed above remain
-unsupported and are rejected by the native contract.  They can only be added
-after a new bounded schema and RawTherapee 5.11 fixture/live evidence.
+Agent-authored Locallab/RT-spots, masks, and spot removal remain unsupported
+because their region graph and mask topology are not yet represented by a
+bounded contract.  Film Simulation remains unsupported because
+`ClutFilename` would be an unbounded external asset path without an asset
+fingerprint contract.  Wavelet and Color Toning remain unsupported because
+their 5.11 sections contain large coupled parameter/curve graphs that are not
+yet modeled and independently verified.  These sections are rejected by the
+native contract until they have a bounded schema and RawTherapee 5.11
+fixture/live evidence.
 
 ## Output containers
 
@@ -151,6 +165,14 @@ LUMENFLOW_RAWTHERAPEE_LIVE_FIXTURES=/private/tmp/lumenflow-raw-fixtures/bangkok-
 RAWTHERAPEE_CLI=/opt/homebrew/bin/rawtherapee-cli \
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_rawtherapee_native_live
 ```
+
+The live test includes separate `tone-detail`, `curves-color`, and `regional`
+Phase 3 contracts.  Each contract is rendered twice for all three Bangkok
+copies and must change decoded pixels, reproduce the same decoded pixel
+fingerprint, and leave the fixture directory and RAW bytes unchanged.  A
+second opt-in check renders each newly added section independently on the first
+Bangkok copy, so a strong module such as Black & White cannot mask a no-op or
+silently ignored field in another section.
 
 The normal unit suite includes the bounded validator/compiler and runner
 determinism checks; the live test is intentionally skipped unless the fixture

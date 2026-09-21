@@ -188,6 +188,118 @@ Compiler=test
         self.assertEqual(overrides["Coarse Transformation"]["Rotate"], 90)
         self.assertEqual(overrides["Resize"]["Scale"], 0.5)
 
+    def test_phase3_advanced_modules_accept_bounded_native_values(self) -> None:
+        contract = {
+            "profile_version": 349,
+            "sections": {
+                "Local Contrast": {
+                    "Enabled": True,
+                    "Radius": 100,
+                    "Amount": 0.5,
+                    "Darkness": 1,
+                    "Lightness": 1,
+                },
+                "Retinex": {
+                    "Enabled": True,
+                    "Str": 35,
+                    "Scal": 3,
+                    "Iter": 1,
+                    "Gam": 1.3,
+                    "Median": False,
+                    "Neigh": 80,
+                },
+                "ToneEqualizer": {
+                    "Enabled": True,
+                    "Band0": 1,
+                    "Band1": 1,
+                    "Band2": 0,
+                    "Band3": 0,
+                    "Band4": -1,
+                    "Band5": -1,
+                },
+                "Luminance Curve": {
+                    "Enabled": True,
+                    "LCurve": "3;0;0;0.25;0.15;0.75;0.85;1;1;",
+                },
+                "RGB Curves": {
+                    "Enabled": True,
+                    "LumaMode": False,
+                    "rCurve": "3;0;0;0.5;0.3;1;1;",
+                    "gCurve": "0;",
+                    "bCurve": "0;",
+                },
+                "Channel Mixer": {
+                    "Enabled": True,
+                    "Red": "1000;150;0;",
+                    "Green": "0;1000;0;",
+                    "Blue": "0;0;1000;",
+                },
+                "Black & White": {
+                    "Enabled": True,
+                    "Method": "ChannelMixer",
+                    "Auto": False,
+                    "ComplementaryColors": True,
+                    "Setting": "RGB-Rel",
+                    "Filter": "None",
+                    "MixerRed": 30,
+                    "MixerOrange": 40,
+                    "MixerYellow": 50,
+                    "MixerGreen": 20,
+                    "MixerCyan": 33,
+                    "MixerBlue": 33,
+                    "MixerMagenta": 33,
+                    "MixerPurple": 33,
+                },
+                "HSV Equalizer": {
+                    "Enabled": True,
+                    "HCurve": "0;",
+                    "SCurve": (
+                        "1;0.09;0.78;0.35;0.35;0.17;0.5;0.35;0.35;"
+                        "0.29;0.5;0.35;0.35;0.51;0.5;0.35;0.35;"
+                        "0.67;0.54;0.33;0.33;0.85;0.5;0.27;0.27;"
+                    ),
+                    "VCurve": "0;",
+                },
+                "Gradient": {
+                    "Enabled": True,
+                    "Degree": 15,
+                    "Feather": 40,
+                    "Strength": 1,
+                    "CenterX": 0,
+                    "CenterY": 0,
+                },
+                "PCVignette": {
+                    "Enabled": True,
+                    "Strength": 1,
+                    "Feather": 50,
+                    "Roundness": 50,
+                },
+            },
+        }
+        normalized = rawtherapee_pp3.validate_native_sections(contract)
+        overrides = rawtherapee_pp3.native_sections_to_overrides(normalized)
+        self.assertEqual(overrides["Retinex"]["Neigh"], 80)
+        self.assertEqual(overrides["ToneEqualizer"]["Band4"], -1)
+        self.assertEqual(overrides["Channel Mixer"]["Red"], "1000;150;0;")
+        self.assertEqual(overrides["Gradient"]["Strength"], 1)
+        self.assertEqual(overrides["PCVignette"]["Roundness"], 50)
+
+    def test_phase3_advanced_modules_fail_closed_for_unsafe_values(self) -> None:
+        base = {"profile_version": 349, "sections": {}}
+        cases = [
+            {**base, "sections": {"ToneEqualizer": {"Band0": 1.5}}},
+            {**base, "sections": {"Retinex": {"Iter": 6}}},
+            {**base, "sections": {"Gradient": {"Strength": 6}}},
+            {**base, "sections": {"PCVignette": {"Roundness": 101}}},
+            {**base, "sections": {"Channel Mixer": {"Red": "1000;0;"}}},
+            {**base, "sections": {"Channel Mixer": {"Red": "1001;0;0;"}}},
+            {**base, "sections": {"Luminance Curve": {"AvoidColorShift": True}}},
+            {**base, "sections": {"Black & White": {"Method": "Luminance"}}},
+        ]
+        for case in cases:
+            with self.subTest(case=case), self.assertRaises(rawtherapee_pp3.PP3UnsupportedValue):
+                rawtherapee_pp3.validate_native_sections(case)
+
     def test_native_contract_fails_closed_for_unknown_fields_and_bad_values(self) -> None:
         base = {"profile_version": 349, "sections": {"RAW": {"CA": True}}}
         cases = [
