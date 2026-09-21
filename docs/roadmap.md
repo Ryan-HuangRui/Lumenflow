@@ -99,6 +99,7 @@ Implemented foundation:
 - A versioned darktable real-RAW feasibility probe that fails closed on source, sidecar, or output-integrity violations.
 - Model-authored `ReviewResult` evidence bound to verified output bytes, plus a persisted two-revision refinement loop with replay and cycle protection.
 - Evidence-bound backend benchmark observations, visual rubric reports, and baseline regression gates that cannot hide runtime failures behind aesthetic scores.
+- A local, path-redacted Personal Edit Example Store populated only by accepted final edits, with explainable purpose/tag/style retrieval and deletion.
 - `adjustment_plan.json` schema.
 - Rendering from an agent-authored plan.
 - Processing records and Markdown reporting.
@@ -111,6 +112,7 @@ Maintenance work:
 - Rerun the darktable feasibility probe after a trusted Gatekeeper-compatible installation is available; keep the backend legacy-only until the provider/compiler/receipt gates also pass.
 - Expand review categories only when benchmark evidence shows the current contract is insufficient.
 - Grow the private benchmark corpus across lighting, skin tone, dynamic-range, color, and composition cases without committing personal RAW files.
+- Evaluate whether semantic embeddings improve personal-example retrieval before adding any embedding dependency; keep deterministic token/tag/style matching as the auditable baseline.
 - Add more fixture coverage for adjustment-plan edge cases.
 - Improve failure messages when external tools are missing.
 

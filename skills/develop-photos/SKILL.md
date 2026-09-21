@@ -40,6 +40,7 @@ into:
 6. Inspect the preview images with the host agent's vision/reasoning capability.
 7. Read the selected backend's `lumenflow.backend_capabilities.v1` contract and require the operation needed for the current stage. Stop on `unsupported`, and stop for real verification on `unverified`; do not silently choose a different backend when the user selected one explicitly.
 8. Retrieve reusable style guidance:
+   - First query the local Personal Edit Example Store by the current purpose, scene tags, and plausible style id when it is configured. Treat matches as evidence of the user's past accepted choices, not fixed presets; do not reuse parameters until the new preview supports them.
    - Read `knowledge/style_library_index.json` first.
    - Filter direct candidates to entries with `active_for_photo_matching=true`.
    - Choose a semantic style from `knowledge/style_families/*.json`.
@@ -68,6 +69,7 @@ into:
 17. Advance the persisted session with `scripts/review_loop.py`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
 18. For `revise`, compile and execute the emitted next intent, inspect the new verified output, and repeat. Write final execution receipts, session state, processing report, and review notes when the session reaches a terminal state.
 19. For benchmark runs, write a `lumenflow.visual_assessment.v1` only after inspecting the exact output fingerprint, then use `scripts/benchmark_eval.py record`. Do not assign a visual score to a failed or dry-run execution, and do not omit failed cases from the aggregate report.
+20. After final acceptance, add the edit to `scripts/personal_example_store.py` only when personal-example memory is desired. Use scene/purpose tags that help later retrieval. Never add rejected, active, failed, or revision-limit outcomes.
 
 Typical command:
 
@@ -183,6 +185,7 @@ Use this exact retrieval order:
 - Do not treat a preview path alone as evidence. Carry the versioned preview artifact id and starting-state hash into downstream workflow state so a stale preview cannot silently justify a new edit.
 - Do not put backend command names, executable paths, PP3 keys, Lightroom parameter names, or output paths in `EditIntent v2`; those belong in the compiled execution plan.
 - Do not execute a plan without an explicit allowed output root. Refuse source fingerprint drift, path escape, command mismatch, profile hash mismatch, or an existing output file before invoking the backend.
+- Personal examples are references, not presets. Never batch-copy a retrieved example's exposure, white balance, crop, or local edits without inspecting the new photo; keep the store local and do not export it unless the user explicitly asks.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
 - RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.
