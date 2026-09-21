@@ -2,27 +2,30 @@
 
 This document fixes the operational contract for the Lumenflow style library.
 
-The library has two layers:
+The library separates reusable knowledge from private source evidence:
 
-- Layer 1: `knowledge/style_families/*.json`
-  Broad style or method families used for retrieval, filtering, and scene matching.
-- Layer 2: `knowledge/style_cards/tutorial_derived/*.json`
-  One video-level guidance card per successful tutorial source.
+- Public reusable knowledge: `knowledge/style_families/*.json`
+  Source-agnostic style or method families used for retrieval, filtering, scene matching, and parameter reasoning.
+- Private evidence: `knowledge/style_cards/tutorial_recipes/*.json` and `knowledge/style_cards/tutorial_derived/*.json`
+  Per-source transcripts, recipes, and intermediate cards used only to rebuild and audit the public knowledge.
+- Private provenance: `knowledge/private_provenance/style_source_map.json`
+  The ignored mapping from reusable knowledge back to its source records.
 
-`knowledge/style_library_index.json` is the entrypoint for agents. It tells the agent where the two layers live, which families are active for photo matching, and which cards are method/workflow/reference material only.
+`knowledge/style_library_index.json` is the runtime entrypoint. It contains no source identity and tells the agent which reusable cards are active for photo matching and which are method/workflow/reference material only.
 
 ## Update Flow
 
 Use this flow for manual refreshes and scheduled jobs.
 
-For public/plugin distribution, the files produced by this flow are local private data and are ignored by git:
+These source-bearing files are local private data and are ignored by git:
 
 - `knowledge/source_records/tutorial_sources.json`
 - `knowledge/source_records/asr_hotwords.txt`
 - `knowledge/style_cards/tutorial_recipes/*`
 - `knowledge/style_cards/tutorial_derived/*`
-- `knowledge/style_families/*`
-- `knowledge/style_library_index.json`
+- `knowledge/private_provenance/*`
+
+The cleaned outputs under `knowledge/style_families/*.json` and `knowledge/style_library_index.json` are safe to review and commit. The builder fails if source keys, URLs, BVIDs, or source IDs leak into them.
 
 Copy the committed `*.example.*` files before running the flow locally.
 
@@ -53,26 +56,28 @@ Step contract:
    - Writes transcript provenance under `knowledge/style_cards/tutorial_recipes/transcripts/` or `knowledge/style_cards/tutorial_recipes/asr_transcripts/`.
 2. `scripts/generate_tutorial_style_cards.py`
    - Reads every successful recipe.
-   - Writes one Layer 2 card per recipe under `knowledge/style_cards/tutorial_derived/`.
-   - Preserves tutorial guidance as reasoning material, not fixed preset parameters.
+   - Writes one private evidence card per recipe under `knowledge/style_cards/tutorial_derived/`.
+   - Preserves source guidance for classification and audit; these cards are not runtime style knowledge.
 3. `scripts/build_style_family_layer.py`
-   - Assigns each Layer 2 card to a Layer 1 family.
-   - Writes `knowledge/style_families/*.json`.
-   - Refreshes `knowledge/style_library_index.json`.
+   - Classifies private evidence cards and merges duplicates into semantic families.
+   - Writes source-clean reusable cards to `knowledge/style_families/*.json`.
+   - Refreshes the source-clean `knowledge/style_library_index.json`.
+   - Writes the source mapping to ignored `knowledge/private_provenance/style_source_map.json`.
    - Refreshes `knowledge/style_cards/tutorial_derived/index.md`.
    - Refreshes `knowledge/style_cards/tutorial_recipes/tutorial_recipe_style_summary.md`.
 4. Tests
    - Run the full test suite after library rebuilds when the update is done inside the repo.
-   - A scheduled job should at least report counts, failures, and whether the Layer 1/Layer 2 consistency check passed.
+   - A scheduled job should report source counts, merged knowledge counts, failures, tests, and the public-data leak check.
 
 Rules:
 
 - Do not store Bilibili cookies in the repository.
 - Do not store subtitle URLs with temporary auth keys as durable provenance.
-- Do not commit generated tutorial transcripts, recipes, tutorial-derived cards, family indexes, or concrete source whitelists to public/plugin distributions.
+- Do not commit generated tutorial transcripts, recipes, tutorial-derived cards, private provenance, or concrete source whitelists.
+- Public reusable cards must not contain platform/video IDs, source titles, source URLs, transcript paths, transcript excerpts, timestamps, or source-specific style IDs.
 - Do not store ASR audio cache files.
-- Do not manually edit generated Layer 2 cards unless doing a deliberate review pass; rerun the generator afterward.
-- If a source is a tool demo, method tutorial, or non-tutorial reference, keep it in the library but set `active_for_photo_matching=false` through the Layer 1 build step.
+- Do not manually edit private evidence cards unless doing a deliberate review pass; rerun the generator afterward.
+- Publish a method tutorial only when it yields reusable method knowledge, with `active_for_photo_matching=false`; keep pure tool demos and non-tutorial references private-only.
 
 ## Retrieval Flow
 
@@ -80,41 +85,37 @@ Use this flow when `develop-photos` chooses a style for a target photo.
 
 1. Read `knowledge/style_library_index.json`.
 2. Filter direct visual candidates:
-   - Include families with `active_for_photo_matching=true`.
+   - Include reusable cards with `active_for_photo_matching=true`.
    - Prefer `role=visual_style`.
    - Exclude direct matches where `role` is `method_family`, `workflow_reference`, or `non_style_reference`.
 3. Inspect the target preview image.
-4. Select a Layer 1 family using the image's subject, light, color problems, scene, and risk profile.
-5. Read the selected `knowledge/style_families/<style_family_id>.json`.
-6. Inspect representative Layer 2 variants from that family.
-7. Pick one best Layer 2 tutorial card when a specific variant fits the photo. If no variant fits cleanly, use only the Layer 1 family guidance.
-8. Optionally read method cards after the visual direction is chosen:
+4. Select one reusable style using the image's subject, light, color problems, scene, and risk profile.
+5. Read the selected `knowledge/style_families/<style_id>.json`.
+6. Optionally read reusable method cards after the visual direction is chosen:
    - `rgb_curve_method`
    - `mask_local_retouch_method`
    - `reference_color_matching_method`
-   - Other inactive method/workflow cards
-9. Generate `adjustment_plan.json` with:
-   - `style_family_id`: the selected Layer 1 family.
-   - `style_id`: the selected Layer 2 card id when one is used, otherwise the Layer 1 family id.
-   - `source_style_card`: the Layer 2 card path when used.
+   - Other inactive method cards
+7. Generate `adjustment_plan.json` with:
+   - `style_family_id` and `style_id`: the selected reusable semantic id.
+   - `source_style_card`: the selected reusable card path.
    - Concrete per-photo parameters inferred from the target preview.
-10. Render and review. If the result misses exposure, color, crop, or style strength, revise the plan instead of changing the style library.
+8. Render and review. If the result misses exposure, color, crop, or style strength, revise the plan instead of changing the style library.
 
 Selection rules:
 
 - A photo should usually get one best visual direction.
 - Add alternate variants only when multiple families genuinely fit the image.
 - Method cards support execution; they should not be the primary visual style.
-- Tutorial values are examples and reasoning evidence. The agent must not copy transcript numbers blindly.
-- The final parameter values belong in `adjustment_plan.json`, not in style families or tutorial cards.
+- Private tutorial values are build-time evidence only and must never be copied into runtime plans.
+- The final parameter values belong in `adjustment_plan.json`, not in reusable knowledge cards.
 
 ## Current Library Shape
 
 As of the current generated library:
 
-- 154 Layer 2 tutorial-derived cards.
-- 24 Layer 1 style/method families.
-- 140 cards active for direct photo matching.
-- 14 cards retained as method, workflow, or non-style references.
+- 162 private tutorial evidence cards classified into 24 semantic groups.
+- 22 reusable knowledge cards are published: 18 visual styles and 4 supporting methods.
+- 2 non-style/workflow groups remain private-only and are excluded from runtime retrieval.
 
 The authoritative live counts are always in `knowledge/style_library_index.json`.

@@ -1,10 +1,18 @@
 {
-  "schema_version": "lumenflow.style_library_index.v1",
-  "generated_from": {
-    "style_families_dir": "knowledge/style_families",
-    "tutorial_derived_dir": "knowledge/style_cards/tutorial_derived"
+  "schema_version": "lumenflow.style_library_index.v2",
+  "knowledge_dir": "knowledge/style_families",
+  "styles": [],
+  "inactive_styles": [],
+  "counts": {
+    "reusable_knowledge_cards": 0,
+    "source_tutorials_merged": 0,
+    "active_styles": 0,
+    "inactive_styles": 0,
+    "by_role": {}
   },
-  "families": [],
-  "cards": [],
-  "inactive_cards": []
+  "retrieval_policy": {
+    "default": "Choose one reusable semantic style card by scene fit, visual intent, and avoid-scene constraints.",
+    "parameter_policy": "Infer concrete parameters after inspecting the target photo; knowledge cards are not fixed presets.",
+    "inactive_policy": "Knowledge with active_for_photo_matching=false is supporting material and cannot be the direct visual style."
+  }
 }
