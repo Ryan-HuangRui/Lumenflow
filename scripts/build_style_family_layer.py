@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the two-layer tutorial style library from video-level cards."""
+"""Merge private tutorial evidence into reusable, source-clean style knowledge."""
 
 from __future__ import annotations
 
@@ -15,7 +15,38 @@ DEFAULT_RECIPE_DIR = Path("knowledge/style_cards/tutorial_recipes")
 DEFAULT_CARD_DIR = Path("knowledge/style_cards/tutorial_derived")
 DEFAULT_FAMILY_DIR = Path("knowledge/style_families")
 DEFAULT_INDEX_PATH = Path("knowledge/style_library_index.json")
+DEFAULT_PROVENANCE_PATH = Path("knowledge/private_provenance/style_source_map.json")
 DEFAULT_SUMMARY_PATH = DEFAULT_RECIPE_DIR / "tutorial_recipe_style_summary.md"
+
+FORBIDDEN_PUBLIC_KEYS = {
+    "bvid",
+    "representative_steps",
+    "representative_variants",
+    "source_recipe",
+    "source_video",
+    "title",
+    "transcript_path",
+    "tutorial_variants",
+    "url",
+}
+
+CATEGORY_OPERATION_MAP = {
+    "basic_tone": "exposure_and_basic_tone",
+    "tone_curve": "tone_curve",
+    "color": "global_color_balance",
+    "hsl": "hsl_color_cleanup",
+    "detail": "detail_and_texture",
+    "mask": "local_adjustments",
+    "local": "local_adjustments",
+    "grading": "color_grading",
+    "export": "final_review",
+    "color_grading": "color_grading",
+    "hsl_color": "hsl_color_cleanup",
+    "mask_local": "local_adjustments",
+    "presence_detail": "detail_and_texture",
+}
+
+PUBLISHABLE_ROLES = {"visual_style", "method_family"}
 
 
 FAMILY_DEFINITIONS: dict[str, dict[str, Any]] = {
@@ -371,13 +402,13 @@ FAMILY_DEFINITIONS: dict[str, dict[str, Any]] = {
         "avoid_scenes": ["没有相近光线或题材却强行套用参考", "需要严格中性还原的照片"],
         "visual_features": {
             "tone": "reference-driven photographer texture",
-            "color": "case-specific palette from the source tutorial",
+            "color": "case-specific palette inferred from a chosen visual reference",
             "contrast": "case-specific light and shadow structure",
             "texture": "photographer-specific detail and atmosphere",
         },
         "agent_guidance": [
-            "先阅读对应 Layer 2 视频卡，判断参考摄影师的题材、光线和色彩关系是否适合目标照片。",
-            "这类家族可以直接作为视觉方向，但具体参数必须来自目标照片和视频变体共同推理。",
+            "先分析所选参考图的题材、光线和色彩关系是否适合目标照片。",
+            "这类知识只定义参考分析方法，具体参数必须根据目标照片与参考图重新推理。",
         ],
     },
     "rgb_curve_method": {
@@ -529,6 +560,10 @@ def contains_any(text: str, keywords: list[str]) -> bool:
     return any(keyword.lower() in text for keyword in keywords)
 
 
+def is_publishable_family(family_id: str) -> bool:
+    return FAMILY_DEFINITIONS[family_id]["role"] in PUBLISHABLE_ROLES
+
+
 def recipe_step_count(recipe: dict[str, Any] | None, card: dict[str, Any]) -> int:
     if recipe:
         steps = recipe.get("extraction", {}).get("steps", [])
@@ -611,10 +646,10 @@ def classify_card(card: dict[str, Any], recipe: dict[str, Any] | None = None) ->
     if contains_any(title, ["日系", "干净", "清新", "樱花", "治愈"]):
         return "japanese_clean_portrait"
 
-    current = card.get("coarse_style_family") or card.get("style_family", {})
-    if isinstance(current, dict) and current.get("path") and not card.get("coarse_style_family"):
-        current = {}
+    current = card.get("style_family", {})
     current_id = current.get("style_id") if isinstance(current, dict) else ""
+    if current_id in FAMILY_DEFINITIONS:
+        return str(current_id)
     fallback_map = {
         "japanese_clean_portrait": "japanese_clean_portrait",
         "japanese_film_gray": "japanese_film_gray",
@@ -677,45 +712,123 @@ def update_card_family(card: dict[str, Any], family_id: str) -> dict[str, Any]:
 
 def build_family_payload(family_id: str, cards: list[dict[str, Any]]) -> dict[str, Any]:
     definition = FAMILY_DEFINITIONS[family_id]
-    variants = []
-    for card in sorted(cards, key=lambda item: str(item.get("style_id", ""))):
-        video = card.get("source_video", {})
-        variants.append(
-            {
-                "style_id": card.get("style_id"),
-                "source_recipe": card.get("source_recipe"),
-                "title": video.get("title"),
-                "language": video.get("language"),
-                "step_count": video.get("step_count", 0),
-                "path": str(DEFAULT_CARD_DIR / f"{card.get('style_id')}.json"),
-            }
-        )
+    category_counts: Counter[str] = Counter()
+    for card in cards:
+        for category, count in card.get("evidence", {}).get("category_counts", {}).items():
+            category_counts[str(category)] += int(count)
+
+    operation_order: list[str] = []
+    for category, _ in category_counts.most_common():
+        operation = CATEGORY_OPERATION_MAP.get(category, category.replace(" ", "_"))
+        if operation and operation not in operation_order:
+            operation_order.append(operation)
+    if not operation_order:
+        operation_order = [
+            "white_balance",
+            "exposure_and_basic_tone",
+            "tone_curve",
+            "color_cleanup",
+        ]
+    if "final_review" not in operation_order:
+        operation_order.append("final_review")
+
+    visual_features = definition["visual_features"]
     payload = {
-        "schema_version": "lumenflow.style_family.v1",
-        "style_family_id": family_id,
-        "style_family_name": definition["style_family_name"],
-        "status": "candidate",
-        "layer": "style_family",
+        "schema_version": "lumenflow.reusable_style_knowledge.v1",
+        "style_id": family_id,
+        "style_name": definition["style_family_name"],
+        "status": "reusable",
+        "knowledge_scope": "source_agnostic_semantic_family",
         "role": definition["role"],
         "parent_family": definition["parent_family"],
-        "active_for_photo_matching": definition["active_for_photo_matching"],
+        "active_for_photo_matching": bool(
+            definition["active_for_photo_matching"] and definition["role"] == "visual_style"
+        ),
         "description": definition["description"],
         "suitable_scenes": definition["suitable_scenes"],
         "avoid_scenes": definition["avoid_scenes"],
-        "visual_features": definition["visual_features"],
+        "visual_features": visual_features,
+        "tone_guidance": {
+            "overall": visual_features.get("tone", "adapt tone to the target photo"),
+            "contrast": visual_features.get("contrast", "adapt contrast to the target photo"),
+            "texture": visual_features.get("texture", "adapt texture to the target photo"),
+        },
+        "color_guidance": {
+            "overall": visual_features.get("color", "adapt color to the target photo"),
+            "subject_protection": "Preserve believable subject color and avoid destructive casts.",
+        },
+        "operation_order": operation_order[:8],
+        "parameter_strategy": "agent_infers_per_photo",
+        "adjustment_plan_guidance": {
+            "schema_version": "lumenflow.adjustment_plan.v1",
+            "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+            "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit.",
+        },
         "agent_guidance": definition["agent_guidance"],
-        "source_count": len(variants),
-        "tutorial_variants": [str(item["style_id"]) for item in variants],
-        "representative_variants": variants[:8],
+        "source_evidence": {
+            "tutorial_count": len(cards),
+            "category_counts": dict(sorted(category_counts.items())),
+        },
+        "raw_profile_role": "none",
+        "raw_profiles": [],
     }
+    validate_public_payload(payload)
     return payload
+
+
+def validate_public_payload(payload: Any, path: str = "root") -> None:
+    """Reject original-video identity or transcript evidence in tracked artifacts."""
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key in FORBIDDEN_PUBLIC_KEYS:
+                raise ValueError(f"forbidden public key at {path}.{key}")
+            validate_public_payload(value, f"{path}.{key}")
+        return
+    if isinstance(payload, list):
+        for index, value in enumerate(payload):
+            validate_public_payload(value, f"{path}[{index}]")
+        return
+    if isinstance(payload, str):
+        if re.search(r"https?://|\bBV[0-9A-Za-z]{6,}\b|bilibili_", payload, re.IGNORECASE):
+            raise ValueError(f"source identity leaked into public payload at {path}")
+
+
+def build_private_provenance(
+    family_payloads: dict[str, dict[str, Any]],
+    by_family: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    families: dict[str, Any] = {}
+    for family_id in sorted(by_family):
+        sources = []
+        for card in sorted(by_family[family_id], key=lambda item: str(item.get("style_id", ""))):
+            sources.append(
+                {
+                    "style_id": card.get("style_id"),
+                    "source_recipe": card.get("source_recipe"),
+                    "source_video": card.get("source_video", {}),
+                }
+            )
+        families[family_id] = {
+            "published": family_id in family_payloads,
+            "public_path": (
+                str(DEFAULT_FAMILY_DIR / f"{family_id}.json")
+                if family_id in family_payloads
+                else None
+            ),
+            "sources": sources,
+        }
+    return {
+        "schema_version": "lumenflow.private_style_provenance.v1",
+        "notice": "Private source map. Keep ignored by Git; public reusable knowledge must not depend on source identity.",
+        "families": families,
+    }
 
 
 def write_tutorial_index(card_dir: Path, cards: list[dict[str, Any]]) -> Path:
     lines = [
         "# Tutorial Derived Style Cards",
         "",
-        "Generated one guidance style card per successful tutorial recipe. These are Layer 2 variants; `knowledge/style_families/` contains Layer 1 retrieval families.",
+        "Generated one private evidence card per successful tutorial recipe. Runtime retrieval uses only the source-clean knowledge under `knowledge/style_families/`.",
         "",
         "| style_id | layer1 family | role | active | language | steps | title |",
         "| --- | --- | --- | --- | --- | ---: | --- |",
@@ -744,7 +857,7 @@ def write_summary(summary_path: Path, family_payloads: dict[str, dict[str, Any]]
     lines = [
         "# Tutorial Recipe Style Summary",
         "",
-        f"Generated from {len(cards)} successful Bilibili tutorial recipes. Layer 1 has {len(family_payloads)} style/method families under `knowledge/style_families/`; Layer 2 keeps one video-level card per successful video under `knowledge/style_cards/tutorial_derived/`.",
+        f"Generated from {len(cards)} successful tutorial recipes. The public layer has {len(family_payloads)} reusable source-agnostic knowledge cards under `knowledge/style_families/`; private video-level evidence remains under ignored paths for audit only.",
         "",
         f"Active for automatic photo matching: {active_count}. Method/workflow/reference cards remain available as supporting reasoning but are not direct visual styles.",
         "",
@@ -755,15 +868,18 @@ def write_summary(summary_path: Path, family_payloads: dict[str, dict[str, Any]]
     ]
     for family_id, payload in sorted(
         family_payloads.items(),
-        key=lambda item: (-int(item[1].get("source_count", 0)), item[0]),
+        key=lambda item: (
+            -int(item[1].get("source_evidence", {}).get("tutorial_count", 0)),
+            item[0],
+        ),
     ):
         lines.append(
             "| `{}` | {} | {} | {} | {} | `{}` |".format(
                 family_id,
-                payload["style_family_name"],
+                payload["style_name"],
                 payload["role"],
                 "yes" if payload["active_for_photo_matching"] else "no",
-                payload["source_count"],
+                payload["source_evidence"]["tutorial_count"],
                 payload["parent_family"],
             )
         )
@@ -798,49 +914,43 @@ def write_summary(summary_path: Path, family_payloads: dict[str, dict[str, Any]]
 
 
 def write_library_index(index_path: Path, family_payloads: dict[str, dict[str, Any]], cards: list[dict[str, Any]]) -> Path:
-    role_counts = Counter(str(card.get("family_role", "")) for card in cards)
+    role_counts = Counter(str(payload.get("role", "")) for payload in family_payloads.values())
     family_entries = []
     for family_id, payload in sorted(family_payloads.items()):
         family_entries.append(
             {
-                "style_family_id": family_id,
-                "style_family_name": payload["style_family_name"],
+                "style_id": family_id,
+                "style_name": payload["style_name"],
                 "role": payload["role"],
                 "active_for_photo_matching": payload["active_for_photo_matching"],
-                "source_count": payload["source_count"],
+                "tutorial_count": payload["source_evidence"]["tutorial_count"],
                 "path": str(DEFAULT_FAMILY_DIR / f"{family_id}.json"),
             }
         )
-    inactive_cards = [
-        {
-            "style_id": card.get("style_id"),
-            "source_recipe": card.get("source_recipe"),
-            "family": card.get("style_family", {}).get("style_id"),
-            "role": card.get("family_role"),
-            "title": card.get("source_video", {}).get("title"),
-        }
-        for card in cards
-        if not card.get("active_for_photo_matching")
+    inactive_families = [
+        entry["style_id"] for entry in family_entries if not entry["active_for_photo_matching"]
     ]
     payload = {
-        "schema_version": "lumenflow.style_library_index.v1",
-        "layer1_dir": str(DEFAULT_FAMILY_DIR),
-        "layer2_dir": str(DEFAULT_CARD_DIR),
-        "families": family_entries,
-        "inactive_cards": inactive_cards,
+        "schema_version": "lumenflow.style_library_index.v2",
+        "knowledge_dir": str(DEFAULT_FAMILY_DIR),
+        "styles": family_entries,
+        "inactive_styles": inactive_families,
         "counts": {
-            "style_families": len(family_payloads),
-            "tutorial_variants": len(cards),
-            "active_tutorial_variants": sum(1 for card in cards if card.get("active_for_photo_matching")),
-            "inactive_tutorial_variants": len(inactive_cards),
+            "reusable_knowledge_cards": len(family_payloads),
+            "source_tutorials_merged": len(cards),
+            "active_styles": sum(
+                1 for payload in family_payloads.values() if payload.get("active_for_photo_matching")
+            ),
+            "inactive_styles": len(inactive_families),
             "by_role": dict(sorted(role_counts.items())),
         },
         "retrieval_policy": {
-            "default": "Choose Layer 1 style_family first, then inspect matching Layer 2 tutorial variants for scene-specific guidance.",
-            "parameter_policy": "Layer 2 cards are reasoning guidance. The develop-photos agent must infer concrete parameters after inspecting the target photo.",
-            "inactive_policy": "Cards with active_for_photo_matching=false are method/workflow/reference material and should not be selected as the direct visual style.",
+            "default": "Choose one reusable semantic style card by scene fit, visual intent, and avoid-scene constraints.",
+            "parameter_policy": "The develop-photos agent must infer concrete parameters after inspecting the target photo; knowledge cards are not fixed presets.",
+            "inactive_policy": "Knowledge with active_for_photo_matching=false is method/workflow/reference material and cannot be selected as the direct visual style.",
         },
     }
+    validate_public_payload(payload)
     write_json(index_path, payload)
     return index_path
 
@@ -851,6 +961,7 @@ def build_layer(
     card_dir: Path = DEFAULT_CARD_DIR,
     family_dir: Path = DEFAULT_FAMILY_DIR,
     index_path: Path = DEFAULT_INDEX_PATH,
+    provenance_path: Path = DEFAULT_PROVENANCE_PATH,
     summary_path: Path = DEFAULT_SUMMARY_PATH,
 ) -> dict[str, Any]:
     recipes = load_recipes(recipe_dir)
@@ -860,8 +971,16 @@ def build_layer(
 
     for card in cards:
         recipe_id = str(card.get("source_recipe", ""))
-        family_id = classify_card(card, recipes.get(recipe_id))
+        recipe = recipes.get(recipe_id)
+        family_id = classify_card(card, recipe)
         updated = update_card_family(card, family_id)
+        evidence = updated.setdefault("evidence", {})
+        if not evidence.get("category_counts") and recipe:
+            categories = Counter(
+                str(step.get("category", "unknown"))
+                for step in recipe.get("extraction", {}).get("steps", [])
+            )
+            evidence["category_counts"] = dict(sorted(categories.items()))
         write_json(Path(card["_path"]), updated)
         updated_cards.append(updated)
         by_family[family_id].append(updated)
@@ -870,6 +989,8 @@ def build_layer(
     family_payloads: dict[str, dict[str, Any]] = {}
     stale_files = {path for path in family_dir.glob("*.json")}
     for family_id in sorted(by_family):
+        if not is_publishable_family(family_id):
+            continue
         payload = build_family_payload(family_id, by_family[family_id])
         family_payloads[family_id] = payload
         path = family_dir / f"{family_id}.json"
@@ -879,11 +1000,23 @@ def build_layer(
         stale_file.unlink()
 
     write_library_index(index_path, family_payloads, updated_cards)
+    write_json(provenance_path, build_private_provenance(family_payloads, by_family))
     write_tutorial_index(card_dir, updated_cards)
     write_summary(summary_path, family_payloads, updated_cards)
 
     return {
         "style_families": len(family_payloads),
+        "semantic_groups": len(by_family),
+        "reusable_knowledge_cards": len(family_payloads),
+        "active_styles": sum(
+            1 for payload in family_payloads.values() if payload.get("active_for_photo_matching")
+        ),
+        "inactive_styles": sum(
+            1 for payload in family_payloads.values() if not payload.get("active_for_photo_matching")
+        ),
+        "private_only_groups": sum(
+            1 for family_id in by_family if not is_publishable_family(family_id)
+        ),
         "tutorial_variants": len(updated_cards),
         "active_tutorial_variants": sum(1 for card in updated_cards if card.get("active_for_photo_matching")),
         "inactive_tutorial_variants": sum(1 for card in updated_cards if not card.get("active_for_photo_matching")),
@@ -893,6 +1026,7 @@ def build_layer(
         },
         "index_path": str(index_path),
         "family_dir": str(family_dir),
+        "provenance_path": str(provenance_path),
         "summary_path": str(summary_path),
     }
 
@@ -903,6 +1037,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--card-dir", type=Path, default=DEFAULT_CARD_DIR)
     parser.add_argument("--family-dir", type=Path, default=DEFAULT_FAMILY_DIR)
     parser.add_argument("--index", type=Path, default=DEFAULT_INDEX_PATH)
+    parser.add_argument("--provenance", type=Path, default=DEFAULT_PROVENANCE_PATH)
     parser.add_argument("--summary", type=Path, default=DEFAULT_SUMMARY_PATH)
     return parser.parse_args(argv)
 
@@ -914,6 +1049,7 @@ def main(argv: list[str] | None = None) -> int:
         card_dir=args.card_dir,
         family_dir=args.family_dir,
         index_path=args.index,
+        provenance_path=args.provenance,
         summary_path=args.summary,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))

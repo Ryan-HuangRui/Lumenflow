@@ -1,0 +1,69 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "cyan_blue_story_portrait",
+  "style_name": "青蓝故事感人像",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "cool_narrative",
+  "active_for_photo_matching": true,
+  "description": "青蓝偏冷的故事感人像与环境人像，用冷背景衬托主体暖肤色。",
+  "suitable_scenes": [
+    "街头人像",
+    "环境人像",
+    "阴天城市",
+    "蓝绿色背景"
+  ],
+  "avoid_scenes": [
+    "暖调日落",
+    "高饱和花草",
+    "儿童暖调生活照"
+  ],
+  "visual_features": {
+    "tone": "quiet and narrative",
+    "color": "cyan-blue bias with protected skin warmth",
+    "contrast": "medium",
+    "texture": "natural documentary texture"
+  },
+  "tone_guidance": {
+    "overall": "quiet and narrative",
+    "contrast": "medium",
+    "texture": "natural documentary texture"
+  },
+  "color_guidance": {
+    "overall": "cyan-blue bias with protected skin warmth",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "hsl_color_cleanup",
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "color_grading",
+    "detail_and_texture",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "青蓝氛围不能牺牲主体肤色，必要时用局部或 HSL 保护人物。",
+    "如果原片没有冷色环境，只借鉴压饱和和叙事对比思路。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 6,
+    "category_counts": {
+      "basic_tone": 87,
+      "color_grading": 5,
+      "hsl_color": 99,
+      "mask_local": 4,
+      "presence_detail": 4,
+      "tone_curve": 32
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "rgb_curve_method",
+  "style_name": "RGB曲线方法论",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "method_family",
+  "parent_family": "editing_method",
+  "active_for_photo_matching": false,
+  "description": "围绕 RGB 曲线、万能曲线、胶片曲线的通用方法卡，不是单一视觉风格。",
+  "suitable_scenes": [
+    "需要曲线校色的照片",
+    "胶片感尝试",
+    "偏色修正"
+  ],
+  "avoid_scenes": [
+    "曲线已明显过度的照片"
+  ],
+  "visual_features": {
+    "tone": "curve-driven tone shaping",
+    "color": "channel curve color separation",
+    "contrast": "controlled by point curve",
+    "texture": "case-specific"
+  },
+  "tone_guidance": {
+    "overall": "curve-driven tone shaping",
+    "contrast": "controlled by point curve",
+    "texture": "case-specific"
+  },
+  "color_guidance": {
+    "overall": "channel curve color separation",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "hsl_color_cleanup",
+    "detail_and_texture",
+    "color_grading",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "把这类卡当成工具思路：先判断照片问题，再决定 RGB 曲线方向。",
+    "曲线调整后必须复查肤色、中性色和高光暗部。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 4,
+    "category_counts": {
+      "basic_tone": 58,
+      "color_grading": 7,
+      "hsl_color": 39,
+      "mask_local": 1,
+      "presence_detail": 8,
+      "tone_curve": 47
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

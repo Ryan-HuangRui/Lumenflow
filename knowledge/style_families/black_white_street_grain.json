@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "black_white_street_grain",
+  "style_name": "黑白街头颗粒",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "monochrome",
+  "active_for_photo_matching": true,
+  "description": "黑白街头、高反差、颗粒和纪实冲击力方向。",
+  "suitable_scenes": [
+    "黑白街拍",
+    "高反差纪实",
+    "颗粒感照片",
+    "强光影结构"
+  ],
+  "avoid_scenes": [
+    "依赖色彩表达的照片",
+    "柔和儿童或婚礼照片"
+  ],
+  "visual_features": {
+    "tone": "monochrome, high impact",
+    "color": "black and white only",
+    "contrast": "strong",
+    "texture": "visible grain and street grit"
+  },
+  "tone_guidance": {
+    "overall": "monochrome, high impact",
+    "contrast": "strong",
+    "texture": "visible grain and street grit"
+  },
+  "color_guidance": {
+    "overall": "black and white only",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "detail_and_texture",
+    "color_grading",
+    "hsl_color_cleanup",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "黑白转换后用明暗结构和颗粒承担风格表达。",
+    "如果照片的核心是色彩关系，不要强转黑白。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 2,
+    "category_counts": {
+      "basic_tone": 40,
+      "color_grading": 3,
+      "hsl_color": 3,
+      "mask_local": 1,
+      "presence_detail": 4,
+      "tone_curve": 21
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

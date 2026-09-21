@@ -44,10 +44,11 @@ lumenflow/
 │   ├── curate-photos/           # 按用途主动选片、去重与编排
 │   └── learn-styles/            # 定时任务或用户主动更新风格库时使用
 ├── knowledge/
-│   ├── style_families/          # Layer 1 风格/方法家族，用于检索
-│   ├── style_cards/             # 手写风格卡、教程 recipe 与 Layer 2 视频变体卡
-│   │   ├── tutorial_recipes/     # 调色教程转写后的 recipe 与 transcript
-│   │   └── tutorial_derived/     # Layer 2 视频级风格卡
+│   ├── style_families/          # 可提交、去来源化的可复用风格知识
+│   ├── style_cards/             # 手写风格卡与私有教程中间产物
+│   │   ├── tutorial_recipes/     # 私有 recipe 与 transcript
+│   │   └── tutorial_derived/     # 私有视频级证据卡，不参与运行时检索
+│   ├── private_provenance/      # 私有来源映射，Git 忽略
 │   ├── style_library_index.json # 风格库检索入口
 │   ├── source_records/           # 社媒/教程来源记录
 │   ├── raw_profiles/            # legacy/fallback RawTherapee profile
@@ -67,18 +68,18 @@ lumenflow/
 
 CLI 只作为调试和脚本复用入口，不是主交互界面。
 
-## 风格库两层结构
+## 风格知识结构
 
-教程来源进入风格库后固定分成两层：
+教程来源进入风格库后分成公开知识层和私有证据层：
 
-- Layer 1：`knowledge/style_families/*.json`，用于检索、场景匹配和过滤。这里包含视觉风格家族，也包含方法/工具/非风格参考家族。
-- Layer 2：`knowledge/style_cards/tutorial_derived/*.json`，一条成功视频对应一张视频级风格卡。
-- 教程 recipe：`knowledge/style_cards/tutorial_recipes/*.json`，作为生成 Layer 2 卡片的来源证据。
-- 检索入口：`knowledge/style_library_index.json`，agent 先读它，再决定读取哪些 Layer 1/Layer 2 文件。
+- 可复用知识：`knowledge/style_families/*.json`，按语义家族合并，供检索、场景匹配和调色推理；不含视频 ID、标题、URL、转写原句或时间戳。
+- 检索入口：`knowledge/style_library_index.json`，只索引可复用知识，可随代码提交。
+- 私有中间证据：`knowledge/style_cards/tutorial_recipes/` 与 `knowledge/style_cards/tutorial_derived/`，保留转写、分类和审计所需信息，但不参与照片处理时的运行时检索。
+- 私有溯源：`knowledge/private_provenance/style_source_map.json`，把语义知识映射回来源，仅用于本地审计并由 Git 忽略。
 
-这些教程派生文件是本地生成的私有数据，默认被 `.gitignore` 排除。公开仓库只提交生成脚本、schema、空目录占位和 `*.example.*` 模板，不提交从第三方教程生成的 transcript、recipe、视频级风格卡或 family index。
+公开知识只保留跨照片可复用的视觉特征、适用/避用场景、操作顺序、参数推理策略和聚合计数。第三方教程的 transcript、recipe、视频级证据卡和来源映射继续由 `.gitignore` 排除。
 
-照片处理时，agent 先根据照片内容选择 Layer 1 `style_family`，再读取匹配的 Layer 2 视频变体作为调色思路。具体参数始终由 agent 看目标照片后写入 `adjustment_plan.json`，不把教程参数当作固定 preset。
+照片处理时，agent 根据目标照片直接选择一张可复用语义知识卡。具体参数始终由 agent 看目标照片后写入 `adjustment_plan.json`，不读取私有视频证据，也不把教程参数当作固定 preset。
 
 更新和检索的固定流程见 `docs/style_library_workflows.md`。
 
