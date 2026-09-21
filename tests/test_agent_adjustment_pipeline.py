@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import create_previews  # noqa: E402
+import darktable_codec  # noqa: E402
 import preview_provider  # noqa: E402
 import render_adjustment_plan  # noqa: E402
 
@@ -95,6 +96,83 @@ class AgentAdjustmentPipelineTests(unittest.TestCase):
 
             manifest = json.loads((output_dir / "preview_manifest.json").read_text(encoding="utf-8"))
             self.assertIn("/custom/rawtherapee-cli", manifest[0]["command"])
+
+    def test_darktable_bare_raw_preview_materializes_complete_managed_xmp_state(self) -> None:
+        """A bare RAW must be able to enter the dynamic darktable compiler."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            source_dir = tmp_path / "source"
+            output_dir = tmp_path / "previews"
+            source_dir.mkdir()
+            raw = source_dir / "keeper.DNG"
+            raw.write_bytes(b"fake raw")
+
+            summary = create_previews.run(
+                source_dir=source_dir,
+                output_dir=output_dir,
+                selected_only=False,
+                min_rating=None,
+                limit=None,
+                dry_run=True,
+                render_timeout=10,
+                base_profile=None,
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+                provider_name="darktable",
+            )
+
+            self.assertEqual(summary["succeeded"], 1)
+            manifest = json.loads((output_dir / "preview_manifest.json").read_text(encoding="utf-8"))
+            artifact = manifest[0]
+            self.assertEqual(artifact["state_completeness"], "complete")
+            self.assertFalse(artifact["starting_state"]["uses_engine_default"])
+            self.assertEqual(len(artifact["state_inputs"]), 1)
+            managed_xmp = Path(artifact["state_inputs"][0]["path"])
+            self.assertTrue(managed_xmp.is_file())
+            self.assertTrue(managed_xmp.is_relative_to(output_dir))
+            self.assertEqual(managed_xmp.read_text(encoding="utf-8"), darktable_codec.minimal_xmp())
+            self.assertIn(str(managed_xmp), artifact["command_argv"])
+            self.assertFalse(raw.with_suffix(".xmp").exists())
+            self.assertFalse(raw.with_name(raw.name + ".xmp").exists())
+
+    def test_create_previews_rejects_missing_explicit_base_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            (source / "keeper.DNG").write_bytes(b"fake raw")
+
+            with self.assertRaisesRegex(ValueError, "base profile does not exist"):
+                create_previews.run(
+                    source_dir=source,
+                    output_dir=root / "previews",
+                    selected_only=False,
+                    min_rating=None,
+                    limit=None,
+                    dry_run=True,
+                    render_timeout=10,
+                    base_profile=root / "missing.xmp",
+                    local_config={},
+                    provider_name="darktable",
+                )
+
+    def test_darktable_managed_base_profile_fails_closed_after_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "previews"
+            managed = create_previews.resolve_preview_base_profile(
+                provider_name="darktable",
+                base_profile=None,
+                output_dir=output,
+            )
+            self.assertIsNotNone(managed)
+            managed.write_text("tampered", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "not the expected codec state"):
+                create_previews.resolve_preview_base_profile(
+                    provider_name="darktable",
+                    base_profile=None,
+                    output_dir=output,
+                )
 
     def test_render_adjustment_plan_dry_run_writes_profiles_and_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
