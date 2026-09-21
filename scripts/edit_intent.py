@@ -190,7 +190,7 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
     if not str(intent.get("purpose", "")).strip():
         raise IntentValidationError("purpose is required")
     style = _require_object(intent.get("style"), "style")
-    _reject_unknown(style, {"style_id", "rationale", "darktable"}, "style")
+    _reject_unknown(style, {"style_id", "rationale", "darktable", "rawtherapee"}, "style")
     if not str(style.get("style_id", "")).strip() or not str(style.get("rationale", "")).strip():
         raise IntentValidationError("style_id and style rationale are required")
     darktable_style = style.get("darktable")
@@ -206,6 +206,11 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
         for index, module in enumerate(modules):
             if not isinstance(module, dict):
                 raise IntentValidationError(f"style.darktable.modules[{index}] must be an object")
+    if "rawtherapee" in style:
+        try:
+            rawtherapee_pp3.validate_native_sections(style["rawtherapee"])
+        except rawtherapee_pp3.PP3UnsupportedValue as error:
+            raise IntentValidationError(str(error)) from error
     global_adjustments = _require_object(intent.get("global_adjustments"), "global_adjustments")
     _validate_adjustments(global_adjustments, "global_adjustments")
 
@@ -495,6 +500,10 @@ def _compile_darktable_intent(
     local_config: dict[str, Any],
     capabilities: backend_capabilities.BackendCapabilities,
 ) -> dict[str, Any]:
+    if "rawtherapee" in intent["style"]:
+        raise IntentValidationError(
+            "style.rawtherapee is only supported by the rawtherapee backend"
+        )
     explicit_modules = (
         intent["style"].get("darktable", {}).get("modules", [])
         if isinstance(intent["style"].get("darktable"), dict)
@@ -680,6 +689,10 @@ def compile_intent(
 
     if backend_id != "rawtherapee":
         raise IntentValidationError(f"No EditIntent v2 compiler is registered for {backend_id}")
+    if "darktable" in intent["style"]:
+        raise IntentValidationError(
+            "style.darktable is only supported by the darktable backend"
+        )
 
     safe_source_stem = _safe_name(source_path.stem)
     safe_intent_id = _safe_name(str(intent["intent_id"]))
@@ -687,14 +700,30 @@ def compile_intent(
     profile_path = output_dir / "profiles" / f"{stem}.pp3"
     output_path = output_dir / f"{stem}.jpg"
     profile_inputs = _rawtherapee_profile_inputs(intent)
+    overrides = rawtherapee_pp3.semantic_overrides(
+        _legacy_adjustments(intent["global_adjustments"]),
+        composition=_legacy_composition(intent["composition"]),
+    )
+    native_contract = intent["style"].get("rawtherapee")
+    if native_contract is not None:
+        native_overrides = rawtherapee_pp3.native_sections_to_overrides(native_contract)
+        for section, fields in native_overrides.items():
+            target = overrides.setdefault(section, {})
+            for key, value in fields.items():
+                if key in target and target[key] != value:
+                    raise IntentValidationError(
+                        f"Conflicting RawTherapee overrides for {section}.{key}"
+                    )
+                target[key] = value
     profile_text = rawtherapee_pp3.compile_profile_text(
         [path for _role, path in profile_inputs],
-        overrides=rawtherapee_pp3.semantic_overrides(
-            _legacy_adjustments(intent["global_adjustments"]),
-            composition=_legacy_composition(intent["composition"]),
-        ),
+        overrides=overrides,
         app_version="5.11",
-        profile_version=349,
+        profile_version=(
+            native_contract["profile_version"]
+            if native_contract is not None
+            else rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION
+        ),
     )
     executable = lumenflow_config.tool_command(
         local_config,

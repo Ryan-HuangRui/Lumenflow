@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -213,6 +214,17 @@ class PhotoPipelineTests(unittest.TestCase):
             )
 
             self.assertEqual(command[0], "/custom/rawtherapee-cli")
+
+    def test_rawtherapee_runner_pins_openmp_for_deterministic_pixels(self) -> None:
+        with patch("render_raw.subprocess.run") as run:
+            render_raw.run_command(["/opt/homebrew/bin/rawtherapee-cli", "-v"])
+
+        self.assertEqual(run.call_args.kwargs["env"]["OMP_NUM_THREADS"], "1")
+
+        with patch("render_raw.subprocess.run") as run:
+            render_raw.run_command(["darktable-cli", "--version"])
+
+        self.assertIsNone(run.call_args.kwargs["env"])
 
     def test_develop_photos_dry_run_writes_records_for_selected_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

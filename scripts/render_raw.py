@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import shutil
 import subprocess
@@ -137,7 +138,14 @@ def run_command(command: list[str], *, dry_run: bool = False, timeout: int | Non
     print(shlex.join(command))
     if dry_run:
         return 0
-    subprocess.run(command, check=True, timeout=timeout)
+    environment = None
+    if command and Path(command[0]).name == "rawtherapee-cli":
+        # RawTherapee 5.11's RAW path has a small OpenMP race in some camera
+        # decoders.  A single worker makes preview and final execution produce
+        # the same pixel fingerprint for an identical PP3/source pair.
+        environment = os.environ.copy()
+        environment["OMP_NUM_THREADS"] = "1"
+    subprocess.run(command, check=True, timeout=timeout, env=environment)
     return 0
 
 

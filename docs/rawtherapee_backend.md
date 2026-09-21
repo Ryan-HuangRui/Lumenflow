@@ -7,7 +7,7 @@ profile stack, and final output container.
 
 ## State and safety model
 
-`scripts/rawtherapee_pp3.py` implements `lumenflow.rawtherapee-pp3.v2`:
+`scripts/rawtherapee_pp3.py` implements `lumenflow.rawtherapee-pp3.v3`:
 
 - profiles are parsed with bounded UTF-8 validation;
 - later profiles override only fields they contain;
@@ -18,6 +18,8 @@ profile stack, and final output container.
 - when a preview artifact supplies explicit `state_inputs`, the compiler
   verifies every path and SHA-256, merges those bytes into the generated PP3,
   and executes the embedded snapshot rather than reading a mutable sidecar.
+- RawTherapee renders run with `OMP_NUM_THREADS=1` so the 5.11 RAW decoder and
+  processing graph produce a stable pixel fingerprint across repeated renders.
 
 For legacy intents without explicit inputs, a regular `RAW.pp3` sidecar is
 discovered and checked against the preview state hash when present.  A base
@@ -42,18 +44,68 @@ The compiler rejects unknown semantic fields.  This is intentional: GUI labels
 are not stable PP3 keys and guessing a mapping can produce a plausible but
 wrong image.
 
-The lower-level `compile_profile_text()` API can merge a complete, fixture-
-verified section/key mapping for additional RawTherapee modules while retaining
-the starting profile fields.  This is a profile-import/merge primitive, not an
-agent-facing native-module API: preserving unknown fields from an input PP3 does
-not verify that an agent-authored value is correct for RawTherapee 5.11.
+The lower-level `compile_profile_text()` API can merge a complete profile while
+retaining fields from newer RawTherapee releases.  Retaining unknown fields from
+an input PP3 is not the same as verifying an agent-authored native value.
 
-`EditIntent v2` currently exposes only the vendor-neutral fields in the table
-above.  It does not expose `rawtherapee_native`, `style.rawtherapee.sections`,
-or any other arbitrary PP3 escape hatch.  Full native-module authoring remains
-future work and must first define a strict bounded schema (for example,
-`style.rawtherapee.sections`) backed by versioned 5.11 fixtures and CLI render
-tests before it is exposed to agents.
+## Bounded native-module contract
+
+`EditIntent v2` now accepts the engine-specific contract below alongside the
+vendor-neutral fields:
+
+```json
+{
+  "style": {
+    "style_id": "bangkok-night",
+    "rationale": "Keep the humid night atmosphere.",
+    "rawtherapee": {
+      "profile_version": 349,
+      "sections": {
+        "Exposure": {
+          "Compensation": 0.35,
+          "CurveMode": "Standard",
+          "Curve": "3;0;0;0.35;0.2;0.7;0.85;1;1;"
+        },
+        "Sharpening": {"Enabled": true, "Radius": 1.0, "Amount": 250}
+      }
+    }
+  }
+}
+```
+
+The contract is versioned for RawTherapee 5.11 profile version `349`.  The
+compiler has an explicit section/field allowlist, scalar type checks, finite
+number/range checks, enum checks, and bounded tone-curve parsing.  Unknown
+sections, fields, profile versions, and malformed curves fail closed.  The
+contract is RawTherapee-specific; a darktable compile rejects it instead of
+silently ignoring it.  A future `style.darktable` contract can coexist without
+sharing this namespace.
+
+The following native sections are currently bounded and covered by the live
+fixture contract.  The table describes the supported slice, not every GUI
+control in that module.
+
+| Module | Verified fields |
+| --- | --- |
+| RAW / RAW Bayer | chromatic aberration correction flags/iterations, hot/dead-pixel flags, demosaic method, DCB/LMMSE controls |
+| Exposure / White Balance | compensation, brightness, contrast, saturation, black, highlight/shadow compression, stable tone curves, temperature and green multiplier |
+| Color appearance | enabled, light/brightness/chroma/contrast controls, scene adaptation and gamut flag |
+| Vibrance / Shadows & Highlights | enable, vibrance amounts/protection, highlight/shadow amounts and tonal widths, radius |
+| Directional Pyramid Denoising / Impulse Denoising / EPD | enable and bounded strength/noise controls |
+| Sharpening / SharpenEdge / SharpenMicro / PostDemosaicSharpening | enable, method, radius, amount, contrast, iteration and edge controls |
+| Lens / geometry | lens profile mode/toggles, distortion, chromatic-aberration correction, rotation, perspective, coarse transforms |
+| Crop / Resize | bounded pixel crop, scale/dimensions, and upscaling flag |
+| Color Management | gamut, allowlisted output profile/intent, black-point compensation |
+
+The fixture test combines these sections in one immutable PP3 and renders all
+three local Bangkok RW2 copies.  It checks decoded-pixel difference from the
+base profile, repeat pixel-fingerprint equality, and unchanged source bytes.
+
+Agent-authored local adjustments (`Locallab`, masks, spot removal), Retinex,
+Local Contrast, Channel Mixer, Black & White, Luminance/RGB curves, Tone
+Equalizer, film simulation, wavelet, and other sections not listed above remain
+unsupported and are rejected by the native contract.  They can only be added
+after a new bounded schema and RawTherapee 5.11 fixture/live evidence.
 
 ## Output containers
 
@@ -86,6 +138,14 @@ contract (`scripts/backend_capabilities.py`).  The three local Bangkok RAW
 copies used for live checks are outside the repository; the NAS originals are
 never modified.
 
-Still outside the verified semantic slice: local/AI masks, advanced color
-tools, full tone-curve authoring, lens/denoise/sharpen module synthesis, and
-catalog writes.  These require versioned PP3 fixtures before being enabled.
+Opt-in live verification (uses only local fixture copies):
+
+```bash
+LUMENFLOW_RAWTHERAPEE_LIVE_FIXTURES=/private/tmp/lumenflow-raw-fixtures/bangkok-2026 \
+RAWTHERAPEE_CLI=/opt/homebrew/bin/rawtherapee-cli \
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_rawtherapee_native_live
+```
+
+The normal unit suite includes the bounded validator/compiler and runner
+determinism checks; the live test is intentionally skipped unless the fixture
+environment variable is provided.

@@ -116,6 +116,110 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertEqual(first["operations"][1]["command_argv"][0], "/custom/rawtherapee-cli")
             self.assertFalse(output_dir.exists())
 
+    def test_compile_rawtherapee_applies_bounded_native_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            output_dir = root / "output"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["style"]["rawtherapee"] = {
+                "profile_version": 349,
+                "sections": {
+                    "RAW": {"CA": True, "CAAutoIterations": 2},
+                    "Exposure": {
+                        "CurveMode": "Standard",
+                        "Curve": "3;0;0;0.35;0.2;0.7;0.85;1;1;",
+                    },
+                    "Sharpening": {"Enabled": True, "Radius": 1.0, "Amount": 250},
+                    "Rotation": {"Degree": 2.0},
+                },
+            }
+
+            first = edit_intent.compile_intent(
+                intent,
+                backend_id="rawtherapee",
+                output_dir=output_dir,
+                local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            )
+            second = edit_intent.compile_intent(
+                intent,
+                backend_id="rawtherapee",
+                output_dir=output_dir,
+                local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            )
+
+            content = first["operations"][0]["payload"]["content"]
+            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v3", content)
+            self.assertIn("CAAutoIterations=2", content)
+            self.assertIn("Curve=3;0;0;0.35;0.2;0.7;0.85;1;1;", content)
+            self.assertIn("Amount=250", content)
+            self.assertIn("Degree=2", content)
+            self.assertEqual(first["plan_id"], second["plan_id"])
+            self.assertEqual(
+                first["operations"][0]["payload"]["sha256"],
+                second["operations"][0]["payload"]["sha256"],
+            )
+
+    def test_native_sections_are_rejected_by_darktable_compiler(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["style"]["rawtherapee"] = {
+                "profile_version": 349,
+                "sections": {"RAW": {"CA": True}},
+            }
+            intent["global_adjustments"] = {}
+            intent["composition"] = {
+                "decision": "preserve_existing_crop",
+                "reason": "Replay the approved darktable history stack.",
+            }
+            with self.assertRaises(edit_intent.IntentValidationError):
+                edit_intent.compile_intent(
+                    intent,
+                    backend_id="darktable",
+                    output_dir=root / "output",
+                    local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+                )
+
+    def test_darktable_modules_are_rejected_by_rawtherapee_compiler(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["style"]["darktable"] = {
+                "modules": [{"operation": "exposure", "params": {}}],
+            }
+            with self.assertRaises(edit_intent.IntentValidationError):
+                edit_intent.compile_intent(
+                    intent,
+                    backend_id="rawtherapee",
+                    output_dir=root / "output",
+                    local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+                )
+
+    def test_native_section_conflicts_with_semantic_field_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["style"]["rawtherapee"] = {
+                "profile_version": 349,
+                "sections": {"Exposure": {"Compensation": 1.25}},
+            }
+            with self.assertRaises(edit_intent.IntentValidationError) as error:
+                edit_intent.compile_intent(
+                    intent,
+                    backend_id="rawtherapee",
+                    output_dir=root / "output",
+                    local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+                )
+            self.assertIn("Conflicting RawTherapee overrides", str(error.exception))
+
     def test_compile_darktable_replays_only_the_preview_bound_xmp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -619,7 +723,7 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertIn("Opaque=preserve", content)
             self.assertIn("Native=keep", content)
             self.assertIn("Compensation=0.35", content)
-            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v2", content)
+            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v3", content)
 
             sidecar.write_text("[Exposure]\nContrast=99\n", encoding="utf-8")
             with self.assertRaises(edit_intent.ExecutionPreconditionError) as error:
@@ -639,6 +743,16 @@ class EditIntentExecutionTests(unittest.TestCase):
                 )
                 self.assertEqual(schema["properties"]["schema_version"]["const"], version)
                 self.assertIs(schema["additionalProperties"], False)
+
+        intent_schema = json.loads(
+            (ROOT / "knowledge" / "schemas" / "edit_intent.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        native = intent_schema["properties"]["style"]["properties"]["rawtherapee"]
+        self.assertIs(native["additionalProperties"], False)
+        self.assertEqual(native["properties"]["profile_version"]["const"], 349)
+        self.assertIs(native["properties"]["sections"]["additionalProperties"], False)
 
 
 if __name__ == "__main__":
