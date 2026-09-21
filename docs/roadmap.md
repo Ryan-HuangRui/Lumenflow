@@ -92,6 +92,9 @@ Implemented foundation:
 - Model-authored selection-plan contract with ordered editorial roles, alternates, edit experiments, and explicit confirmation state.
 - Deterministic plan validation and ordered preview packaging without RAW mutation.
 - Preview generation.
+- Versioned, state-bound `PreviewArtifact` manifests for RawTherapee previews.
+- Strict cross-backend capability contracts with fail-closed Lightroom evidence mapping.
+- Vendor-neutral `EditIntent v2` plus RawTherapee `ExecutionPlan` and verified `ExecutionReceipt` contracts.
 - RawTherapee and darktable command construction.
 - `adjustment_plan.json` schema.
 - Rendering from an agent-authored plan.
@@ -101,6 +104,7 @@ Implemented foundation:
 Maintenance work:
 
 - Expand RawTherapee `.pp3` parameter coverage.
+- Add EditIntent v2 compilers only after each backend advertises the required capabilities.
 - Improve render-review notes and revision-loop output.
 - Add more fixture coverage for adjustment-plan edge cases.
 - Improve failure messages when external tools are missing.

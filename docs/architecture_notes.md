@@ -90,6 +90,17 @@ Every backend publishes `lumenflow.backend_capabilities.v1` before later compile
 
 Lightroom capabilities are derived from the live versioned bridge contract. Protocol or version mismatch invalidates all runtime evidence even when individual capability flags are true. RawTherapee capabilities are static for the current profile-based adapter. Darktable intentionally advertises only `render.legacy` until the isolated dynamic-module spike succeeds.
 
+### Intent, compilation, and execution
+
+The new runtime path separates model judgment from backend mechanics:
+
+1. `lumenflow.edit_intent.v2` records authorization, exact source and preview-state evidence, purpose, style rationale, vendor-neutral global adjustments, composition, and local-adjustment intent.
+2. A backend compiler checks `lumenflow.backend_capabilities.v1` and emits `lumenflow.execution_plan.v1`. Compilation is side-effect free.
+3. The executor accepts an explicit allowed output root, revalidates source bytes, backend/compiler versions, artifact paths, embedded profile content, and the exact argv it can reconstruct locally.
+4. `lumenflow.execution_receipt.v1` records per-operation outcomes, source before/after fingerprints, verified output bytes, and failure details.
+
+The first compiler targets RawTherapee. It never invokes a shell, refuses output paths outside the caller-approved root, refuses existing output replacement, and rejects a plan whose command or profile payload was modified. `adjustment_plan.v1` remains available as a compatibility renderer while callers migrate; it is not extended with new runtime responsibilities.
+
 ## Style Library
 
 Tutorial ingestion separates public reusable knowledge from private evidence:

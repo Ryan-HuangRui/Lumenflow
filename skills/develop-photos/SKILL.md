@@ -19,7 +19,7 @@ into:
 
 1. A confirmed selection plan or an explicit user-specified photo set.
 2. JPEG previews that the host agent can inspect visually.
-3. Agent-authored per-photo adjustment plans based on reusable style knowledge.
+3. Agent-authored per-photo `EditIntent v2` documents based on reusable style knowledge.
 4. Rendered JPG outputs through RawTherapee CLI by default, or Lightroom when explicitly selected and available.
 5. Agent review of rendered outputs, with revised plans when needed.
 6. A processing report explaining what happened.
@@ -53,25 +53,26 @@ into:
    - Record `composition.decision` as `preserve_existing_crop`, `no_crop`, `crop`, or `manual_recommendation`.
    - Record the framing reason in `composition.reason`; crop executions should also include `composition.crop.reason`.
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
-11. Decide local adjustments before rendering. Record `mask_decision.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include executable Lightroom AI `masks`; if no mask is needed, explain why in `mask_decision.reason`.
-12. Write one `adjustment_plan.json` per RAW using `knowledge/schemas/adjustment_plan.schema.json`.
-13. Render each plan with `scripts/render_adjustment_plan.py`. The default RawTherapee path creates temporary `.pp3` profiles and calls the configured RawTherapee CLI from `config/lumenflow.local.json` when present. For Lightroom, pass `--engine lightroom`; the plan must include `lightroom.photo_id`, or the source RAW must already be resolvable in the Lightroom catalog by file path.
-14. Review rendered outputs with the host agent's vision/reasoning capability:
+11. Decide local adjustments before rendering. Record `local_adjustments.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include requested masks; the compiler must still reject them when the selected backend lacks verified `mask.ai` capability. If no mask is needed, explain why in `local_adjustments.reason`.
+12. Write one vendor-neutral `EditIntent v2` per RAW using `knowledge/schemas/edit_intent.schema.json`. Bind it to the confirmed authorization reference, source fingerprint, preview artifact id, and starting-state hash.
+13. Compile the intent with `scripts/edit_intent.py compile`. The compiler must produce `lumenflow.execution_plan.v1` without writing a profile or rendered image.
+14. Execute the plan with `scripts/edit_intent.py execute`, passing the exact allowed output directory. Preserve the resulting `lumenflow.execution_receipt.v1` for review. Use `scripts/render_adjustment_plan.py` only for existing `adjustment_plan.v1` compatibility inputs.
+15. Review rendered outputs with the host agent's vision/reasoning capability:
     - exposure and highlight clipping
     - blocked shadows
     - color cast and skin/subject color
     - style strength
     - crop quality and whether important context was lost
     - obvious rendering artifacts
-15. If review finds a material issue, write a revised plan with `revision` incremented, `parent_plan` pointing to the previous plan, and `review_basis` explaining the change; render again.
-16. Write final `processing_records.json`, `processing_report.md`, and review notes.
+16. If review finds a material issue, write a revised intent with `revision` incremented and review evidence explaining the change; compile and execute a new plan.
+17. Write final execution receipts, processing report, and review notes.
 
 Typical command:
 
 ```bash
 python scripts/create_previews.py /path/to/photos
-python scripts/render_adjustment_plan.py /path/to/output/plans/IMG_001.adjustment_plan.json
-python scripts/render_adjustment_plan.py /path/to/output/plans/IMG_001.adjustment_plan.json --engine lightroom
+python scripts/edit_intent.py compile /path/to/IMG_001.edit_intent.json --backend rawtherapee --output-dir /path/to/output --plan-output /path/to/output/IMG_001.execution_plan.json
+python scripts/edit_intent.py execute /path/to/output/IMG_001.execution_plan.json --allowed-output-dir /path/to/output --receipt-output /path/to/output/IMG_001.execution_receipt.json
 ```
 
 With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-source/negative_raw/2026五一港珠澳/P1034473.RW2` renders into `/photo-output-root/2026五一港珠澳/`.
@@ -81,6 +82,8 @@ With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-
 ## Engine Selection
 
 Default to RawTherapee unless the user explicitly asks for Lightroom, the plan requires executable Lightroom AI masks, or the source workflow is already organized around Lightroom catalog selections.
+
+The `EditIntent v2` compiler currently supports RawTherapee only. Lightroom inputs remain on the fail-closed `adjustment_plan.v1` compatibility path until the Lightroom v2 compiler and state-bound preview probe are implemented; do not silently translate a v2 intent into legacy Lightroom commands.
 
 Use RawTherapee when:
 
@@ -172,6 +175,8 @@ Use this exact retrieval order:
 - Keep the reusable style selection and photo-specific reasoning auditable in the plan rationale or metadata.
 - Keep every run auditable: source path, preview path, style id, variant id, agent rationale, generated adjustments, composition decision, profile path, CLI command, review outcome, and failure reason.
 - Do not treat a preview path alone as evidence. Carry the versioned preview artifact id and starting-state hash into downstream workflow state so a stale preview cannot silently justify a new edit.
+- Do not put backend command names, executable paths, PP3 keys, Lightroom parameter names, or output paths in `EditIntent v2`; those belong in the compiled execution plan.
+- Do not execute a plan without an explicit allowed output root. Refuse source fingerprint drift, path escape, command mismatch, profile hash mismatch, or an existing output file before invoking the backend.
 - Prefer one best variant per photo. Add extra variants only when the photo has multiple credible directions.
 - RawTherapee is the default dynamic rendering backend. Use darktable only for legacy/fallback workflows until dynamic darktable parameter generation is implemented. Use Lightroom only when Lightroom Classic is open, the CLI Bridge plugin is running, `lr system ping` succeeds, and the source RAW is already in the Lightroom catalog.
 - Keep generated `.pp3` files under the output directory, not in `knowledge/raw_profiles/`.

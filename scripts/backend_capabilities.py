@@ -172,7 +172,9 @@ def rawtherapee_capabilities() -> BackendCapabilities:
             ),
             "state.read": _supported("PP3 profile inputs can be fingerprinted without mutating RAW files"),
             "plan.compile.v1": _supported("adjustment_plan.v1 compiles to temporary PP3 profiles"),
-            "intent.compile.v2": _unsupported("EditIntent v2 compiler is not implemented yet"),
+            "intent.compile.v2": _supported(
+                "EditIntent v2 compiles to an isolated RawTherapee execution plan"
+            ),
             "render": _supported("RawTherapee CLI renders isolated output files"),
             "render.legacy": _unsupported("Use the first-class RawTherapee renderer"),
             "export.verified": _unsupported("Final render receipts do not verify output fingerprints yet"),
