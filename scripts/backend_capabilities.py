@@ -203,7 +203,7 @@ def rawtherapee_capabilities() -> BackendCapabilities:
 def darktable_capabilities() -> BackendCapabilities:
     return _contract(
         "darktable",
-        "darktable-isolated-xmp-v1",
+        "darktable-module-codec-v1",
         {
             "preview.state_bound": _supported(
                 "A real RAW preview passed with an explicit fingerprinted XMP and isolated darktable runtime",
@@ -218,8 +218,9 @@ def darktable_capabilities() -> BackendCapabilities:
             ),
             "plan.compile.v1": _unsupported("adjustment_plan.v1 is not compiled to darktable modules"),
             "intent.compile.v2": _supported(
-                "EditIntent v2 can safely replay an exact preview-bound XMP; dynamic module compilation is rejected",
-                "compiler=lumenflow.darktable-xmp-replay@1",
+                "EditIntent v2 compiles a verified subset of darktable 5.4.1 module structs and replays them through darktable-cli",
+                "compiler=lumenflow.darktable-xmp-modules@1",
+                "modules=exposure,temperature,sigmoid,filmicrgb,colorbalancergb,crop",
             ),
             "render": _supported(
                 "darktable-cli passed isolated real-RAW exports with source and sidecar preservation",
@@ -235,9 +236,15 @@ def darktable_capabilities() -> BackendCapabilities:
                 "sentinel_sha256=b8979553ec61b579c2600787e62d9e10885645358e07bafbd6c58cddc84cce4e",
             ),
             "develop.write.verified": _unsupported("Catalog develop writes are outside the legacy path"),
-            "composition.crop": _unsupported("Dynamic crop compilation is not implemented"),
+            "composition.crop": _supported(
+                "Normalized crop module structs are compiled and live-verified with darktable-cli 5.4.1",
+                "module=crop@3",
+            ),
             "mask.ai": _unsupported("AI mask compilation is not implemented"),
-            "adjustments.advanced_color": _unsupported("Dynamic module compilation is not implemented"),
+            "adjustments.advanced_color": _supported(
+                "Explicit filmic RGB, sigmoid and color balance RGB module structs are version-checked",
+                "modules=filmicrgb@6,sigmoid@3,colorbalancergb@5",
+            ),
         },
     )
 
