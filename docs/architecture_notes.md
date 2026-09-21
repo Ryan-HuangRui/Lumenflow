@@ -36,8 +36,8 @@ The scripts are responsible for deterministic work:
 3. Creating rendered JPEG previews for development and emitting versioned, state-bound preview artifacts.
 4. Rendering RawTherapee or darktable commands.
 5. Fetching subtitles and normalizing transcripts.
-6. Generating local tutorial recipes and derived cards.
-7. Rebuilding local style-family indexes.
+6. Generating private tutorial recipes and evidence cards.
+7. Merging source-clean reusable style knowledge and rebuilding its runtime index.
 
 ## Lightroom Safety Boundary
 
@@ -109,20 +109,23 @@ Visual review remains a host-model responsibility. The model inspects the render
 
 ## Style Library
 
-The style library has two layers when tutorial ingestion is used locally:
+Tutorial ingestion separates public reusable knowledge from private evidence:
 
-- Layer 1: `knowledge/style_families/*.json`
-- Layer 2: `knowledge/style_cards/tutorial_derived/*.json`
+- Public reusable knowledge: `knowledge/style_families/*.json`
+- Private evidence: `knowledge/style_cards/tutorial_recipes/*.json` and `knowledge/style_cards/tutorial_derived/*.json`
+- Private source map: `knowledge/private_provenance/style_source_map.json`
 
 The entrypoint is `knowledge/style_library_index.json`.
 
-These files are generated private data and are ignored by git by default. Public repositories should ship only:
+The reusable cards and source-clean index are generated, reviewable, and tracked. Public repositories should also ship:
 
 - hand-authored starter style cards
-- empty directory placeholders
+- reusable source-agnostic style knowledge
 - `knowledge/style_library_index.example.json`
 - source config examples
 - generation scripts and tests
+
+Transcripts, recipes, video-level evidence cards, source maps, source whitelists, cookies, and ASR caches remain ignored private data.
 
 ## Source Strategy
 
@@ -133,4 +136,4 @@ Lumenflow only works from user-approved sources by default.
 - X: prefer official API with explicit account whitelist.
 - Instagram: avoid default scraping; use explicit authorized sources only.
 
-Do not commit cookies, API tokens, generated transcripts, source whitelists, ASR audio caches, or generated third-party-derived style libraries.
+Do not commit cookies, API tokens, generated transcripts, source whitelists, source maps, video-level evidence cards, or ASR audio caches. Reusable knowledge is commit-safe only after the builder's source-leak validation passes.

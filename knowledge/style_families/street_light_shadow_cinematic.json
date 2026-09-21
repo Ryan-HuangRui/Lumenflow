@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "street_light_shadow_cinematic",
+  "style_name": "街头光影电影感",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "cinematic_street",
+  "active_for_photo_matching": true,
+  "description": "扫街、街头光影、电影感色彩和中高对比叙事照片。",
+  "suitable_scenes": [
+    "扫街",
+    "街头光影",
+    "旅行街景",
+    "人文纪实"
+  ],
+  "avoid_scenes": [
+    "纯净柔光人像",
+    "需要明亮透明的照片"
+  ],
+  "visual_features": {
+    "tone": "cinematic street contrast",
+    "color": "restrained palette with warm-cool separation",
+    "contrast": "medium-high local contrast",
+    "texture": "visible street detail"
+  },
+  "tone_guidance": {
+    "overall": "cinematic street contrast",
+    "contrast": "medium-high local contrast",
+    "texture": "visible street detail"
+  },
+  "color_guidance": {
+    "overall": "restrained palette with warm-cool separation",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "hsl_color_cleanup",
+    "detail_and_texture",
+    "color_grading",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "先判断光影结构是否成立，再加对比和色彩分离。",
+    "街拍质感来自明暗关系，不要只靠降曝光制造电影感。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 21,
+    "category_counts": {
+      "basic_tone": 351,
+      "color_grading": 28,
+      "hsl_color": 187,
+      "mask_local": 18,
+      "presence_detail": 35,
+      "tone_curve": 221
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}
