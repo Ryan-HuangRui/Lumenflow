@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import shlex
-import subprocess
 from pathlib import Path
 from typing import Any
 
 import lumenflow_config
+import preview_provider
 import render_raw
 import scan_raws
 
@@ -54,8 +53,10 @@ def run(
     render_timeout: int,
     base_profile: Path | None = Path("knowledge/raw_profiles/base.pp3"),
     local_config: dict[str, Any] | None = None,
+    provider_name: str = "rawtherapee",
 ) -> dict[str, Any]:
     local_config = local_config or {}
+    provider = preview_provider.create_preview_provider(provider_name, local_config=local_config)
     all_raws = scan_raws.scan_raws(source_dir, selected_only=False, min_rating=min_rating)
     selected_raws = [item for item in all_raws if item.get("selected")]
     if not selected_only:
@@ -68,28 +69,23 @@ def run(
     for raw_item in selected_raws:
         raw_path = Path(raw_item["path"])
         preview_path = output_dir / preview_name(raw_path)
-        command = build_preview_command(raw_path, preview_path, base_profile, local_config)
-        record = {
-            "source": str(raw_path),
-            "preview": str(preview_path),
-            "command": shlex.join(command),
-            "selection_reason": raw_item.get("selection_reason", ""),
-            "status": "dry_run" if dry_run else "pending",
-            "failure_reason": "",
-        }
-        try:
-            render_raw.run_command(command, dry_run=dry_run, timeout=render_timeout)
-            if not dry_run:
-                record["status"] = "success"
-        except (subprocess.SubprocessError, OSError) as exc:
-            record["status"] = "failed"
-            record["failure_reason"] = str(exc)
-        records.append(record)
+        artifact = provider.create_preview(
+            preview_provider.PreviewRequest(
+                source=raw_path,
+                output=preview_path,
+                base_profile=base_profile,
+                dry_run=dry_run,
+                timeout=render_timeout,
+                selection_reason=raw_item.get("selection_reason", ""),
+            )
+        )
+        records.append(artifact.to_dict())
 
     write_json(output_dir / "preview_manifest.json", records)
     summary = {
         "source_dir": str(source_dir),
         "output_dir": str(output_dir),
+        "provider": provider_name,
         "total_raws": len(all_raws),
         "previewed": len(records),
         "succeeded": sum(1 for record in records if record["status"] in {"success", "dry_run"}),
@@ -110,6 +106,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--render-timeout", type=int, default=300)
+    parser.add_argument("--provider", choices=["rawtherapee", "lightroom"], default="rawtherapee")
     parser.add_argument("--base-profile", type=Path, default=Path("knowledge/raw_profiles/base.pp3"))
     parser.add_argument("--local-config", type=Path, default=lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH)
     args = parser.parse_args()
@@ -134,6 +131,7 @@ def main() -> None:
         render_timeout=args.render_timeout,
         base_profile=args.base_profile,
         local_config=local_config,
+        provider_name=args.provider,
     )
 
 

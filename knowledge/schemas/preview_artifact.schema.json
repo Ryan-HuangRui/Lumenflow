@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumenflow.local/schemas/preview_artifact.schema.json",
+  "title": "Lumenflow Preview Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "provider",
+    "source",
+    "preview",
+    "source_fingerprint",
+    "preview_fingerprint",
+    "starting_state",
+    "starting_state_hash",
+    "state_inputs",
+    "state_completeness",
+    "command",
+    "command_argv",
+    "selection_reason",
+    "status",
+    "failure_reason",
+    "generated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "lumenflow.preview_artifact.v1"
+    },
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^preview_[0-9a-f]{32}$"
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "adapter_version", "executable"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "adapter_version": {"type": "string", "minLength": 1},
+        "executable": {"type": "string", "minLength": 1}
+      }
+    },
+    "source": {"type": "string", "minLength": 1},
+    "preview": {"type": "string", "minLength": 1},
+    "source_fingerprint": {"$ref": "#/$defs/file_fingerprint"},
+    "preview_fingerprint": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/file_fingerprint"}
+      ]
+    },
+    "starting_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "profile_stack", "uses_engine_default"],
+      "properties": {
+        "kind": {"const": "rawtherapee_profile_stack"},
+        "profile_stack": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "sha256", "size_bytes"],
+            "properties": {
+              "role": {"enum": ["base_profile", "source_sidecar"]},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "size_bytes": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "uses_engine_default": {"type": "boolean"}
+      }
+    },
+    "starting_state_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "state_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256", "size_bytes"],
+        "properties": {
+          "role": {"enum": ["base_profile", "source_sidecar"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "state_completeness": {"enum": ["complete", "partial"]},
+    "command": {"type": "string", "minLength": 1},
+    "command_argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "selection_reason": {"type": "string"},
+    "status": {"enum": ["dry_run", "success", "failed"]},
+    "failure_reason": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "file_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size_bytes"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ Portable photo styling skills for AI agents.
 - 支持扫描指定目录的 RAW、按拍摄日期限定候选集、生成预览和联系表。
 - 让 agent 使用模型视觉能力按用途去重、选片、分配叙事角色并编排顺序，用户确认后再进入修图。
 - 让 agent 根据风格库、照片预览和照片内容选择处理风格。
+- 让每张开发预览通过 `PreviewProvider` 生成版本化 `PreviewArtifact`，绑定 RAW 内容、实际起始 profile/sidecar 状态和输出文件指纹。
 - 让 agent 生成每张照片的动态调色计划，而不是固定套用 profile。
 - 让 agent 在 plan 中记录裁剪判断，并在渲染后复核输出、必要时二次修改。
 - 通过 RawTherapee CLI 优先渲染导出；darktable CLI 作为 legacy fallback；Lightroom Classic 可作为可选交互式处理引擎。
@@ -120,6 +121,24 @@ skill 按需调用 scripts/
 - darktable CLI：备选渲染引擎，也可用于更强的 lighttable 筛选/标记工作流。
 - Lightroom CLI：可选交互式引擎，要求 Lightroom Classic 已打开、Lightroom CLI Bridge 插件已启动，且目标照片已在 catalog 中。
 - ExifTool：读取元数据和辅助验证。
+
+## 预览合同
+
+`scripts/create_previews.py` 默认使用 RawTherapee `PreviewProvider`。输出的
+`preview_manifest.json` 不再只是文件路径列表；每一项都是
+`lumenflow.preview_artifact.v1`，包含：
+
+- RAW 的 SHA-256 与字节数。
+- 实际参与预览的基础 profile 和同名 `.pp3` sidecar 内容指纹。
+- 可复算的 `starting_state_hash` 和 `complete` / `partial` 完整度。
+- 执行命令、状态以及成功输出的 SHA-256。
+
+这使 agent 后续生成的编辑意图能够明确引用“看过的是哪张照片、基于什么起始状态”。
+兼容字段 `source`、`preview`、`command` 和 `status` 仍然保留。
+
+Lightroom 预览当前保持 fail-closed。只有 Bridge 同时声明并验证
+`safe_object_develop_read` 和 `verified_state_bound_preview`，Lumenflow 才会越过预检；
+完整的 Lightroom 状态绑定适配器仍需真机探针后实现。
 
 ## Lightroom 引擎
 

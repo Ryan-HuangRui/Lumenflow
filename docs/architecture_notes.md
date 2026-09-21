@@ -33,7 +33,7 @@ The scripts are responsible for deterministic work:
 
 1. Scanning RAW files and sidecar metadata.
 2. Extracting embedded JPEG previews, generating contact sheets, and validating selection plans.
-3. Creating rendered JPEG previews for development.
+3. Creating rendered JPEG previews for development and emitting versioned, state-bound preview artifacts.
 4. Rendering RawTherapee or darktable commands.
 5. Fetching subtitles and normalizing transcripts.
 6. Generating private tutorial recipes and evidence cards.
@@ -69,7 +69,7 @@ The intended photo-processing flow is:
 3. The host agent inspects the complete candidate set with native vision, groups near-duplicates, matches the user's purpose, and writes an ordered `selection_plan.json`.
 4. `scripts/curate_photos.py finalize` validates candidate identity, order, roles, reasons, alternates, and the no-RAW-mutation invariant.
 5. The user explicitly confirms membership and order; only the confirmed set crosses into development.
-6. `scripts/create_previews.py` renders development previews when the embedded previews are insufficient.
+6. `scripts/create_previews.py` renders development previews when the embedded previews are insufficient. Its `PreviewProvider` emits `lumenflow.preview_artifact.v1`, binding the exact RAW fingerprint, ordered profile/sidecar fingerprints, starting-state hash, command, and output fingerprint.
 7. The agent analyzes confirmed photos and reads style guidance.
 8. The agent writes `adjustment_plan.json` using `knowledge/schemas/adjustment_plan.schema.json`.
 9. `scripts/render_adjustment_plan.py` converts the plan into temporary RawTherapee `.pp3` profiles and renders outputs.
@@ -79,6 +79,10 @@ The intended photo-processing flow is:
 Curation scripts deliberately do not score aesthetics. Purpose interpretation, expression, composition, narrative coverage, and sequence rhythm stay with the model; deterministic code keeps file identity and handoff state auditable.
 
 Style cards are guidance only. Concrete values belong in the per-photo adjustment plan because the same style needs different settings on different images.
+
+### Preview boundary
+
+Preview generation is a backend boundary, not a loose JPEG helper. A downstream model may reason from a preview only when the manifest identifies the source bytes and the starting edit state used to render it. RawTherapee is the first provider: a source `.pp3` sidecar is treated as the complete starting state, while a base profile or engine defaults alone are marked partial. Lightroom remains fail-closed until the bridge proves both safe object-level develop reads and state-bound preview generation through a live probe.
 
 ## Style Library
 
