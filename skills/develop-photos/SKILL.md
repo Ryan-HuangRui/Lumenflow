@@ -85,6 +85,8 @@ Default to RawTherapee unless the user explicitly asks for Lightroom, the plan r
 
 The `EditIntent v2` compiler currently supports RawTherapee only. Lightroom inputs remain on the fail-closed `adjustment_plan.v1` compatibility path until the Lightroom v2 compiler and state-bound preview probe are implemented; do not silently translate a v2 intent into legacy Lightroom commands.
 
+darktable is also legacy-only. Do not infer first-class capability from an installed command. Before considering backend promotion, run `scripts/darktable_probe.py` against a disposable sentinel RAW and require a `passed` `lumenflow.darktable_probe.v1` report. Probe success is necessary but not sufficient: the state-bound preview provider and EditIntent compiler must also exist.
+
 Use RawTherapee when:
 
 - The user wants unattended local RAW rendering.

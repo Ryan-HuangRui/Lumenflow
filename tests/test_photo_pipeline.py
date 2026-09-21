@@ -116,6 +116,9 @@ class PhotoPipelineTests(unittest.TestCase):
             self.assertIn("clean-natural", command)
             self.assertIn("--conf", command)
             self.assertIn("plugins/imageio/format/jpeg/quality=92", command)
+            self.assertIn("--library", command)
+            self.assertIn(":memory:", command)
+            self.assertIn("write_sidecar_files=never", command)
 
     def test_build_command_uses_configured_rawtherapee_command(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
