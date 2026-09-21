@@ -1,0 +1,69 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "dark_low_saturation_moody",
+  "style_name": "低饱暗调质感",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "moody_dark",
+  "active_for_photo_matching": true,
+  "description": "低饱和、暗调、质感化的人像或环境照片，强调情绪和主体可读性。",
+  "suitable_scenes": [
+    "暗调人像",
+    "情绪片",
+    "低照度环境",
+    "硬朗质感照片"
+  ],
+  "avoid_scenes": [
+    "小清新人像",
+    "明亮旅行记录",
+    "家庭暖调照片"
+  ],
+  "visual_features": {
+    "tone": "dark, restrained, tactile",
+    "color": "low saturation with selective warmth",
+    "contrast": "strong local contrast",
+    "texture": "tactile and moody"
+  },
+  "tone_guidance": {
+    "overall": "dark, restrained, tactile",
+    "contrast": "strong local contrast",
+    "texture": "tactile and moody"
+  },
+  "color_guidance": {
+    "overall": "low saturation with selective warmth",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "exposure_and_basic_tone",
+    "hsl_color_cleanup",
+    "tone_curve",
+    "local_adjustments",
+    "color_grading",
+    "detail_and_texture",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "压暗时保留主体边缘和眼神/关键细节。",
+    "饱和度降低后要检查肤色是否灰绿。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 6,
+    "category_counts": {
+      "basic_tone": 93,
+      "color_grading": 7,
+      "hsl_color": 88,
+      "mask_local": 8,
+      "presence_detail": 7,
+      "tone_curve": 37
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}

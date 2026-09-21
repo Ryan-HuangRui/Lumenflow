@@ -1,0 +1,68 @@
+{
+  "schema_version": "lumenflow.reusable_style_knowledge.v1",
+  "style_id": "urban_neon_night",
+  "style_name": "都市霓虹夜景",
+  "status": "reusable",
+  "knowledge_scope": "source_agnostic_semantic_family",
+  "role": "visual_style",
+  "parent_family": "cinematic_street",
+  "active_for_photo_matching": true,
+  "description": "城市夜景、霓虹、蓝紫或青橙光源的高度风格化夜景方向。",
+  "suitable_scenes": [
+    "城市夜景",
+    "霓虹街区",
+    "夜景人像",
+    "蓝紫光源"
+  ],
+  "avoid_scenes": [
+    "自然光清新人像",
+    "低饱和纪实"
+  ],
+  "visual_features": {
+    "tone": "dark luminous city night",
+    "color": "blue-purple or cyan-orange neon palette",
+    "contrast": "medium-high with highlight glow",
+    "texture": "sharp lights and controlled noise"
+  },
+  "tone_guidance": {
+    "overall": "dark luminous city night",
+    "contrast": "medium-high with highlight glow",
+    "texture": "sharp lights and controlled noise"
+  },
+  "color_guidance": {
+    "overall": "blue-purple or cyan-orange neon palette",
+    "subject_protection": "Preserve believable subject color and avoid destructive casts."
+  },
+  "operation_order": [
+    "hsl_color_cleanup",
+    "exposure_and_basic_tone",
+    "tone_curve",
+    "detail_and_texture",
+    "color_grading",
+    "local_adjustments",
+    "final_review"
+  ],
+  "parameter_strategy": "agent_infers_per_photo",
+  "adjustment_plan_guidance": {
+    "schema_version": "lumenflow.adjustment_plan.v1",
+    "rule": "Treat this knowledge as a reusable visual direction. Inspect the target photo before generating concrete values.",
+    "variant_policy": "Generate one best variant by default; add alternates only when several directions genuinely fit."
+  },
+  "agent_guidance": [
+    "优先控制噪点和高光溢出，再强化霓虹色彩。",
+    "如果照片主体是人，霓虹色不能完全污染肤色。"
+  ],
+  "source_evidence": {
+    "tutorial_count": 4,
+    "category_counts": {
+      "basic_tone": 50,
+      "color_grading": 5,
+      "hsl_color": 63,
+      "mask_local": 1,
+      "presence_detail": 11,
+      "tone_curve": 30
+    }
+  },
+  "raw_profile_role": "none",
+  "raw_profiles": []
+}
