@@ -132,6 +132,17 @@ class EditIntentExecutionTests(unittest.TestCase):
                         "Curve": "3;0;0;0.35;0.2;0.7;0.85;1;1;",
                     },
                     "Sharpening": {"Enabled": True, "Radius": 1.0, "Amount": 250},
+                    "Local Contrast": {
+                        "Enabled": True,
+                        "Radius": 100,
+                        "Amount": 0.5,
+                    },
+                    "PCVignette": {
+                        "Enabled": True,
+                        "Strength": 1,
+                        "Feather": 50,
+                        "Roundness": 50,
+                    },
                     "Rotation": {"Degree": 2.0},
                 },
             }
@@ -150,10 +161,14 @@ class EditIntentExecutionTests(unittest.TestCase):
             )
 
             content = first["operations"][0]["payload"]["content"]
-            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v3", content)
+            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v4", content)
             self.assertIn("CAAutoIterations=2", content)
             self.assertIn("Curve=3;0;0;0.35;0.2;0.7;0.85;1;1;", content)
             self.assertIn("Amount=250", content)
+            self.assertIn("[Local Contrast]", content)
+            self.assertIn("Radius=100", content)
+            self.assertIn("[PCVignette]", content)
+            self.assertIn("Strength=1", content)
             self.assertIn("Degree=2", content)
             self.assertEqual(first["plan_id"], second["plan_id"])
             self.assertEqual(
@@ -723,7 +738,7 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertIn("Opaque=preserve", content)
             self.assertIn("Native=keep", content)
             self.assertIn("Compensation=0.35", content)
-            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v3", content)
+            self.assertIn("Compiler=lumenflow.rawtherapee-pp3.v4", content)
 
             sidecar.write_text("[Exposure]\nContrast=99\n", encoding="utf-8")
             with self.assertRaises(edit_intent.ExecutionPreconditionError) as error:

@@ -119,6 +119,30 @@
                 "Exposure": {
                   "$ref": "#/$defs/native_sections/Exposure"
                 },
+                "Local Contrast": {
+                  "$ref": "#/$defs/native_sections/Local_Contrast"
+                },
+                "Retinex": {
+                  "$ref": "#/$defs/native_sections/Retinex"
+                },
+                "ToneEqualizer": {
+                  "$ref": "#/$defs/native_sections/ToneEqualizer"
+                },
+                "Luminance Curve": {
+                  "$ref": "#/$defs/native_sections/Luminance_Curve"
+                },
+                "RGB Curves": {
+                  "$ref": "#/$defs/native_sections/RGB_Curves"
+                },
+                "Channel Mixer": {
+                  "$ref": "#/$defs/native_sections/Channel_Mixer"
+                },
+                "Black & White": {
+                  "$ref": "#/$defs/native_sections/Black_White"
+                },
+                "HSV Equalizer": {
+                  "$ref": "#/$defs/native_sections/HSV_Equalizer"
+                },
                 "White Balance": {
                   "$ref": "#/$defs/native_sections/White_Balance"
                 },
@@ -160,6 +184,12 @@
                 },
                 "Perspective": {
                   "$ref": "#/$defs/native_sections/Perspective"
+                },
+                "Gradient": {
+                  "$ref": "#/$defs/native_sections/Gradient"
+                },
+                "PCVignette": {
+                  "$ref": "#/$defs/native_sections/PCVignette"
                 },
                 "Crop": {
                   "$ref": "#/$defs/native_sections/Crop"
@@ -254,6 +284,12 @@
       "maxLength": 256,
       "pattern": "^[0-3](?:;[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)){0,34};$"
     },
+    "native_channel_mix": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 128,
+      "pattern": "^[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+);[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+);[-+]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+);$"
+    },
     "native_sections": {
       "RAW": {
         "type": "object",
@@ -316,6 +352,115 @@
           "Auto": {"$ref": "#/$defs/native_bool"},
           "HistogramMatching": {"$ref": "#/$defs/native_bool"},
           "ClampOOG": {"$ref": "#/$defs/native_bool"}
+        }
+      },
+      "Local_Contrast": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Radius": {"type": "integer", "minimum": 1, "maximum": 200},
+          "Amount": {"type": "number", "minimum": 0, "maximum": 2},
+          "Darkness": {"type": "number", "minimum": 0, "maximum": 2},
+          "Lightness": {"type": "number", "minimum": 0, "maximum": 2}
+        }
+      },
+      "Retinex": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Str": {"type": "integer", "minimum": 0, "maximum": 100},
+          "Scal": {"type": "integer", "minimum": 1, "maximum": 6},
+          "Iter": {"type": "integer", "minimum": 1, "maximum": 5},
+          "Gam": {"type": "number", "minimum": 0.1, "maximum": 5},
+          "Median": {"$ref": "#/$defs/native_bool"},
+          "Neigh": {"type": "integer", "minimum": 10, "maximum": 280}
+        }
+      },
+      "ToneEqualizer": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Band0": {"type": "integer", "minimum": -5, "maximum": 5},
+          "Band1": {"type": "integer", "minimum": -5, "maximum": 5},
+          "Band2": {"type": "integer", "minimum": -5, "maximum": 5},
+          "Band3": {"type": "integer", "minimum": -5, "maximum": 5},
+          "Band4": {"type": "integer", "minimum": -5, "maximum": 5},
+          "Band5": {"type": "integer", "minimum": -5, "maximum": 5}
+        }
+      },
+      "Luminance_Curve": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Brightness": {"type": "number", "minimum": -100, "maximum": 100},
+          "Contrast": {"type": "number", "minimum": -100, "maximum": 100},
+          "Chromaticity": {"type": "number", "minimum": -100, "maximum": 100},
+          "RedAndSkinTonesProtection": {"type": "number", "minimum": 0, "maximum": 100},
+          "LCredsk": {"$ref": "#/$defs/native_bool"},
+          "LCurve": {"$ref": "#/$defs/native_curve"}
+        }
+      },
+      "RGB_Curves": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "LumaMode": {"$ref": "#/$defs/native_bool"},
+          "rCurve": {"$ref": "#/$defs/native_curve"},
+          "gCurve": {"$ref": "#/$defs/native_curve"},
+          "bCurve": {"$ref": "#/$defs/native_curve"}
+        }
+      },
+      "Channel_Mixer": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Red": {"$ref": "#/$defs/native_channel_mix"},
+          "Green": {"$ref": "#/$defs/native_channel_mix"},
+          "Blue": {"$ref": "#/$defs/native_channel_mix"}
+        }
+      },
+      "Black_White": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Method": {"enum": ["Desaturation", "ChannelMixer"]},
+          "Auto": {"$ref": "#/$defs/native_bool"},
+          "ComplementaryColors": {"$ref": "#/$defs/native_bool"},
+          "Setting": {"enum": ["RGB-Rel"]},
+          "Filter": {"enum": ["None"]},
+          "MixerRed": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerOrange": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerYellow": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerGreen": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerCyan": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerBlue": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerMagenta": {"type": "integer", "minimum": -100, "maximum": 100},
+          "MixerPurple": {"type": "integer", "minimum": -100, "maximum": 100}
+        }
+      },
+      "HSV_Equalizer": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "HCurve": {"$ref": "#/$defs/native_curve"},
+          "SCurve": {"$ref": "#/$defs/native_curve"},
+          "VCurve": {"$ref": "#/$defs/native_curve"}
         }
       },
       "White_Balance": {
@@ -501,6 +646,30 @@
           "Method": {"enum": ["simple", "camera_based", "control_lines"]},
           "Horizontal": {"type": "number", "minimum": -100, "maximum": 100},
           "Vertical": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "Gradient": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Degree": {"type": "number", "minimum": -180, "maximum": 180},
+          "Feather": {"type": "number", "minimum": 0, "maximum": 100},
+          "Strength": {"type": "number", "minimum": -5, "maximum": 5},
+          "CenterX": {"type": "number", "minimum": -100, "maximum": 100},
+          "CenterY": {"type": "number", "minimum": -100, "maximum": 100}
+        }
+      },
+      "PCVignette": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "Enabled": {"$ref": "#/$defs/native_bool"},
+          "Strength": {"type": "number", "minimum": -6, "maximum": 6},
+          "Feather": {"type": "number", "minimum": 0, "maximum": 100},
+          "Roundness": {"type": "number", "minimum": 0, "maximum": 100}
         }
       },
       "Crop": {

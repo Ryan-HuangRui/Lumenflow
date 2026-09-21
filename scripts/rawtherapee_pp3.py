@@ -27,10 +27,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
-PP3_COMPILER_VERSION = "lumenflow.rawtherapee-pp3.v3"
+PP3_COMPILER_VERSION = "lumenflow.rawtherapee-pp3.v4"
 PP3_ENGINE_VERSION = "5.11"
 RAWTHERAPEE_NATIVE_PROFILE_VERSION = 349
-RAWTHERAPEE_NATIVE_SCHEMA_VERSION = "lumenflow.rawtherapee-native.v1"
+RAWTHERAPEE_NATIVE_SCHEMA_VERSION = "lumenflow.rawtherapee-native.v2"
 MAX_PROFILE_BYTES = 1024 * 1024
 
 
@@ -78,6 +78,10 @@ def _native_int_enum(*choices: int) -> NativeFieldSpec:
 
 def _native_curve() -> NativeFieldSpec:
     return NativeFieldSpec("curve")
+
+
+def _native_channel_mix() -> NativeFieldSpec:
+    return NativeFieldSpec("channel_mix")
 
 
 # These are the only native fields an EditIntent may author.  Every entry is
@@ -153,6 +157,75 @@ RAWTHERAPEE_NATIVE_FIELD_SPECS: dict[str, dict[str, NativeFieldSpec]] = {
         "Auto": _native_bool(),
         "HistogramMatching": _native_bool(),
         "ClampOOG": _native_bool(),
+    },
+    "Local Contrast": {
+        "Enabled": _native_bool(),
+        "Radius": _native_int(1, 200),
+        "Amount": _native_float(0.0, 2.0),
+        "Darkness": _native_float(0.0, 2.0),
+        "Lightness": _native_float(0.0, 2.0),
+    },
+    "Retinex": {
+        "Enabled": _native_bool(),
+        "Str": _native_int(0, 100),
+        "Scal": _native_int(1, 6),
+        "Iter": _native_int(1, 5),
+        "Gam": _native_float(0.1, 5.0),
+        "Median": _native_bool(),
+        "Neigh": _native_int(10, 280),
+    },
+    "ToneEqualizer": {
+        "Enabled": _native_bool(),
+        "Band0": _native_int(-5, 5),
+        "Band1": _native_int(-5, 5),
+        "Band2": _native_int(-5, 5),
+        "Band3": _native_int(-5, 5),
+        "Band4": _native_int(-5, 5),
+        "Band5": _native_int(-5, 5),
+    },
+    "Luminance Curve": {
+        "Enabled": _native_bool(),
+        "Brightness": _native_float(-100.0, 100.0),
+        "Contrast": _native_float(-100.0, 100.0),
+        "Chromaticity": _native_float(-100.0, 100.0),
+        "RedAndSkinTonesProtection": _native_float(0.0, 100.0),
+        "LCredsk": _native_bool(),
+        "LCurve": _native_curve(),
+    },
+    "RGB Curves": {
+        "Enabled": _native_bool(),
+        "LumaMode": _native_bool(),
+        "rCurve": _native_curve(),
+        "gCurve": _native_curve(),
+        "bCurve": _native_curve(),
+    },
+    "Channel Mixer": {
+        "Enabled": _native_bool(),
+        "Red": _native_channel_mix(),
+        "Green": _native_channel_mix(),
+        "Blue": _native_channel_mix(),
+    },
+    "Black & White": {
+        "Enabled": _native_bool(),
+        "Method": _native_enum("Desaturation", "ChannelMixer"),
+        "Auto": _native_bool(),
+        "ComplementaryColors": _native_bool(),
+        "Setting": _native_enum("RGB-Rel"),
+        "Filter": _native_enum("None"),
+        "MixerRed": _native_int(-100, 100),
+        "MixerOrange": _native_int(-100, 100),
+        "MixerYellow": _native_int(-100, 100),
+        "MixerGreen": _native_int(-100, 100),
+        "MixerCyan": _native_int(-100, 100),
+        "MixerBlue": _native_int(-100, 100),
+        "MixerMagenta": _native_int(-100, 100),
+        "MixerPurple": _native_int(-100, 100),
+    },
+    "HSV Equalizer": {
+        "Enabled": _native_bool(),
+        "HCurve": _native_curve(),
+        "SCurve": _native_curve(),
+        "VCurve": _native_curve(),
     },
     "White Balance": {
         "Enabled": _native_bool(),
@@ -269,6 +342,20 @@ RAWTHERAPEE_NATIVE_FIELD_SPECS: dict[str, dict[str, NativeFieldSpec]] = {
         "Horizontal": _native_float(-100.0, 100.0),
         "Vertical": _native_float(-100.0, 100.0),
     },
+    "Gradient": {
+        "Enabled": _native_bool(),
+        "Degree": _native_float(-180.0, 180.0),
+        "Feather": _native_float(0.0, 100.0),
+        "Strength": _native_float(-5.0, 5.0),
+        "CenterX": _native_float(-100.0, 100.0),
+        "CenterY": _native_float(-100.0, 100.0),
+    },
+    "PCVignette": {
+        "Enabled": _native_bool(),
+        "Strength": _native_float(-6.0, 6.0),
+        "Feather": _native_float(0.0, 100.0),
+        "Roundness": _native_float(0.0, 100.0),
+    },
     "Crop": {
         "Enabled": _native_bool(),
         "X": _native_int(-1, 100000),
@@ -336,6 +423,21 @@ def _validate_native_curve(section: str, key: str, value: Any) -> None:
             raise PP3UnsupportedValue(f"{section}.{key} curve points must be between 0 and 1")
 
 
+def _validate_native_channel_mix(section: str, key: str, value: Any) -> None:
+    if not isinstance(value, str) or len(value) > 128 or not value.endswith(";"):
+        raise PP3UnsupportedValue(f"{section}.{key} must be a bounded RGB channel mix")
+    tokens = value[:-1].split(";")
+    if len(tokens) != 3 or any(not token for token in tokens):
+        raise PP3UnsupportedValue(f"{section}.{key} must contain exactly three values")
+    for token in tokens:
+        try:
+            number = float(token)
+        except (TypeError, ValueError) as error:
+            raise PP3UnsupportedValue(f"{section}.{key} has a non-numeric channel value") from error
+        if not math.isfinite(number) or number < -1000 or number > 1000:
+            raise PP3UnsupportedValue(f"{section}.{key} channel values must be between -1000 and 1000")
+
+
 def validate_native_sections(value: Mapping[str, Any] | None) -> dict[str, Any]:
     """Validate and normalize the bounded ``style.rawtherapee`` contract."""
 
@@ -391,6 +493,8 @@ def validate_native_sections(value: Mapping[str, Any] | None) -> dict[str, Any]:
                     raise PP3UnsupportedValue(f"{section}.{key} must be one of: {choices}")
             elif spec.kind == "curve":
                 _validate_native_curve(section, key, field_value)
+            elif spec.kind == "channel_mix":
+                _validate_native_channel_mix(section, key, field_value)
             else:  # pragma: no cover - schema declaration error
                 raise PP3UnsupportedValue(f"Unknown native field kind: {spec.kind}")
             if spec.minimum is not None and float(field_value) < spec.minimum:

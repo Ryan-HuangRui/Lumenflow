@@ -125,6 +125,204 @@ class RawTherapeeNativeLiveTests(unittest.TestCase):
             },
         }
 
+    @staticmethod
+    def _phase3_contracts() -> dict[str, dict[str, object]]:
+        return {
+            "tone-detail": {
+                "profile_version": rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                "sections": {
+                    "Local Contrast": {
+                        "Enabled": True,
+                        "Radius": 100,
+                        "Amount": 0.5,
+                        "Darkness": 1,
+                        "Lightness": 1,
+                    },
+                    "Retinex": {
+                        "Enabled": True,
+                        "Str": 35,
+                        "Scal": 3,
+                        "Iter": 1,
+                        "Gam": 1.3,
+                        "Median": False,
+                        "Neigh": 80,
+                    },
+                    "ToneEqualizer": {
+                        "Enabled": True,
+                        "Band0": 1,
+                        "Band1": 1,
+                        "Band2": 0,
+                        "Band3": 0,
+                        "Band4": -1,
+                        "Band5": -1,
+                    },
+                },
+            },
+            "curves-color": {
+                "profile_version": rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                "sections": {
+                    "Luminance Curve": {
+                        "Enabled": True,
+                        "LCurve": "3;0;0;0.25;0.15;0.75;0.85;1;1;",
+                    },
+                    "RGB Curves": {
+                        "Enabled": True,
+                        "LumaMode": False,
+                        "rCurve": "3;0;0;0.5;0.3;1;1;",
+                        "gCurve": "0;",
+                        "bCurve": "0;",
+                    },
+                    "Channel Mixer": {
+                        "Enabled": True,
+                        "Red": "1000;150;0;",
+                        "Green": "0;1000;0;",
+                        "Blue": "0;0;1000;",
+                    },
+                    "Black & White": {
+                        "Enabled": True,
+                        "Method": "ChannelMixer",
+                        "Auto": False,
+                        "ComplementaryColors": True,
+                        "Setting": "RGB-Rel",
+                        "Filter": "None",
+                        "MixerRed": 30,
+                        "MixerOrange": 40,
+                        "MixerYellow": 50,
+                        "MixerGreen": 20,
+                        "MixerCyan": 33,
+                        "MixerBlue": 33,
+                        "MixerMagenta": 33,
+                        "MixerPurple": 33,
+                    },
+                    "HSV Equalizer": {
+                        "Enabled": True,
+                        "HCurve": "0;",
+                        # HSV Equalizer curves use the serialized 1 + 4n
+                        # control-point form emitted by RawTherapee 5.11.
+                        "SCurve": (
+                            "1;0.09;0.78;0.35;0.35;0.17;0.5;0.35;0.35;"
+                            "0.29;0.5;0.35;0.35;0.51;0.5;0.35;0.35;"
+                            "0.67;0.54;0.33;0.33;0.85;0.5;0.27;0.27;"
+                        ),
+                        "VCurve": "0;",
+                    },
+                },
+            },
+            "regional": {
+                "profile_version": rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                "sections": {
+                    "Gradient": {
+                        "Enabled": True,
+                        "Degree": 15,
+                        "Feather": 40,
+                        "Strength": 1,
+                        "CenterX": 0,
+                        "CenterY": 0,
+                    },
+                    "PCVignette": {
+                        "Enabled": True,
+                        "Strength": 1,
+                        "Feather": 50,
+                        "Roundness": 50,
+                    },
+                },
+            },
+        }
+
+    @staticmethod
+    def _phase3_section_contracts() -> dict[str, dict[str, object]]:
+        """Return one independently enabled contract for every Phase 3 section.
+
+        The grouped contracts below prove that the sections compose and remain
+        deterministic across all three fixtures.  These single-section probes
+        are deliberately separate so a strong effect from (for example) B&W
+        cannot mask a PP3 key that RawTherapee silently ignores.
+        """
+        return {
+            "Local Contrast": {
+                "Enabled": True,
+                "Radius": 100,
+                "Amount": 0.5,
+                "Darkness": 1,
+                "Lightness": 1,
+            },
+            "Retinex": {
+                "Enabled": True,
+                "Str": 35,
+                "Scal": 3,
+                "Iter": 1,
+                "Gam": 1.3,
+                "Median": False,
+                "Neigh": 80,
+            },
+            "ToneEqualizer": {
+                "Enabled": True,
+                "Band0": 1,
+                "Band1": 1,
+                "Band2": 0,
+                "Band3": 0,
+                "Band4": -1,
+                "Band5": -1,
+            },
+            "Luminance Curve": {
+                "Enabled": True,
+                "LCurve": "3;0;0;0.25;0.15;0.75;0.85;1;1;",
+            },
+            "RGB Curves": {
+                "Enabled": True,
+                "LumaMode": False,
+                "rCurve": "3;0;0;0.5;0.3;1;1;",
+                "gCurve": "0;",
+                "bCurve": "0;",
+            },
+            "Channel Mixer": {
+                "Enabled": True,
+                "Red": "1000;150;0;",
+                "Green": "0;1000;0;",
+                "Blue": "0;0;1000;",
+            },
+            "Black & White": {
+                "Enabled": True,
+                "Method": "ChannelMixer",
+                "Auto": False,
+                "ComplementaryColors": True,
+                "Setting": "RGB-Rel",
+                "Filter": "None",
+                "MixerRed": 30,
+                "MixerOrange": 40,
+                "MixerYellow": 50,
+                "MixerGreen": 20,
+                "MixerCyan": 33,
+                "MixerBlue": 33,
+                "MixerMagenta": 33,
+                "MixerPurple": 33,
+            },
+            "HSV Equalizer": {
+                "Enabled": True,
+                "HCurve": "0;",
+                "SCurve": (
+                    "1;0.09;0.78;0.35;0.35;0.17;0.5;0.35;0.35;"
+                    "0.29;0.5;0.35;0.35;0.51;0.5;0.35;0.35;"
+                    "0.67;0.54;0.33;0.33;0.85;0.5;0.27;0.27;"
+                ),
+                "VCurve": "0;",
+            },
+            "Gradient": {
+                "Enabled": True,
+                "Degree": 15,
+                "Feather": 40,
+                "Strength": 1,
+                "CenterX": 0,
+                "CenterY": 0,
+            },
+            "PCVignette": {
+                "Enabled": True,
+                "Strength": 1,
+                "Feather": 50,
+                "Roundness": 50,
+            },
+        }
+
     def test_native_modules_change_pixels_deterministically_for_all_fixtures(self) -> None:
         fixture_root = Path(os.environ[FIXTURE_ENV]).expanduser()
         executable = Path(os.environ.get("RAWTHERAPEE_CLI", DEFAULT_CLI))
@@ -183,6 +381,144 @@ class RawTherapeeNativeLiveTests(unittest.TestCase):
                 self.assertTrue(self._has_pixel_difference(baseline_output, native_output))
 
         self.assertEqual(source_hashes, {path: self._sha256(path) for path in sources})
+        self.assertEqual(source_entries, set(fixture_root.iterdir()))
+
+    def test_phase3_advanced_groups_change_pixels_deterministically_for_all_fixtures(self) -> None:
+        fixture_root = Path(os.environ[FIXTURE_ENV]).expanduser()
+        executable = Path(os.environ.get("RAWTHERAPEE_CLI", DEFAULT_CLI))
+        base_profile = Path(os.environ.get("RAWTHERAPEE_BASE_PROFILE", DEFAULT_BASE_PROFILE))
+        if not executable.is_file():
+            self.skipTest(f"RawTherapee CLI not found: {executable}")
+        if not base_profile.is_file():
+            self.skipTest(f"RawTherapee base profile not found: {base_profile}")
+        sources = [fixture_root / name for name in RAW_NAMES]
+        missing = [path for path in sources if not path.is_file()]
+        if missing:
+            self.skipTest(f"fixture RAW missing: {missing}")
+
+        source_hashes = {path: self._sha256(path) for path in sources}
+        source_entries = set(fixture_root.iterdir())
+        contracts = self._phase3_contracts()
+
+        with tempfile.TemporaryDirectory(prefix="lumenflow-rawtherapee-phase3-live-") as directory:
+            output_root = Path(directory)
+            baseline_outputs: dict[Path, Path] = {}
+            for source in sources:
+                baseline_output = output_root / f"{source.stem}-baseline.jpg"
+                self._run(
+                    executable,
+                    render_raw.build_rawtherapee_command(
+                        source, baseline_output, [base_profile], executable=str(executable)
+                    ),
+                )
+                baseline_outputs[source] = baseline_output
+
+            for group_name, contract in contracts.items():
+                overrides = rawtherapee_pp3.native_sections_to_overrides(contract)
+                native_profile = output_root / f"{group_name}.pp3"
+                native_profile.write_text(
+                    rawtherapee_pp3.compile_profile_text(
+                        [base_profile],
+                        overrides=overrides,
+                        app_version="5.11",
+                        profile_version=rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                    ),
+                    encoding="utf-8",
+                )
+                for source in sources:
+                    native_output = output_root / f"{source.stem}-{group_name}.jpg"
+                    repeat_output = output_root / f"{source.stem}-{group_name}-repeat.jpg"
+                    command = render_raw.build_rawtherapee_command(
+                        source, native_output, [native_profile], executable=str(executable)
+                    )
+                    self._run(executable, command)
+                    self._run(
+                        executable,
+                        render_raw.build_rawtherapee_command(
+                            source,
+                            repeat_output,
+                            [native_profile],
+                            executable=str(executable),
+                        ),
+                    )
+                    self.assertTrue(native_output.is_file())
+                    self.assertTrue(repeat_output.is_file())
+                    self.assertTrue(
+                        self._has_pixel_difference(baseline_outputs[source], native_output),
+                        f"{group_name} did not change pixels for {source.name}",
+                    )
+                    self.assertEqual(
+                        self._pixel_sha256(native_output),
+                        self._pixel_sha256(repeat_output),
+                        f"{group_name} was not deterministic for {source.name}",
+                    )
+
+        self.assertEqual(source_hashes, {path: self._sha256(path) for path in sources})
+        self.assertEqual(source_entries, set(fixture_root.iterdir()))
+
+    def test_phase3_each_section_changes_pixels_on_first_fixture(self) -> None:
+        """Prove each advanced section is effective, not merely accepted.
+
+        This is intentionally a one-shot pixel-delta check per section.  The
+        grouped live test above supplies the more expensive three-fixture
+        repeatability coverage.
+        """
+        fixture_root = Path(os.environ[FIXTURE_ENV]).expanduser()
+        executable = Path(os.environ.get("RAWTHERAPEE_CLI", DEFAULT_CLI))
+        base_profile = Path(os.environ.get("RAWTHERAPEE_BASE_PROFILE", DEFAULT_BASE_PROFILE))
+        if not executable.is_file():
+            self.skipTest(f"RawTherapee CLI not found: {executable}")
+        if not base_profile.is_file():
+            self.skipTest(f"RawTherapee base profile not found: {base_profile}")
+        source = fixture_root / RAW_NAMES[0]
+        if not source.is_file():
+            self.skipTest(f"fixture RAW missing: {source}")
+
+        source_hash = self._sha256(source)
+        source_entries = set(fixture_root.iterdir())
+        contracts = self._phase3_section_contracts()
+
+        with tempfile.TemporaryDirectory(prefix="lumenflow-rawtherapee-phase3-sections-") as directory:
+            output_root = Path(directory)
+            baseline_output = output_root / "baseline.jpg"
+            self._run(
+                executable,
+                render_raw.build_rawtherapee_command(
+                    source, baseline_output, [base_profile], executable=str(executable)
+                ),
+            )
+            for section_index, (section_name, section) in enumerate(contracts.items()):
+                contract = {
+                    "profile_version": rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                    "sections": {section_name: section},
+                }
+                # Keep output/profile basenames opaque: RawTherapee can find
+                # same-named sidecars in a working directory, so a human
+                # section name must not become an implicit input.
+                profile = output_root / f"section-{section_index}.pp3"
+                profile.write_text(
+                    rawtherapee_pp3.compile_profile_text(
+                        [base_profile],
+                        overrides=rawtherapee_pp3.native_sections_to_overrides(contract),
+                        app_version="5.11",
+                        profile_version=rawtherapee_pp3.RAWTHERAPEE_NATIVE_PROFILE_VERSION,
+                    ),
+                    encoding="utf-8",
+                )
+                output = output_root / f"section-{section_index}.jpg"
+                self._run(
+                    executable,
+                    render_raw.build_rawtherapee_command(
+                        source, output, [profile], executable=str(executable)
+                    ),
+                )
+                self.assertTrue(output.is_file())
+                self.assertTrue(
+                    self._has_pixel_difference(baseline_output, output),
+                    f"{section_name} did not change pixels for {source.name}",
+                )
+
+        self.assertEqual(source_hash, self._sha256(source))
         self.assertEqual(source_entries, set(fixture_root.iterdir()))
 
     @staticmethod
