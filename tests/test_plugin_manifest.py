@@ -21,6 +21,19 @@ def read_json(path: Path) -> dict:
 
 
 class PluginManifestTests(unittest.TestCase):
+    def test_mit_release_metadata_has_a_matching_license_file(self) -> None:
+        license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+        self.assertIn("MIT License", license_text)
+        self.assertIn("Copyright (c) 2026 Lumenflow contributors", license_text)
+        self.assertEqual(read_json(ROOT / "plugin.json")["license"], "MIT")
+        self.assertEqual(
+            read_json(ROOT / ".codex-plugin" / "plugin.json")["license"], "MIT"
+        )
+        self.assertIn('license = "MIT"', (ROOT / "pyproject.toml").read_text())
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("尚未包含 `LICENSE` 文件", readme)
+        self.assertIn("MIT License", readme)
+
     def test_root_plugin_manifest_uses_closed_portable_shape(self) -> None:
         manifest = read_json(ROOT / "plugin.json")
 

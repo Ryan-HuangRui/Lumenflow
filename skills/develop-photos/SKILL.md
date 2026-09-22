@@ -24,26 +24,36 @@ into:
 5. Agent review of rendered outputs, with revised plans when needed.
 6. A processing report explaining what happened.
 
+## Runtime Routing (MCP First)
+
+If Lumenflow MCP tools are available, always use them as the product interface:
+
+1. Call `lumenflow.status` first and route from its explicit `features` map, not from the `lite` or `full` label alone.
+2. Use `features.local_curation` to decide whether local selection work is possible, `features.raw_preview` for state-bound preview generation, `features.raw_development` for compile/execute, and `features.high_depth_export` before promising TIFF16/OpenEXR output.
+3. In an installed Plugin workflow, use the high-level tools `lumenflow.create_previews`, `lumenflow.search_styles`, `lumenflow.search_examples`, `lumenflow.compile_edit`, `lumenflow.execute_edit`, `lumenflow.start_review`, `lumenflow.advance_review`, and optionally `lumenflow.store_example`.
+4. If RAW features are unavailable, enter Lite Mode: inspect only host-visible images, propose style/edit intent, and explain what local configuration or backend is missing. Never claim that a RAW was rendered.
+5. Do not use repository scripts to bypass missing allowed roots, backend verification, or MCP policy.
+
+Direct `scripts/` commands are a developer/debug fallback only. Do not use them in a normal installed Plugin workflow.
+
 ## Workflow
 
-1. Parse the user's source directory. If the user does not provide an output directory, use `photos.output_root` from `config/lumenflow.local.json` and create `<photos.output_root>/<source directory name>/`.
+1. Call `lumenflow.status`. Parse the user's source directory and verify the required feature flags. If the user does not provide an output directory, use the configured photo output root and create a source-specific child workspace.
 2. Resolve the edit set before scanning:
    - Prefer a `curate-photos` selection plan with `status.decision=user_confirmed`.
    - Accept a direct file list or explicit folder-wide instruction from the user.
    - Do not edit a curation proposal whose status is still `agent_recommended_pending_user_confirmation`.
-3. Scan the confirmed RAW files with `scripts/scan_raws.py`. When the user explicitly chose an existing editor selection, honor:
+3. Resolve the confirmed RAW paths from the curation workspace or explicit user list. When the user explicitly chose an existing editor selection, honor:
    - darktable `<raw filename>.xmp` rating/color labels if available.
    - RawTherapee `<raw filename>.pp3` rank if available.
    - If the user wants the agent to choose from an uncurated folder, invoke `curate-photos` first.
-4. Generate previews with `scripts/create_previews.py`.
+4. Generate state-bound previews with `lumenflow.create_previews` only when `features.raw_preview=true`.
 5. Read `preview_manifest.json` before visual analysis. Each entry must use `lumenflow.preview_artifact.v1`; retain its `artifact_id`, `source_fingerprint`, `starting_state_hash`, and `state_completeness` with downstream plan/review evidence. A partial starting state is usable for RawTherapee drafting but must not be represented as a complete editor-state snapshot.
 6. Inspect the preview images with the host agent's vision/reasoning capability.
-7. Read the selected backend's `lumenflow.backend_capabilities.v1` contract and require the operation needed for the current stage. Stop on `unsupported`, and stop for real verification on `unverified`; do not silently choose a different backend when the user selected one explicitly.
+7. Read the selected backend's `lumenflow://backends/{backend_id}` resource and require the operation needed for the current stage. Stop on `unsupported`, and stop for real verification on `unverified`; do not silently choose a different backend when the user selected one explicitly.
 8. Retrieve reusable style guidance:
-   - First query the local Personal Edit Example Store by the current purpose, scene tags, and plausible style id when it is configured. Treat matches as evidence of the user's past accepted choices, not fixed presets; do not reuse parameters until the new preview supports them.
-   - Read `knowledge/style_library_index.json` first.
-   - Filter direct candidates to entries with `active_for_photo_matching=true`.
-   - Choose a semantic style from `knowledge/style_families/*.json`.
+   - First call `lumenflow.search_examples` by the current purpose, scene tags, and plausible style id. Treat matches as evidence of the user's past accepted choices, not fixed presets; do not reuse parameters until the new preview supports them.
+   - Call `lumenflow.search_styles`, then read the selected `lumenflow://styles/{style_id}` resource for detailed guidance.
    - Do not read private tutorial recipes, transcripts, provenance, or video-level evidence during photo development.
    - Use method/workflow cards only as supporting execution guidance, not as the primary visual style.
 9. Choose the best style per photo. If more than one direction is genuinely appropriate, create multiple variants.
@@ -56,8 +66,8 @@ into:
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
 11. Decide local adjustments before rendering. Record `local_adjustments.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include requested masks; the compiler must still reject them when the selected backend lacks verified `mask.ai` capability. If no mask is needed, explain why in `local_adjustments.reason`.
 12. Write one vendor-neutral `EditIntent v2` per RAW using `knowledge/schemas/edit_intent.schema.json`. Bind it to the confirmed authorization reference, source fingerprint, preview artifact id, and starting-state hash. Use the optional bounded `output` contract for an explicit final container/bit depth; a practical loop may review JPEG first and move the accepted revision to a receipt-bound 16-bit TIFF or OpenEXR final.
-13. Compile the intent with `scripts/edit_intent.py compile`. The compiler must produce `lumenflow.execution_plan.v1` without writing a profile or rendered image.
-14. Execute the plan with `scripts/edit_intent.py execute`, passing the exact allowed output directory. Preserve the resulting `lumenflow.execution_receipt.v1` for review. Use `scripts/render_adjustment_plan.py` only for existing `adjustment_plan.v1` compatibility inputs.
+13. Compile the intent with `lumenflow.compile_edit`. The tool must produce `lumenflow.execution_plan.v1` without writing a profile or rendered image.
+14. Execute the plan with `lumenflow.execute_edit`, passing the exact allowed output directory. Preserve the resulting `lumenflow.execution_receipt.v1` for review.
 15. Review rendered outputs with the host agent's vision/reasoning capability:
     - exposure and highlight clipping
     - blocked shadows
@@ -66,12 +76,14 @@ into:
     - crop quality and whether important context was lost
     - obvious rendering artifacts
 16. Write `lumenflow.review_result.v1`, binding the current intent revision, plan, receipt, and output fingerprint. Use `accept`, `revise`, or `reject`; a revision may replace only style, global adjustments, composition, local-adjustment intent, or the bounded final-output contract.
-17. Advance the persisted session with `scripts/review_loop.py`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
+17. Start the persisted session with `lumenflow.start_review`, then advance it with `lumenflow.advance_review`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
 18. For `revise`, compile and execute the emitted next intent, inspect the new verified output, and repeat. Write final execution receipts, session state, processing report, and review notes when the session reaches a terminal state.
 19. For benchmark runs, write a `lumenflow.visual_assessment.v1` only after inspecting the exact output fingerprint, then use `scripts/benchmark_eval.py record`. Do not assign a visual score to a failed or dry-run execution, and do not omit failed cases from the aggregate report.
-20. After final acceptance, add the edit to `scripts/personal_example_store.py` only when personal-example memory is desired. Use scene/purpose tags that help later retrieval. Never add rejected, active, failed, or revision-limit outcomes.
+20. After final acceptance, call `lumenflow.store_example` only when personal-example memory is desired. Use scene/purpose tags that help later retrieval. Never add rejected, active, failed, or revision-limit outcomes.
 
-Typical command:
+## Developer/debug CLI fallback
+
+Use this only when maintaining Lumenflow itself or when the user explicitly asks to debug the CLI without an MCP host:
 
 ```bash
 python scripts/create_previews.py /path/to/photos
@@ -80,6 +92,8 @@ python scripts/edit_intent.py execute /path/to/output/IMG_001.execution_plan.jso
 python scripts/review_loop.py start /path/to/IMG_001.edit_intent.json --state-output /path/to/output/IMG_001.review_session.json
 python scripts/review_loop.py advance /path/to/output/IMG_001.review_session.json /path/to/output/IMG_001.execution_plan.json /path/to/output/IMG_001.execution_receipt.json /path/to/output/IMG_001.review_result.json --state-output /path/to/output/IMG_001.review_session.json --next-intent-output /path/to/output/IMG_001.edit_intent.r2.json
 ```
+
+Use `scripts/render_adjustment_plan.py` only for existing `adjustment_plan.v1` compatibility inputs. The same allowed-root, capability, receipt, review, and no-overwrite rules apply to this fallback.
 
 With `photos.output_root` set to `/photo-output-root`, a source such as `/photo-source/negative_raw/2026五一港珠澳/P1034473.RW2` renders into `/photo-output-root/2026五一港珠澳/`.
 

@@ -160,6 +160,47 @@ class LumenflowRuntime:
             }
         return engines
 
+    def _feature_status(
+        self, engines: Mapping[str, Mapping[str, Any]]
+    ) -> dict[str, bool]:
+        roots_configured = self.allowed_roots.configured
+
+        def supports(engine: Mapping[str, Any], *capability_names: str) -> bool:
+            if not engine.get("available"):
+                return False
+            contract = engine.get("capabilities")
+            declared = (
+                contract.get("capabilities") if isinstance(contract, dict) else None
+            )
+            if not isinstance(declared, dict):
+                return False
+            return all(
+                isinstance(declared.get(name), dict)
+                and declared[name].get("state") == "supported"
+                for name in capability_names
+            )
+
+        raw_preview = roots_configured and any(
+            supports(engine, "preview.state_bound") for engine in engines.values()
+        )
+        raw_development = roots_configured and any(
+            supports(engine, "intent.compile.v2", "render", "export.verified")
+            for engine in engines.values()
+        )
+        high_depth_export = roots_configured and any(
+            backend_id in {"rawtherapee", "darktable"}
+            and supports(engine, "intent.compile.v2", "render", "export.verified")
+            for backend_id, engine in engines.items()
+        )
+        return {
+            "style_search": True,
+            "personal_memory": True,
+            "local_curation": roots_configured,
+            "raw_preview": raw_preview,
+            "raw_development": raw_development,
+            "high_depth_export": high_depth_export,
+        }
+
     def _require_backend(self, backend_id: str) -> None:
         self.allowed_roots.require_configured()
         engine = self._engine_status().get(backend_id)
@@ -251,6 +292,7 @@ class LumenflowRuntime:
     def status(self) -> ToolResult:
         def inspect_runtime() -> dict[str, Any]:
             engines = self._engine_status()
+            features = self._feature_status(engines)
             try:
                 version = importlib.metadata.version("lumenflow")
             except importlib.metadata.PackageNotFoundError:
@@ -259,12 +301,8 @@ class LumenflowRuntime:
                 "service": "lumenflow",
                 "version": version,
                 "protocol": "stdio",
-                "mode": (
-                    "full"
-                    if self.allowed_roots.configured
-                    and any(engine["available"] for engine in engines.values())
-                    else "lite"
-                ),
+                "mode": "full" if features["raw_development"] else "lite",
+                "features": features,
                 "path_policy": self.allowed_roots.to_dict(),
                 "engines": engines,
             }

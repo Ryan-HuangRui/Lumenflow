@@ -15,17 +15,22 @@ Use the host model's native vision and reasoning to interpret the user's purpose
 
 Never modify RAW files, sidecars, Lightroom ratings, collection membership, or develop settings during curation.
 
+## Runtime Routing (MCP First)
+
+If Lumenflow MCP tools are available, always use them as the product interface:
+
+1. Call `lumenflow.status` first.
+2. Read `features.local_curation`; do not infer tool availability from the `lite` or `full` label alone.
+3. When `local_curation=true`, use `lumenflow.prepare_curation` and `lumenflow.finalize_curation` for all local-file preparation and validation.
+4. When `local_curation=false`, do not run repository scripts to bypass the runtime policy. Explain that allowed source/output roots must be configured. You may still curate images that the user has directly provided to the host, but do not claim that a local RAW folder was scanned.
+5. If the Lumenflow MCP runtime itself is unavailable, enter Lite Mode and limit work to host-visible images and advisory curation.
+
+Direct `scripts/` commands are a developer/debug fallback only. Do not use them in a normal installed Plugin workflow.
+
 ## Workflow
 
 1. Resolve the user's source directory, purpose, and any hard scope such as dates, desired count, people, events, or output format. Infer a reasonable editorial purpose when it is obvious; otherwise ask one concise question.
-2. Prepare a curation workspace:
-
-   ```bash
-   python3 scripts/curate_photos.py prepare /path/to/raws \
-     --output-dir /path/to/curation \
-     --date-from 2026-06-01 \
-     --date-to 2026-06-30
-   ```
+2. Prepare a curation workspace with `lumenflow.prepare_curation`, passing the absolute source folder, absolute output directory, and optional date bounds.
 
 3. Read `candidate_manifest.json`. Report preview failures or missing capture dates that changed the candidate set.
 4. Inspect every contact sheet with the host model's vision. Open individual previews at higher detail when focus, expression, motion blur, or near-duplicate choice is uncertain.
@@ -59,16 +64,27 @@ Never modify RAW files, sidecars, Lightroom ratings, collection membership, or d
    }
    ```
 
-7. Validate and package the proposed sequence:
-
-   ```bash
-   python3 scripts/curate_photos.py finalize \
-     /path/to/curation/candidate_manifest.json \
-     /path/to/curation/selection_plan.json
-   ```
+7. Validate and package the proposed sequence with `lumenflow.finalize_curation`, passing the absolute manifest and plan paths returned by the active workspace.
 
 8. Show the proposed sequence, rationale, alternates, and `selection_report.md` to the user. Do not treat the proposal as approval.
 9. After explicit user confirmation, change `status.decision` to `user_confirmed`, validate again, and hand only those ordered assets to `develop-photos`. If the user changes membership or order, create a revised plan and validate it before handoff.
+
+## Developer/debug CLI fallback
+
+Use this only when maintaining Lumenflow itself or when the user explicitly asks to debug the CLI without an MCP host:
+
+```bash
+python3 scripts/curate_photos.py prepare /path/to/raws \
+  --output-dir /path/to/curation \
+  --date-from 2026-06-01 \
+  --date-to 2026-06-30
+
+python3 scripts/curate_photos.py finalize \
+  /path/to/curation/candidate_manifest.json \
+  /path/to/curation/selection_plan.json
+```
+
+The same confirmation and source-immutability rules apply to this fallback.
 
 ## Visual Judgment Contract
 

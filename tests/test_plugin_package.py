@@ -12,6 +12,35 @@ PYTHON = Path(sys.executable)
 
 
 class PluginPackageTests(unittest.TestCase):
+    def test_photo_skills_are_mcp_first_with_cli_only_as_debug_fallback(self) -> None:
+        expectations = {
+            "curate-photos": (
+                "lumenflow.status",
+                "lumenflow.prepare_curation",
+                "lumenflow.finalize_curation",
+                "scripts/curate_photos.py",
+            ),
+            "develop-photos": (
+                "lumenflow.status",
+                "lumenflow.create_previews",
+                "lumenflow.compile_edit",
+                "lumenflow.execute_edit",
+                "lumenflow.start_review",
+                "lumenflow.advance_review",
+                "scripts/edit_intent.py",
+            ),
+        }
+        for skill_name, phrases in expectations.items():
+            with self.subTest(skill=skill_name):
+                text = (ROOT / "skills" / skill_name / "SKILL.md").read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn("## Runtime Routing (MCP First)", text)
+                self.assertIn("developer/debug fallback only", text)
+                for phrase in phrases:
+                    self.assertIn(phrase, text)
+                self.assertLess(text.index(phrases[1]), text.index(phrases[-1]))
+
     def test_project_declares_installable_src_layout_package(self) -> None:
         pyproject = ROOT / "pyproject.toml"
         self.assertTrue(pyproject.exists(), "PR1 must provide an installable pyproject.toml")

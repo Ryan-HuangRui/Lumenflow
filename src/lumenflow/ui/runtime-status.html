@@ -83,6 +83,9 @@
     .chip.standby { color: var(--amber); background: rgba(255,188,102,.10); }
     .engine-meta { color: var(--dim); font-size: 10px; margin-top: 16px; }
     .engine-detail { color: var(--muted); line-height: 1.4; margin: 8px 0 0; font-size: 13px; }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .feature-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 14px 16px; border: 1px solid var(--line); background: rgba(26,33,30,.72); border-radius: 11px; }
+    .feature-name { color: var(--muted); font-size: 13px; }
     .roots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .root-card { min-height: 112px; padding: 16px; border-left: 2px solid var(--aqua); background: linear-gradient(140deg, rgba(127,228,209,.10), rgba(26,33,30,.7)); border-radius: 0 11px 11px 0; }
     .root-kind { color: var(--aqua); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
@@ -94,7 +97,7 @@
       .shell { width: min(100% - 26px, 620px); padding-top: 20px; }
       .topbar, .section-heading { align-items: flex-start; flex-direction: column; }
       .brand-mark { display: none; }
-      .hero-grid, .engine-grid { grid-template-columns: 1fr; }
+      .hero-grid, .engine-grid, .feature-grid { grid-template-columns: 1fr; }
       .roots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
@@ -126,6 +129,10 @@
         </article>
       </section>
       <section>
+        <div class="section-heading"><h2>Workflow capabilities</h2><span class="note">mode is a summary · features are authoritative</span></div>
+        <div class="feature-grid" id="feature-grid"></div>
+      </section>
+      <section>
         <div class="section-heading"><h2>Engine readiness</h2><span class="note">availability is not authorization</span></div>
         <div class="engine-grid" id="engine-grid"></div>
       </section>
@@ -142,6 +149,14 @@
       runtime: { state: "Ready for local work", detail: "The runtime is prepared to inspect, preview, and validate. Writes remain bounded by explicit workflow contracts.", mode: "Full", version: "0.1.0" },
       mode: "full",
       version: "0.1.0",
+      features: {
+        style_search: true,
+        personal_memory: true,
+        local_curation: true,
+        raw_preview: true,
+        raw_development: true,
+        high_depth_export: true
+      },
       engines: {
         rawtherapee: { available: true, version: "5.11", detail: "Verified profile · isolated export" },
         darktable: { available: true, version: "5.4.1", detail: "Verified module · in-memory catalog" }
@@ -149,6 +164,14 @@
       path_policy: { configured: true, source_roots: ["configured-root"], output_roots: ["configured-root"] }
     };
     const ROOT_LABELS = { input: "Photo input", output: "Rendered output", data: "Plugin data", config: "Local config" };
+    const FEATURE_LABELS = {
+      style_search: "Style search",
+      personal_memory: "Personal memory",
+      local_curation: "Local curation",
+      raw_preview: "RAW preview",
+      raw_development: "RAW development",
+      high_depth_export: "High-depth export"
+    };
 
     function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
     function text(value, fallback) { return typeof value === "string" && value.trim() ? value.trim().slice(0, 180) : fallback; }
@@ -183,13 +206,25 @@
       const data = state && typeof state === "object" ? state : FALLBACK_STATE;
       const runtime = data.runtime && typeof data.runtime === "object" ? data.runtime : data;
       const mode = String(runtime.mode || "lite").toLowerCase() === "full" ? "Full" : "Lite";
-      const runtimeState = mode === "Full" ? "Ready for local work" : "Lite inspection mode";
-      const runtimeDetail = mode === "Full" ? "The runtime is prepared to inspect, preview, and validate. Writes remain bounded by explicit workflow contracts." : "The runtime can inspect local state, but photo access remains unavailable until allowed roots and an engine are configured.";
+      const features = runtime.features && typeof runtime.features === "object" ? runtime.features : FALLBACK_STATE.features;
+      const curationReady = features.local_curation === true;
+      const runtimeState = mode === "Full" ? "Ready for RAW work" : curationReady ? "Local curation ready" : "Lite inspection mode";
+      const runtimeDetail = mode === "Full" ? "The runtime is prepared to inspect, preview, and validate. Writes remain bounded by explicit workflow contracts." : curationReady ? "Allowed roots are configured, so local curation is available. A verified RAW engine is still required for preview rendering and development." : "Style search and personal memory remain available. Configure allowed roots to enable local curation, then add a verified RAW engine for development.";
       document.getElementById("runtime-state").textContent = runtimeState;
       document.getElementById("runtime-detail").textContent = runtimeDetail;
       document.getElementById("mode-value").textContent = mode;
       document.getElementById("full-mode-pill").classList.toggle("active", mode === "Full");
       document.getElementById("runtime-version").textContent = text(runtime.version, FALLBACK_STATE.version);
+
+      const featureGrid = document.getElementById("feature-grid");
+      clear(featureGrid);
+      Object.entries(FEATURE_LABELS).forEach(([featureId, label]) => {
+        const available = features[featureId] === true;
+        const card = element("article", "feature-card");
+        card.append(element("span", "feature-name", label));
+        card.append(element("span", "chip " + (available ? "ready" : "standby"), available ? "available" : "unavailable"));
+        featureGrid.append(card);
+      });
 
       const engineGrid = document.getElementById("engine-grid");
       clear(engineGrid);

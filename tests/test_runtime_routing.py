@@ -75,6 +75,17 @@ class RuntimeRoutingTests(unittest.TestCase):
 
             self.assertEqual(status["mode"], "lite")
             self.assertFalse(status["path_policy"]["configured"])
+            self.assertEqual(
+                status["features"],
+                {
+                    "style_search": True,
+                    "personal_memory": True,
+                    "local_curation": False,
+                    "raw_preview": False,
+                    "raw_development": False,
+                    "high_depth_export": False,
+                },
+            )
             self.assertFalse(result["ok"])
             self.assertEqual(result["error"]["code"], "ALLOWED_ROOTS_REQUIRED")
 
@@ -106,7 +117,53 @@ class RuntimeRoutingTests(unittest.TestCase):
 
             self.assertEqual(status["mode"], "full")
             self.assertTrue(status["path_policy"]["configured"])
+            self.assertEqual(
+                status["features"],
+                {
+                    "style_search": True,
+                    "personal_memory": True,
+                    "local_curation": True,
+                    "raw_preview": True,
+                    "raw_development": True,
+                    "high_depth_export": True,
+                },
+            )
             self.assertTrue(result["ok"], result)
+
+    def test_configured_roots_without_engine_enable_curation_but_stay_lite(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / "source"
+            output_root = root / "output"
+            source_root.mkdir()
+            output_root.mkdir()
+            runtime = LumenflowRuntime(
+                local_config={
+                    "security": {
+                        "allowed_source_roots": [str(source_root)],
+                        "allowed_output_roots": [str(output_root)],
+                    },
+                    "tools": {
+                        "rawtherapee_cli": str(root / "missing-rawtherapee-cli"),
+                        "darktable_cli": str(root / "missing-darktable-cli"),
+                    },
+                }
+            )
+
+            status = runtime.status()["result"]
+
+            self.assertEqual(status["mode"], "lite")
+            self.assertEqual(
+                status["features"],
+                {
+                    "style_search": True,
+                    "personal_memory": True,
+                    "local_curation": True,
+                    "raw_preview": False,
+                    "raw_development": False,
+                    "high_depth_export": False,
+                },
+            )
 
     def test_source_outside_allowlist_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

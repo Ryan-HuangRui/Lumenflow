@@ -27,18 +27,31 @@ override that path with `LUMENFLOW_CONFIG`, keep private state under
 
 ## Lite and Full routing
 
-`lumenflow.status` reports both the resolved RAW engines and the active path policy.
+`lumenflow.status` reports the resolved RAW engines, active path policy, and an
+explicit `features` capability map. `mode` remains a concise UI summary; agents must
+route individual operations from `features` rather than treating Lite/Full as a global
+tool gate.
 The runtime deliberately starts in **Lite Mode** unless both of these conditions hold:
 
 1. `security.allowed_source_roots` and `security.allowed_output_roots` are non-empty,
    absolute, existing directories.
 2. At least one supported RAW engine command resolves to a local executable.
 
-Lite Mode keeps non-photo operations such as status, style search, and private example
-search available. Tools that would read photos, materialize profiles, or write exports
-fail closed. **Full Mode** enables the RAW editing route, while each requested backend
-is still checked independently before use. Curation can run once its file roots are
-configured; it does not require a RAW rendering backend.
+Lite Mode always keeps status, style search, and private example search available.
+Once file roots are configured, local curation is also available even when no RAW
+renderer is installed. **Full Mode** means at least one verified RAW development route
+is available, while each requested backend is still checked independently before use.
+
+The feature map contains:
+
+| Feature | Availability rule |
+| --- | --- |
+| `style_search` | Always available from the bundled style library |
+| `personal_memory` | Always available through the local private store |
+| `local_curation` | Allowed source and output roots are configured |
+| `raw_preview` | Local curation plus an available state-bound preview backend |
+| `raw_development` | Local curation plus an available verified intent/render/export backend |
+| `high_depth_export` | A current verified RawTherapee or darktable development route is available |
 
 Example local policy:
 

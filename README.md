@@ -79,7 +79,7 @@ RawTherapee / darktable 渲染 → ExecutionReceipt
 | [`learn-styles`](skills/learn-styles/SKILL.md) | 从用户批准的来源更新本地风格知识库 |
 | [`fetch-bilibili-subtitles`](skills/fetch-bilibili-subtitles/SKILL.md) | 获取已有字幕，供私有教程摄取流程使用 |
 
-CLI 是 skill 调用的确定性工具，不是主要交互界面。审美选择不会由脚本中的固定分数替代。
+Plugin 的高层 MCP 工具是安装后的主要产品接口；CLI 只保留给开发、调试和兼容场景。审美选择不会由脚本中的固定分数替代。
 
 ## 快速开始
 
@@ -377,7 +377,7 @@ git ls-files | grep -E 'lumenflow\.local\.json|(^|/)local/|(^|/)runs/|(^|/)tmp/'
 python -m unittest discover -s tests
 ```
 
-当前主分支包含 166 个测试。部分用例会打印 dry-run 命令和 JSON 摘要，这是预期行为；测试不会处理真实照片。
+完整测试套件覆盖 Core、MCP、Plugin packaging、UI 资源和各 RAW 后端合同。部分用例会打印 dry-run 命令和 JSON 摘要，这是预期行为；默认测试不会处理真实照片。
 
 改动 JSON 合同、执行器或安全边界时，还应运行：
 
@@ -436,4 +436,4 @@ Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“�
 
 ## 许可证
 
-当前仓库尚未包含 `LICENSE` 文件。代码公开可见并不自动授予复制、修改或分发权；维护者需要在正式接受外部使用与贡献前选择并添加开源许可证。
+Lumenflow 采用 [MIT License](LICENSE) 开源。你可以在许可证条款允许的范围内使用、复制、修改、合并、发布和分发本项目。

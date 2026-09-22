@@ -95,6 +95,18 @@ class PluginUIAssetTests(unittest.TestCase):
         self.assertNotRegex(document, r"/(?:Users|home|private|var)/")
         self.assertNotRegex(document, r"[A-Za-z]:\\")
 
+    def test_runtime_status_renders_feature_capabilities_independently_of_mode(self) -> None:
+        document = (UI_ROOT / "runtime-status.html").read_text(encoding="utf-8")
+        for phrase in (
+            "features",
+            "local_curation",
+            "raw_preview",
+            "raw_development",
+            "high_depth_export",
+            "Workflow capabilities",
+        ):
+            self.assertIn(phrase, document)
+
     def test_curation_accepts_manifest_and_selection_plan_shapes_without_paths(self) -> None:
         document = (UI_ROOT / "curation.html").read_text(encoding="utf-8")
         for phrase in ("manifest.candidates", "selection_plan", "status.decision", "assetLabel"):
