@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -264,6 +266,16 @@ class PhotoPipelineTests(unittest.TestCase):
             render_raw.run_command(["darktable-cli", "--version"])
 
         self.assertIsNone(run.call_args.kwargs["env"])
+
+    def test_runner_logs_commands_to_stderr_without_polluting_stdio_stdout(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            render_raw.run_command(["rawtherapee-cli", "-v"], dry_run=True)
+
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("rawtherapee-cli -v", stderr.getvalue())
 
     def test_develop_photos_dry_run_writes_records_for_selected_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
