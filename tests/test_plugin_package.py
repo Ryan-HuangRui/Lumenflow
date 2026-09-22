@@ -18,7 +18,7 @@ class PluginPackageTests(unittest.TestCase):
         text = pyproject.read_text(encoding="utf-8")
         self.assertIn('requires-python = ">=3.11"', text)
         self.assertIn('package-dir = {"" = "src"}', text)
-        self.assertIn('include = ["lumenflow"]', text)
+        self.assertIn('include = ["lumenflow*"]', text)
 
     def test_package_modules_do_not_modify_import_path(self) -> None:
         package_root = ROOT / "src" / "lumenflow"
