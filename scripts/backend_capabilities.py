@@ -178,7 +178,7 @@ def rawtherapee_capabilities() -> BackendCapabilities:
                 "compiler=lumenflow.rawtherapee-pp3.v4",
             ),
             "intent.compile.v2": _supported(
-                "EditIntent v2 compiles vendor-neutral adjustments plus the versioned, allowlisted style.rawtherapee sections and verified PP3 state inputs to an isolated execution plan",
+                "EditIntent v2 compiles vendor-neutral adjustments, allowlisted style.rawtherapee sections, verified PP3 state inputs, and bounded JPEG/PNG/TIFF output settings to an isolated execution plan",
                 "compiler=lumenflow.rawtherapee-pp3.v4",
                 "native_schema=lumenflow.rawtherapee-native.v2",
                 "native_profile_version=349",
@@ -229,14 +229,14 @@ def darktable_capabilities() -> BackendCapabilities:
                 "base=lumenflow.darktable_codec.v2",
             ),
             "render": _supported(
-                "darktable-cli passed isolated real-RAW exports with source and sidecar preservation; bounded JPEG/PNG/TIFF/OpenEXR output is available through the direct renderer",
+                "darktable-cli passed isolated real-RAW exports with source and sidecar preservation; bounded JPEG/PNG/TIFF/OpenEXR output is available through ExecutionPlan v1",
                 "executor=execution_plan.v1",
                 "darktable-cli=5.4.1",
                 "probe=darktable_probe_7a4a7a02494044ceb2141c26199a8805",
             ),
             "render.legacy": _supported("Legacy style or XMP command construction remains available"),
             "export.verified": _supported(
-                "A real XMP-replay execution emitted a successful v1 receipt with source/output fingerprints; direct exports verify JPEG/PNG/TIFF and OpenEXR half/float containers",
+                "Real dynamic-module executions emitted successful v1 receipts for JPEG review renders and 32-bit OpenEXR finals; direct fixtures also verify PNG/TIFF and OpenEXR half/float containers",
                 "receipt=execution_receipt.v1",
                 "darktable-cli=5.4.1",
                 "sentinel_sha256=b8979553ec61b579c2600787e62d9e10885645358e07bafbd6c58cddc84cce4e",

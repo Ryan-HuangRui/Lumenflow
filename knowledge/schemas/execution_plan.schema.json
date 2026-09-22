@@ -60,13 +60,10 @@
           }
         },
         "output": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path", "format"],
-          "properties": {
-            "path": {"type": "string", "minLength": 1},
-            "format": {"const": "JPEG"}
-          }
+          "oneOf": [
+            {"$ref": "#/$defs/legacy_jpeg_output"},
+            {"$ref": "#/$defs/explicit_output"}
+          ]
         }
       }
     },
@@ -100,6 +97,36 @@
       "properties": {
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "legacy_jpeg_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "format"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "format": {"const": "JPEG"}
+      }
+    },
+    "explicit_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "format", "bit_depth", "options"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "format": {"enum": ["JPEG", "PNG", "TIFF", "OPENEXR"]},
+        "bit_depth": {"enum": ["8", "16", "16f", "32"]},
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "jpeg_quality": {"type": "integer", "minimum": 1, "maximum": 100},
+            "jpeg_chroma": {"type": "integer", "enum": [1, 2, 3]},
+            "tiff_compression": {"type": "boolean"},
+            "icc_type": {"enum": ["SRGB", "ADOBERGB", "LIN_REC709", "LIN_REC2020", "REC709", "PROPHOTO_RGB", "DISPLAY_P3"]},
+            "icc_intent": {"enum": ["PERCEPTUAL", "RELATIVE_COLORIMETRIC", "SATURATION", "ABSOLUTE_COLORIMETRIC"]}
+          }
+        }
       }
     },
     "authorization": {

@@ -147,7 +147,8 @@ class ReviewLoopTests(unittest.TestCase):
                         "contrast": 8,
                         "highlight_recovery": 26,
                         "shadow_lift": 18,
-                    }
+                    },
+                    "output": {"format": "tiff", "bit_depth": "16"},
                 },
             )
 
@@ -156,6 +157,7 @@ class ReviewLoopTests(unittest.TestCase):
         revised = transition["next_intent"]
         self.assertEqual(revised["revision"], 2)
         self.assertEqual(revised["global_adjustments"]["exposure_ev"], 0.45)
+        self.assertEqual(revised["output"], {"format": "tiff", "bit_depth": "16"})
         self.assertEqual(revised["source"], intent["source"])
         self.assertEqual(revised["authorization"], intent["authorization"])
         self.assertEqual(transition["session"]["revisions_used"], 1)

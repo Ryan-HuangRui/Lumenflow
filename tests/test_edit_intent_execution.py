@@ -116,6 +116,130 @@ class EditIntentExecutionTests(unittest.TestCase):
             self.assertEqual(first["operations"][1]["command_argv"][0], "/custom/rawtherapee-cli")
             self.assertFalse(output_dir.exists())
 
+    def test_rawtherapee_tiff16_export_is_bound_to_plan_and_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            output_dir = root / "output"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["output"] = {
+                "format": "tiff",
+                "bit_depth": "16",
+                "rawtherapee": {"tiff_compression": True},
+            }
+
+            plan = edit_intent.compile_intent(
+                intent,
+                backend_id="rawtherapee",
+                output_dir=output_dir,
+                local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            )
+
+            output = plan["artifacts"]["output"]
+            self.assertEqual(
+                output,
+                {
+                    "path": str(output_dir / "bangkok_intent-bangkok-001_r1.tif"),
+                    "format": "TIFF",
+                    "bit_depth": "16",
+                    "options": {"tiff_compression": True},
+                },
+            )
+            command = plan["operations"][1]["command_argv"]
+            self.assertIn("-tz", command)
+            self.assertIn("-b16", command)
+
+            def fake_runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
+                self.assertFalse(dry_run)
+                Path(plan["artifacts"]["output"]["path"]).write_bytes(b"rendered-tiff16")
+                return 0
+
+            receipt = edit_intent.execute_plan(
+                plan,
+                dry_run=False,
+                timeout=10,
+                runner=fake_runner,
+                allowed_output_dir=output_dir,
+                local_config={"tools": {"rawtherapee_cli": "/custom/rawtherapee-cli"}},
+            )
+            self.assertEqual(receipt["status"], "success")
+            self.assertEqual(
+                receipt["output_fingerprint"]["sha256"],
+                hashlib.sha256(b"rendered-tiff16").hexdigest(),
+            )
+
+    def test_darktable_openexr32_export_is_bound_to_plan_and_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            xmp = root / "bangkok.DNG.xmp"
+            output_dir = root / "output"
+            raw.write_bytes(b"raw-bangkok")
+            xmp.write_text(darktable_codec.minimal_xmp(), encoding="utf-8")
+            preview = preview_provider.DarktablePreviewProvider().create_preview(
+                preview_provider.PreviewRequest(raw, root / "preview.jpg", xmp, True, 10)
+            )
+            intent = self._intent(raw)
+            intent["global_adjustments"] = {}
+            intent["composition"] = {
+                "decision": "preserve_existing_crop",
+                "reason": "Keep the approved framing.",
+            }
+            intent["preview_basis"] = preview_provider.preview_basis_from_artifact(preview)
+            intent["output"] = {
+                "format": "openexr",
+                "bit_depth": "32",
+                "darktable": {
+                    "icc_type": "LIN_REC2020",
+                    "icc_intent": "RELATIVE_COLORIMETRIC",
+                },
+            }
+
+            plan = edit_intent.compile_intent(
+                intent,
+                backend_id="darktable",
+                output_dir=output_dir,
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+            )
+
+            output = plan["artifacts"]["output"]
+            self.assertEqual(output["format"], "OPENEXR")
+            self.assertEqual(output["bit_depth"], "32")
+            self.assertTrue(output["path"].endswith(".exr"))
+            command = plan["operations"][1]["command_argv"]
+            self.assertIn("exr", command)
+            self.assertIn("plugins/imageio/format/exr/bpp=32", command)
+            self.assertIn("LIN_REC2020", command)
+            self.assertIn("RELATIVE_COLORIMETRIC", command)
+
+            receipt = edit_intent.execute_plan(
+                plan,
+                dry_run=True,
+                timeout=10,
+                allowed_output_dir=output_dir,
+                local_config={"tools": {"darktable_cli": "/custom/darktable-cli"}},
+            )
+            self.assertEqual(receipt["status"], "dry_run")
+
+    def test_backend_incompatible_output_contract_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["output"] = {"format": "openexr", "bit_depth": "16"}
+
+            with self.assertRaisesRegex(
+                edit_intent.IntentValidationError,
+                "RawTherapee.*openexr",
+            ):
+                edit_intent.compile_intent(
+                    intent,
+                    backend_id="rawtherapee",
+                    output_dir=root / "output",
+                )
+
     def test_compile_rawtherapee_applies_bounded_native_sections(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -470,6 +594,39 @@ class EditIntentExecutionTests(unittest.TestCase):
                 output_dir=output_dir,
             )
             plan["operations"][1]["command_argv"] = ["/bin/sh", "-c", "touch /tmp/lumenflow-pwned"]
+            calls: list[list[str]] = []
+
+            def runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:
+                calls.append(command)
+                return 0
+
+            with self.assertRaises(edit_intent.ExecutionPreconditionError) as error:
+                edit_intent.execute_plan(
+                    plan,
+                    dry_run=False,
+                    timeout=10,
+                    runner=runner,
+                    allowed_output_dir=output_dir,
+                )
+
+            self.assertEqual(error.exception.code, "PLAN_COMMAND_MISMATCH")
+            self.assertEqual(calls, [])
+            self.assertFalse(output_dir.exists())
+
+    def test_tampered_high_depth_output_contract_is_rejected_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "bangkok.DNG"
+            output_dir = root / "output"
+            raw.write_bytes(b"raw-bangkok")
+            intent = self._intent(raw)
+            intent["output"] = {"format": "tiff", "bit_depth": "16"}
+            plan = edit_intent.compile_intent(
+                intent,
+                backend_id="rawtherapee",
+                output_dir=output_dir,
+            )
+            plan["artifacts"]["output"]["bit_depth"] = "32"
             calls: list[list[str]] = []
 
             def runner(command: list[str], *, dry_run: bool, timeout: int | None) -> int:

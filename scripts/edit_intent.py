@@ -57,6 +57,7 @@ INTENT_FIELDS = {
     "global_adjustments",
     "composition",
     "local_adjustments",
+    "output",
 }
 GLOBAL_ADJUSTMENT_RANGES: dict[str, tuple[float | None, float | None]] = {
     "exposure_ev": (-5, 5),
@@ -70,6 +71,25 @@ GLOBAL_ADJUSTMENT_RANGES: dict[str, tuple[float | None, float | None]] = {
     "green_multiplier": (0, None),
 }
 DARKTABLE_STATE_INPUT_ROLES = {"base_profile", "source_sidecar"}
+OUTPUT_FORMATS = {
+    "jpeg": {"label": "JPEG", "suffix": "jpg"},
+    "png": {"label": "PNG", "suffix": "png"},
+    "tiff": {"label": "TIFF", "suffix": "tif"},
+    "openexr": {"label": "OPENEXR", "suffix": "exr"},
+}
+OUTPUT_DEPTHS = {
+    "rawtherapee": {
+        "jpeg": {"8"},
+        "png": {"8", "16"},
+        "tiff": {"8", "16", "16f", "32"},
+    },
+    "darktable": {
+        "jpeg": {"8"},
+        "png": {"8", "16"},
+        "tiff": {"8", "16", "32"},
+        "openexr": {"16", "32"},
+    },
+}
 
 
 def _now() -> str:
@@ -121,6 +141,144 @@ def _validate_adjustments(value: dict[str, Any], field: str) -> None:
             raise IntentValidationError(f"{field}.{key} is below its supported range")
         if maximum is not None and number > maximum:
             raise IntentValidationError(f"{field}.{key} is above its supported range")
+
+
+def _validate_output_request(value: dict[str, Any], field: str = "output") -> None:
+    _reject_unknown(
+        value,
+        {"format", "bit_depth", "jpeg_quality", "rawtherapee", "darktable"},
+        field,
+    )
+    if value.get("format") not in OUTPUT_FORMATS:
+        raise IntentValidationError(
+            f"{field}.format must be jpeg, png, tiff, or openexr"
+        )
+    if value.get("bit_depth") not in {"8", "16", "16f", "32"}:
+        raise IntentValidationError(f"{field}.bit_depth is not supported")
+    quality = value.get("jpeg_quality")
+    if quality is not None and (
+        isinstance(quality, bool) or not isinstance(quality, int) or not 1 <= quality <= 100
+    ):
+        raise IntentValidationError(f"{field}.jpeg_quality must be an integer from 1 to 100")
+
+    rawtherapee = value.get("rawtherapee")
+    if rawtherapee is not None:
+        rawtherapee = _require_object(rawtherapee, f"{field}.rawtherapee")
+        if not rawtherapee:
+            raise IntentValidationError(f"{field}.rawtherapee must not be empty")
+        _reject_unknown(
+            rawtherapee,
+            {"jpeg_chroma", "tiff_compression"},
+            f"{field}.rawtherapee",
+        )
+        jpeg_chroma = rawtherapee.get("jpeg_chroma")
+        if jpeg_chroma is not None and (
+            isinstance(jpeg_chroma, bool)
+            or not isinstance(jpeg_chroma, int)
+            or jpeg_chroma not in {1, 2, 3}
+        ):
+            raise IntentValidationError(
+                f"{field}.rawtherapee.jpeg_chroma must be 1, 2, or 3"
+            )
+        if "tiff_compression" in rawtherapee and not isinstance(
+            rawtherapee["tiff_compression"], bool
+        ):
+            raise IntentValidationError(
+                f"{field}.rawtherapee.tiff_compression must be a boolean"
+            )
+
+    darktable = value.get("darktable")
+    if darktable is not None:
+        darktable = _require_object(darktable, f"{field}.darktable")
+        if not darktable:
+            raise IntentValidationError(f"{field}.darktable must not be empty")
+        _reject_unknown(darktable, {"icc_type", "icc_intent"}, f"{field}.darktable")
+        if darktable.get("icc_type") not in {None, *render_raw.DARKTABLE_ICC_TYPES}:
+            raise IntentValidationError(f"{field}.darktable.icc_type is not supported")
+        if darktable.get("icc_intent") not in {None, *render_raw.DARKTABLE_ICC_INTENTS}:
+            raise IntentValidationError(f"{field}.darktable.icc_intent is not supported")
+
+
+def _normalize_output_request(value: dict[str, Any], backend_id: str) -> dict[str, Any]:
+    """Return the exact backend-bound output artifact and renderer kwargs."""
+
+    _validate_output_request(value)
+    output_format = value["format"]
+    bit_depth = value["bit_depth"]
+    supported = OUTPUT_DEPTHS[backend_id]
+    if output_format not in supported:
+        backend_name = "RawTherapee" if backend_id == "rawtherapee" else "darktable"
+        raise IntentValidationError(
+            f"{backend_name} output format {output_format} is not supported"
+        )
+    if bit_depth not in supported[output_format]:
+        backend_name = "RawTherapee" if backend_id == "rawtherapee" else "darktable"
+        raise IntentValidationError(
+            f"{backend_name} {output_format} output does not support {bit_depth}-bit depth"
+        )
+    if value.get("jpeg_quality") is not None and output_format != "jpeg":
+        raise IntentValidationError("output.jpeg_quality is only valid for JPEG")
+
+    rawtherapee = value.get("rawtherapee") or {}
+    darktable = value.get("darktable") or {}
+    if backend_id == "rawtherapee" and "darktable" in value:
+        raise IntentValidationError("output.darktable is only valid for the darktable backend")
+    if backend_id == "darktable" and "rawtherapee" in value:
+        raise IntentValidationError(
+            "output.rawtherapee is only valid for the RawTherapee backend"
+        )
+    if rawtherapee.get("jpeg_chroma") is not None and output_format != "jpeg":
+        raise IntentValidationError(
+            "output.rawtherapee.jpeg_chroma is only valid for JPEG"
+        )
+    if rawtherapee.get("tiff_compression") is not None and output_format != "tiff":
+        raise IntentValidationError(
+            "output.rawtherapee.tiff_compression is only valid for TIFF"
+        )
+
+    options: dict[str, Any] = {}
+    builder_kwargs: dict[str, Any] = {
+        "output_format": output_format,
+        "bit_depth": bit_depth,
+    }
+    if "jpeg_quality" in value:
+        options["jpeg_quality"] = value["jpeg_quality"]
+        builder_kwargs["jpeg_quality"] = value["jpeg_quality"]
+    engine_options = rawtherapee if backend_id == "rawtherapee" else darktable
+    for key, option in engine_options.items():
+        options[key] = option
+        builder_kwargs[key] = option
+
+    metadata = OUTPUT_FORMATS[output_format]
+    return {
+        "format": metadata["label"],
+        "suffix": metadata["suffix"],
+        "bit_depth": bit_depth,
+        "options": options,
+        "builder_kwargs": builder_kwargs,
+    }
+
+
+def _output_artifact(
+    intent: dict[str, Any],
+    *,
+    backend_id: str,
+    output_dir: Path,
+    stem: str,
+) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    request = intent.get("output")
+    if request is None:
+        path = output_dir / f"{stem}.jpg"
+        return path, {"path": str(path), "format": "JPEG"}, {}
+    normalized = _normalize_output_request(request, backend_id)
+    path = output_dir / f"{stem}.{normalized['suffix']}"
+    artifact = {
+        "path": str(path),
+        "format": normalized["format"],
+        "bit_depth": normalized["bit_depth"],
+        "options": normalized["options"],
+    }
+    return path, artifact, normalized["builder_kwargs"]
 
 
 def validate_edit_intent(intent: dict[str, Any]) -> None:
@@ -211,6 +369,9 @@ def validate_edit_intent(intent: dict[str, Any]) -> None:
             rawtherapee_pp3.validate_native_sections(style["rawtherapee"])
         except rawtherapee_pp3.PP3UnsupportedValue as error:
             raise IntentValidationError(str(error)) from error
+    if "output" in intent:
+        output = _require_object(intent["output"], "output")
+        _validate_output_request(output)
     global_adjustments = _require_object(intent.get("global_adjustments"), "global_adjustments")
     _validate_adjustments(global_adjustments, "global_adjustments")
 
@@ -552,7 +713,12 @@ def _compile_darktable_intent(
     safe_intent_id = _safe_name(str(intent["intent_id"]))
     stem = f"{safe_source_stem}_{safe_intent_id}_r{intent['revision']}"
     profile_path = output_dir / "profiles" / f"{stem}.xmp"
-    output_path = output_dir / f"{stem}.jpg"
+    output_path, output_artifact, output_kwargs = _output_artifact(
+        intent,
+        backend_id="darktable",
+        output_dir=output_dir,
+        stem=stem,
+    )
     compiler = {"id": "lumenflow.darktable-xmp-replay", "version": "1"}
     profile_content = xmp_content
     profile_sha256 = xmp_fingerprint["sha256"]
@@ -572,14 +738,15 @@ def _compile_darktable_intent(
             "state_inputs": [state_input],
             "xmp_content": xmp_content,
         }
-    runtime_key = _canonical_hash(
-        {
-            "source": intent["source"],
-            "preview_basis": intent["preview_basis"],
-            "intent_id": intent["intent_id"],
-            "revision": intent["revision"],
-        }
-    )[:24]
+    runtime_identity = {
+        "source": intent["source"],
+        "preview_basis": intent["preview_basis"],
+        "intent_id": intent["intent_id"],
+        "revision": intent["revision"],
+    }
+    if intent.get("output") is not None:
+        runtime_identity["output"] = output_artifact
+    runtime_key = _canonical_hash(runtime_identity)[:24]
     runtime_root = output_dir / ".darktable-runtime" / runtime_key
     executable = lumenflow_config.tool_command(local_config, "darktable_cli", "darktable-cli")
     command = render_raw.build_darktable_command(
@@ -591,6 +758,7 @@ def _compile_darktable_intent(
         library=":memory:",
         write_sidecars=False,
         executable=executable,
+        **output_kwargs,
     )
     required_capabilities = ["intent.compile.v2", "render"]
     identity = {
@@ -603,7 +771,7 @@ def _compile_darktable_intent(
         "required_capabilities": required_capabilities,
         "profile_path": str(profile_path),
         "profile_sha256": profile_sha256,
-        "output_path": str(output_path),
+        "output": output_artifact,
         "command_argv": command,
     }
     plan_id = "plan_" + _canonical_hash(identity)[:32]
@@ -624,7 +792,7 @@ def _compile_darktable_intent(
         "required_capabilities": required_capabilities,
         "artifacts": {
             "profile": {"path": str(profile_path), "sha256": profile_sha256},
-            "output": {"path": str(output_path), "format": "JPEG"},
+            "output": output_artifact,
         },
         "operations": [
             {
@@ -698,7 +866,12 @@ def compile_intent(
     safe_intent_id = _safe_name(str(intent["intent_id"]))
     stem = f"{safe_source_stem}_{safe_intent_id}_r{intent['revision']}"
     profile_path = output_dir / "profiles" / f"{stem}.pp3"
-    output_path = output_dir / f"{stem}.jpg"
+    output_path, output_artifact, output_kwargs = _output_artifact(
+        intent,
+        backend_id="rawtherapee",
+        output_dir=output_dir,
+        stem=stem,
+    )
     profile_inputs = _rawtherapee_profile_inputs(intent)
     overrides = rawtherapee_pp3.semantic_overrides(
         _legacy_adjustments(intent["global_adjustments"]),
@@ -735,6 +908,7 @@ def compile_intent(
         output_path,
         [profile_path],
         executable=executable,
+        **output_kwargs,
     )
     identity = {
         "intent_id": intent["intent_id"],
@@ -746,7 +920,7 @@ def compile_intent(
         "required_capabilities": required_capabilities,
         "profile_path": str(profile_path),
         "profile_sha256": hashlib.sha256(profile_text.encode("utf-8")).hexdigest(),
-        "output_path": str(output_path),
+        "output": output_artifact,
         "command_argv": command,
     }
     plan_id = "plan_" + _canonical_hash(identity)[:32]
@@ -770,10 +944,7 @@ def compile_intent(
                 "path": str(profile_path),
                 "sha256": identity["profile_sha256"],
             },
-            "output": {
-                "path": str(output_path),
-                "format": "JPEG",
-            },
+            "output": output_artifact,
         },
         "operations": [
             {
@@ -809,6 +980,61 @@ def _resolved_child(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _output_kwargs_from_artifact(
+    output: Any,
+    *,
+    backend_id: str,
+) -> dict[str, Any]:
+    if not isinstance(output, dict):
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    if set(output) == {"path", "format"}:
+        if output.get("format") != "JPEG" or Path(str(output.get("path", ""))).suffix.lower() != ".jpg":
+            raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+        return {}
+    if set(output) != {"path", "format", "bit_depth", "options"}:
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    if not isinstance(output.get("path"), str) or not output["path"]:
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    options = output.get("options")
+    if not isinstance(options, dict):
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    format_by_label = {
+        metadata["label"]: output_format
+        for output_format, metadata in OUTPUT_FORMATS.items()
+    }
+    output_format = format_by_label.get(output.get("format"))
+    if output_format is None:
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    request: dict[str, Any] = {
+        "format": output_format,
+        "bit_depth": output.get("bit_depth"),
+    }
+    engine_options: dict[str, Any] = {}
+    for key, value in options.items():
+        if key == "jpeg_quality":
+            request[key] = value
+        else:
+            engine_options[key] = value
+    if engine_options:
+        request[backend_id] = engine_options
+    try:
+        normalized = _normalize_output_request(request, backend_id)
+    except IntentValidationError as error:
+        raise ExecutionPreconditionError(
+            "INVALID_EXECUTION_PLAN",
+            f"Output artifact is invalid: {error}",
+        ) from error
+    expected = {
+        "format": normalized["format"],
+        "bit_depth": normalized["bit_depth"],
+        "options": normalized["options"],
+    }
+    actual = {key: output[key] for key in ("format", "bit_depth", "options")}
+    if actual != expected or Path(output["path"]).suffix.lower() != f".{normalized['suffix']}":
+        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    return normalized["builder_kwargs"]
 
 
 def _validate_execution_plan(
@@ -1072,8 +1298,7 @@ def _validate_execution_plan(
     output = artifacts["output"]
     if not isinstance(profile, dict) or set(profile) != {"path", "sha256"}:
         raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Profile artifact is invalid")
-    if not isinstance(output, dict) or set(output) != {"path", "format"} or output.get("format") != "JPEG":
-        raise ExecutionPreconditionError("INVALID_EXECUTION_PLAN", "Output artifact is invalid")
+    output_kwargs = _output_kwargs_from_artifact(output, backend_id=backend_id)
     profile_path = Path(profile["path"])
     output_path = Path(output["path"])
     if not _resolved_child(profile_path, allowed_output_dir) or not _resolved_child(
@@ -1140,6 +1365,7 @@ def _validate_execution_plan(
             output_path,
             [profile_path],
             executable=executable,
+            **output_kwargs,
         )
     else:
         if plan["compiler"]["id"] == "lumenflow.darktable-xmp-modules":
@@ -1175,14 +1401,15 @@ def _validate_execution_plan(
                 "STARTING_STATE_MISMATCH",
                 "The materialized darktable XMP does not match the preview basis",
             )
-        runtime_key = _canonical_hash(
-            {
-                "source": source,
-                "preview_basis": preview_basis,
-                "intent_id": plan["intent_id"],
-                "revision": plan["intent_revision"],
-            }
-        )[:24]
+        runtime_identity = {
+            "source": source,
+            "preview_basis": preview_basis,
+            "intent_id": plan["intent_id"],
+            "revision": plan["intent_revision"],
+        }
+        if set(output) != {"path", "format"}:
+            runtime_identity["output"] = output
+        runtime_key = _canonical_hash(runtime_identity)[:24]
         runtime_root = allowed_output_dir / ".darktable-runtime" / runtime_key
         executable = lumenflow_config.tool_command(local_config, "darktable_cli", "darktable-cli")
         expected_command = render_raw.build_darktable_command(
@@ -1194,6 +1421,7 @@ def _validate_execution_plan(
             library=":memory:",
             write_sidecars=False,
             executable=executable,
+            **output_kwargs,
         )
     if render_operation["command_argv"] != expected_command:
         raise ExecutionPreconditionError(

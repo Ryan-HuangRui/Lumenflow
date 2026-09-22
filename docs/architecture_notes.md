@@ -101,10 +101,10 @@ The darktable feasibility gate is itself versioned as `lumenflow.darktable_probe
 
 The current runtime path separates model judgment from backend mechanics:
 
-1. `lumenflow.edit_intent.v2` records authorization, exact source and preview-state evidence, purpose, style rationale, vendor-neutral global adjustments, composition, and local-adjustment intent.
+1. `lumenflow.edit_intent.v2` records authorization, exact source and preview-state evidence, purpose, style rationale, vendor-neutral global adjustments, composition, local-adjustment intent, and an optional bounded final-output contract.
 2. A backend compiler checks `lumenflow.backend_capabilities.v1` and emits `lumenflow.execution_plan.v1`. Compilation is side-effect free.
 3. The executor accepts an explicit allowed output root, revalidates source bytes, backend/compiler versions, artifact paths, embedded profile content, and the exact argv it can reconstruct locally.
-4. `lumenflow.execution_receipt.v1` records per-operation outcomes, source before/after fingerprints, verified output bytes, and failure details.
+4. `lumenflow.execution_receipt.v1` records per-operation outcomes, source before/after fingerprints, verified output bytes, and failure details. Its plan id binds the fingerprint to the exact container, bit depth, color/output options, profile bytes, and renderer argv.
 
 The verified compilers target RawTherapee PP3 and darktable XMP/module plans. They never invoke a
 shell, refuse output paths outside the caller-approved root, refuse existing output replacement,
@@ -114,7 +114,7 @@ runtime responsibilities.
 
 ### Review and bounded refinement
 
-Visual review remains a host-model responsibility. The model inspects the rendered JPEG and emits `lumenflow.review_result.v1`; deterministic code binds that judgment to the current intent revision, plan, successful receipt, and still-matching output bytes. A persisted `lumenflow.review_session.v1` permits only editable intent fields to change, defaults to two revisions, and records review ids plus semantic intent hashes to stop replay, no-op revisions, budget resets, and cycles. Accept, reject, and revision-limit outcomes close the session.
+Visual review remains a host-model responsibility. The model inspects the rendered output and emits `lumenflow.review_result.v1`; deterministic code binds that judgment to the current intent revision, plan, successful receipt, and still-matching output bytes. A persisted `lumenflow.review_session.v1` permits only editable intent fields—including final-output settings—to change, defaults to two revisions, and records review ids plus semantic intent hashes to stop replay, no-op revisions, budget resets, and cycles. Accept, reject, and revision-limit outcomes close the session.
 
 ### Evaluation boundary
 
