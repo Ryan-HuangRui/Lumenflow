@@ -125,7 +125,10 @@ python -m pip install -r requirements-asr.txt
 cp config/lumenflow.local.example.json config/lumenflow.local.json
 ```
 
-至少把 `photos.output_root` 改为本机的绝对输出目录。`config/lumenflow.local.json` 已被 Git 忽略。
+至少把 `photos.output_root` 改为本机的绝对输出目录，并把
+`security.allowed_source_roots`、`security.allowed_output_roots` 限定到实际照片目录和输出目录。
+MCP Runtime 会解析真实路径后执行边界判断，未配置两类根目录时保持 Lite Mode，不读取或写入照片。
+`config/lumenflow.local.json` 已被 Git 忽略。
 
 ### 5. 检查环境
 
@@ -164,6 +167,15 @@ lumenflow-mcp
 现有 `EditIntent v2 → ExecutionPlan → ExecutionReceipt → ReviewResult` 合同，不向模型
 暴露任意 shell 执行入口。接入方式、资源 URI、返回结构和安全约束见
 [`docs/mcp_runtime.md`](docs/mcp_runtime.md)。
+
+仓库根目录同时提供 portable Agent Plugin 清单：`plugin.json` 和 `mcp.json`。支持该规范的
+宿主会从固定的 `skills/` 目录发现 skills，并通过插件相对启动器
+`./scripts/launch_lumenflow_mcp` 启动本地 MCP。启动器按 `${PLUGIN_DATA}/venv`、仓库
+`.venv`、系统 `python3` 的顺序选择首个满足 Python 3.11+ 且已安装依赖的解释器，并自动加入
+`src/`；插件数据目录中的配置路径由 `LUMENFLOW_CONFIG` 和 `LUMENFLOW_DATA_ROOT` 传入，不把
+密钥或本机照片路径写入清单。旧版 Codex 宿主可继续使用 `.codex-plugin/plugin.json` 与
+`.mcp.json` 兼容层。一次性创建插件私有 venv、配置 Lite/Full 路由及 allowed roots 的步骤见
+[`docs/mcp_runtime.md`](docs/mcp_runtime.md#portable-agent-plugin-packaging)。
 
 ## 用 agent 完成一次选片
 

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "lumenflow": {
+      "command": "./scripts/launch_lumenflow_mcp",
+      "cwd": "${PLUGIN_ROOT}",
+      "env": {
+        "LUMENFLOW_CONFIG": "${PLUGIN_DATA}/lumenflow.local.json",
+        "LUMENFLOW_DATA_ROOT": "${PLUGIN_DATA}"
+      }
+    }
+  }
+}

@@ -102,8 +102,15 @@ class McpRuntimeTests(unittest.TestCase):
                 raw.write_bytes(b"bangkok-raw")
                 source_hash = hashlib.sha256(raw.read_bytes()).hexdigest()
                 intent = self._intent(raw)
+                runtime_config = {
+                    "security": {
+                        "allowed_source_roots": [str(root)],
+                        "allowed_output_roots": [str(root)],
+                    },
+                    "tools": {"rawtherapee_cli": sys.executable},
+                }
 
-                async with Client(create_server(local_config={})) as client:
+                async with Client(create_server(local_config=runtime_config)) as client:
                     compiled = await client.call_tool(
                         "lumenflow.compile_edit",
                         {
@@ -147,8 +154,15 @@ class McpRuntimeTests(unittest.TestCase):
                 raw = root / "bangkok.DNG"
                 output_dir = root / "output"
                 raw.write_bytes(b"bangkok-raw")
+                runtime_config = {
+                    "security": {
+                        "allowed_source_roots": [str(root)],
+                        "allowed_output_roots": [str(root)],
+                    },
+                    "tools": {"rawtherapee_cli": sys.executable},
+                }
 
-                async with Client(create_server(local_config={})) as client:
+                async with Client(create_server(local_config=runtime_config)) as client:
                     compiled = await client.call_tool(
                         "lumenflow.compile_edit",
                         {
@@ -182,16 +196,25 @@ class McpRuntimeTests(unittest.TestCase):
         from lumenflow.mcp.server import create_server
 
         async def scenario() -> None:
-            async with Client(create_server(local_config={})) as client:
-                result = await client.call_tool(
-                    "lumenflow.create_previews",
-                    {
-                        "backend_id": "rawtherapee",
-                        "source_paths": ["relative.DNG"],
-                        "output_dir": "relative-output",
-                        "dry_run": True,
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                config = {
+                    "security": {
+                        "allowed_source_roots": [str(root)],
+                        "allowed_output_roots": [str(root)],
                     },
-                )
+                    "tools": {"rawtherapee_cli": sys.executable},
+                }
+                async with Client(create_server(local_config=config)) as client:
+                    result = await client.call_tool(
+                        "lumenflow.create_previews",
+                        {
+                            "backend_id": "rawtherapee",
+                            "source_paths": ["relative.DNG"],
+                            "output_dir": "relative-output",
+                            "dry_run": True,
+                        },
+                    )
             self.assertFalse(result.structured_content["ok"])
             self.assertEqual(
                 result.structured_content["error"]["code"], "ABSOLUTE_PATH_REQUIRED"

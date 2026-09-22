@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-import importlib.metadata
 import copy
 import hashlib
+import importlib.metadata
+import json
+import os
 import shutil
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from .. import backend_capabilities
 from .. import config as lumenflow_config
 from ..curation import CurationError, SelectionPlanError
 from ..core import edit_intent, preview, review
 from ..memory import personal_examples
+from ..security import AllowedRoots, PathPolicyError
 from ..style_library import StyleLibrary, StyleLibraryError
 
 
@@ -48,6 +51,8 @@ def _absolute_path(value: str, field: str) -> Path:
 
 def _tool_error(error: Exception) -> ToolResult:
     if isinstance(error, RuntimeInputError):
+        return _failure(error.code, error.reason)
+    if isinstance(error, PathPolicyError):
         return _failure(error.code, error.reason)
     if isinstance(error, edit_intent.ExecutionPreconditionError):
         return _failure(error.code, error.reason)
@@ -89,9 +94,14 @@ class LumenflowRuntime:
         *,
         local_config: dict[str, Any] | None = None,
         workspace_root: Path | None = None,
+        environment: Mapping[str, str] | None = None,
     ) -> None:
         self.local_config = dict(local_config or {})
         self.workspace_root = (workspace_root or Path.cwd()).resolve()
+        self.environment = dict(os.environ if environment is None else environment)
+        self.allowed_roots = AllowedRoots.from_config(
+            self.local_config, environment=self.environment
+        )
         self._resources: dict[str, Any] = {}
 
     def _register(self, uri: str, value: Any) -> None:
@@ -115,9 +125,110 @@ class LumenflowRuntime:
         return StyleLibrary(roots)
 
     def _example_store_path(self) -> Path:
+        configured = lumenflow_config.config_path(
+            self.local_config, "workflow", "personal_example_store"
+        )
+        data_root = self.environment.get("LUMENFLOW_DATA_ROOT")
+        if configured is None and data_root:
+            return Path(data_root).expanduser().resolve() / "personal_edit_examples.sqlite3"
         return lumenflow_config.personal_example_store_path(
             self.local_config, repo_root=self.workspace_root
         )
+
+    def _engine_status(self) -> dict[str, dict[str, Any]]:
+        engines: dict[str, dict[str, Any]] = {}
+        for backend_id, config_key, default_command in (
+            ("rawtherapee", "rawtherapee_cli", "rawtherapee-cli"),
+            ("darktable", "darktable_cli", "darktable-cli"),
+        ):
+            command = lumenflow_config.tool_command(
+                self.local_config, config_key, default_command
+            )
+            command_path = Path(command)
+            resolved = (
+                str(command_path.resolve())
+                if command_path.is_absolute() and command_path.is_file()
+                else shutil.which(command)
+            )
+            engines[backend_id] = {
+                "configured_command": command,
+                "resolved_command": resolved,
+                "available": resolved is not None,
+                "capabilities": backend_capabilities.backend_capabilities_for(
+                    backend_id
+                ).to_dict(),
+            }
+        return engines
+
+    def _require_backend(self, backend_id: str) -> None:
+        self.allowed_roots.require_configured()
+        engine = self._engine_status().get(backend_id)
+        if engine is None:
+            raise RuntimeInputError(
+                "UNSUPPORTED_BACKEND", f"No RAW backend is registered for {backend_id}"
+            )
+        if not engine["available"]:
+            raise RuntimeInputError(
+                "BACKEND_UNAVAILABLE",
+                f"{backend_id} is not available at its configured command",
+            )
+
+    def _authorize_intent(self, intent: dict[str, Any]) -> None:
+        source = intent.get("source")
+        source_path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(source_path, str):
+            self.allowed_roots.require_source(Path(source_path), "intent.source.path")
+        preview_basis = intent.get("preview_basis")
+        state_inputs = (
+            preview_basis.get("state_inputs") if isinstance(preview_basis, dict) else None
+        )
+        if isinstance(state_inputs, list):
+            for index, item in enumerate(state_inputs):
+                path = item.get("path") if isinstance(item, dict) else None
+                if isinstance(path, str):
+                    self.allowed_roots.require_read(
+                        Path(path), f"intent.preview_basis.state_inputs[{index}].path"
+                    )
+
+    def _authorize_plan(self, plan: dict[str, Any]) -> None:
+        source = plan.get("source")
+        source_path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(source_path, str):
+            self.allowed_roots.require_source(Path(source_path), "plan.source.path")
+        output_root = plan.get("output_root")
+        if isinstance(output_root, str):
+            self.allowed_roots.require_output(Path(output_root), "plan.output_root")
+        artifacts = plan.get("artifacts")
+        if isinstance(artifacts, dict):
+            for name in ("profile", "output"):
+                artifact = artifacts.get(name)
+                path = artifact.get("path") if isinstance(artifact, dict) else None
+                if isinstance(path, str):
+                    self.allowed_roots.require_output(
+                        Path(path), f"plan.artifacts.{name}.path"
+                    )
+
+    def _authorize_curation_manifest(self, manifest_path: Path) -> None:
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return
+        candidates = manifest.get("candidates") if isinstance(manifest, dict) else None
+        if not isinstance(candidates, list):
+            return
+        for index, candidate in enumerate(candidates):
+            if not isinstance(candidate, dict):
+                continue
+            source = candidate.get("source")
+            preview_path = candidate.get("preview")
+            if isinstance(source, str):
+                self.allowed_roots.require_source(
+                    Path(source), f"manifest.candidates[{index}].source"
+                )
+            if isinstance(preview_path, str):
+                self.allowed_roots.require_output(
+                    Path(preview_path), f"manifest.candidates[{index}].preview"
+                )
 
     @staticmethod
     def _workspace_id(path: Path) -> str:
@@ -139,28 +250,7 @@ class LumenflowRuntime:
 
     def status(self) -> ToolResult:
         def inspect_runtime() -> dict[str, Any]:
-            engines: dict[str, Any] = {}
-            for backend_id, config_key, default_command in (
-                ("rawtherapee", "rawtherapee_cli", "rawtherapee-cli"),
-                ("darktable", "darktable_cli", "darktable-cli"),
-            ):
-                command = lumenflow_config.tool_command(
-                    self.local_config, config_key, default_command
-                )
-                command_path = Path(command)
-                resolved = (
-                    str(command_path)
-                    if command_path.is_absolute() and command_path.is_file()
-                    else shutil.which(command)
-                )
-                engines[backend_id] = {
-                    "configured_command": command,
-                    "resolved_command": resolved,
-                    "available": resolved is not None,
-                    "capabilities": backend_capabilities.backend_capabilities_for(
-                        backend_id
-                    ).to_dict(),
-                }
+            engines = self._engine_status()
             try:
                 version = importlib.metadata.version("lumenflow")
             except importlib.metadata.PackageNotFoundError:
@@ -171,9 +261,11 @@ class LumenflowRuntime:
                 "protocol": "stdio",
                 "mode": (
                     "full"
-                    if any(engine["available"] for engine in engines.values())
+                    if self.allowed_roots.configured
+                    and any(engine["available"] for engine in engines.values())
                     else "lite"
                 ),
+                "path_policy": self.allowed_roots.to_dict(),
                 "engines": engines,
             }
 
@@ -191,11 +283,14 @@ class LumenflowRuntime:
         selection_reason: str = "",
     ) -> ToolResult:
         def create() -> list[dict[str, Any]]:
+            self._require_backend(backend_id)
             if not source_paths:
                 raise RuntimeInputError(
                     "EMPTY_SOURCE_SET", "source_paths must contain at least one RAW file"
                 )
-            target_root = _absolute_path(output_dir, "output_dir")
+            target_root = self.allowed_roots.require_output(
+                _absolute_path(output_dir, "output_dir"), "output_dir"
+            )
             profile_paths = base_profile_paths or {}
             provider = preview.create_preview_provider(
                 backend_id, local_config=self.local_config
@@ -204,6 +299,7 @@ class LumenflowRuntime:
             outputs: set[Path] = set()
             for index, source_value in enumerate(source_paths):
                 source = _absolute_path(source_value, f"source_paths[{index}]")
+                self.allowed_roots.require_source(source, f"source_paths[{index}]")
                 if not source.is_file() or source.is_symlink():
                     raise RuntimeInputError(
                         "SOURCE_NOT_READABLE", f"source is not a regular file: {source}"
@@ -231,6 +327,10 @@ class LumenflowRuntime:
                     raise RuntimeInputError(
                         "BASE_PROFILE_NOT_READABLE",
                         f"base profile is not a regular file: {base_profile}",
+                    )
+                if base_profile is not None:
+                    self.allowed_roots.require_read(
+                        base_profile, f"base_profile_paths[{source_value!r}]"
                     )
                 requests.append(
                     preview.PreviewRequest(
@@ -267,6 +367,8 @@ class LumenflowRuntime:
 
             source = _absolute_path(source_dir, "source_dir")
             output = _absolute_path(output_dir, "output_dir")
+            self.allowed_roots.require_source(source, "source_dir")
+            self.allowed_roots.require_output(output, "output_dir")
             manifest = prepare_workspace(
                 source,
                 output,
@@ -300,6 +402,10 @@ class LumenflowRuntime:
             manifest = _absolute_path(manifest_path, "manifest_path")
             plan = _absolute_path(plan_path, "plan_path")
             output = _absolute_path(output_dir, "output_dir") if output_dir else manifest.parent
+            self.allowed_roots.require_output(manifest, "manifest_path")
+            self.allowed_roots.require_output(plan, "plan_path")
+            self.allowed_roots.require_output(output, "output_dir")
+            self._authorize_curation_manifest(manifest)
             result = finalize_selection(
                 manifest_path=manifest,
                 plan_path=plan,
@@ -364,6 +470,7 @@ class LumenflowRuntime:
         tags: list[str] | None = None,
     ) -> ToolResult:
         def store() -> dict[str, Any]:
+            self._authorize_plan(plan)
             example = personal_examples.build_personal_example(
                 session, plan, receipt, tags=tags or []
             )
@@ -381,14 +488,20 @@ class LumenflowRuntime:
         backend_id: str,
         output_dir: str,
     ) -> ToolResult:
-        response = _guard(
-            lambda: edit_intent.compile_intent(
+        def compile_operation() -> dict[str, Any]:
+            self._require_backend(backend_id)
+            self._authorize_intent(intent)
+            output = self.allowed_roots.require_output(
+                _absolute_path(output_dir, "output_dir"), "output_dir"
+            )
+            return edit_intent.compile_intent(
                 intent,
                 backend_id=backend_id,
-                output_dir=_absolute_path(output_dir, "output_dir"),
+                output_dir=output,
                 local_config=self.local_config,
             )
-        )
+
+        response = _guard(compile_operation)
         if response["ok"]:
             plan = response["result"]
             self._register(f"lumenflow://plans/{plan['plan_id']}", plan)
@@ -402,17 +515,24 @@ class LumenflowRuntime:
         dry_run: bool = True,
         timeout: int | None = 300,
     ) -> ToolResult:
-        response = _guard(
-            lambda: edit_intent.execute_plan(
+        def execute_operation() -> dict[str, Any]:
+            backend = plan.get("backend")
+            backend_id = backend.get("id") if isinstance(backend, dict) else ""
+            self._require_backend(backend_id)
+            self._authorize_plan(plan)
+            output = self.allowed_roots.require_output(
+                _absolute_path(allowed_output_dir, "allowed_output_dir"),
+                "allowed_output_dir",
+            )
+            return edit_intent.execute_plan(
                 plan,
                 dry_run=dry_run,
                 timeout=timeout,
-                allowed_output_dir=_absolute_path(
-                    allowed_output_dir, "allowed_output_dir"
-                ),
+                allowed_output_dir=output,
                 local_config=self.local_config,
             )
-        )
+
+        response = _guard(execute_operation)
         if response["ok"]:
             receipt = response["result"]
             self._register(
@@ -443,11 +563,13 @@ class LumenflowRuntime:
         receipt: dict[str, Any],
         review_result: dict[str, Any],
     ) -> ToolResult:
-        response = _guard(
-            lambda: review.advance_review_session(
+        def advance_operation() -> dict[str, Any]:
+            self._authorize_plan(plan)
+            return review.advance_review_session(
                 session, plan, receipt, review_result
             )
-        )
+
+        response = _guard(advance_operation)
         if response["ok"]:
             updated_session = response["result"]["session"]
             self._register(

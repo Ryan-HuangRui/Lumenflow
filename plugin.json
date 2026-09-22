@@ -1,0 +1,41 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lumenflow",
+  "version": "0.1.0",
+  "description": "Local-first RAW photo curation and development workflow for visual agents.",
+  "author": {
+    "name": "Lumenflow contributors",
+    "url": "https://github.com/Ryan-HuangRui"
+  },
+  "homepage": "https://github.com/Ryan-HuangRui/Lumenflow",
+  "repository": "https://github.com/Ryan-HuangRui/Lumenflow",
+  "license": "MIT",
+  "keywords": [
+    "photography",
+    "raw",
+    "curation",
+    "mcp"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Lumenflow",
+        "shortDescription": "Local-first RAW photo workflow",
+        "longDescription": "Prepare traceable photo curation workspaces and run the validated local RAW workflow through MCP.",
+        "developerName": "Lumenflow contributors",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://github.com/Ryan-HuangRui/Lumenflow",
+        "defaultPrompt": [
+          "Prepare a curation workspace for my RAW photos.",
+          "Help me review and sequence a photo selection.",
+          "Inspect my Lumenflow workflow status."
+        ],
+        "brandColor": "#2563EB"
+      }
+    }
+  }
+}
