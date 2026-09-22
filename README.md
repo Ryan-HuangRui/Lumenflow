@@ -151,6 +151,19 @@ Codex 可直接从仓库运行这些 skill。
 先给我选片提案，得到我确认后再修图。
 ```
 
+### 7. 启动本地 MCP Runtime
+
+安装项目后可直接启动 STDIO 服务：
+
+```bash
+lumenflow-mcp
+```
+
+当前最小闭环提供 `status → create_previews → compile_edit → execute_edit → review`
+六个高层工具。工具继续复用现有 `EditIntent v2 → ExecutionPlan → ExecutionReceipt →
+ReviewResult` 合同，不向模型暴露任意 shell 执行入口。接入方式、返回结构和安全约束见
+[`docs/mcp_runtime.md`](docs/mcp_runtime.md)。
+
 ## 用 agent 完成一次选片
 
 准备 curation workspace：
