@@ -91,6 +91,28 @@ Style and backend resources are reproducible from local knowledge. Workspace, pr
 receipt, and review resources reflect artifacts created during the current server
 session; their identifiers remain stable inside the underlying contracts.
 
+## Optional MCP Apps UI
+
+Compatible hosts can render three versioned, self-contained UI resources:
+
+| Resource | Linked tools | Purpose |
+| --- | --- | --- |
+| `ui://lumenflow/runtime-status/v1.html` | `lumenflow.status` | Lite/Full routing, engine readiness, and allowlist summaries |
+| `ui://lumenflow/curation/v1.html` | `lumenflow.prepare_curation`, `lumenflow.finalize_curation` | Candidate/sequence inspection, editorial roles, and confirmation state |
+| `ui://lumenflow/review/v1.html` | `lumenflow.start_review`, `lumenflow.advance_review` | Bounded revision status and verified plan/receipt/source evidence |
+
+Each resource uses `text/html;profile=mcp-app`, declares empty external CSP domain
+allowlists, and communicates through the standards-first `ui/*` JSON-RPC bridge. Tool
+metadata uses `_meta.ui.resourceUri`; `openai/outputTemplate` is included only as the
+ChatGPT compatibility alias. The documents have no remote JavaScript, stylesheet,
+image, frame, or API dependency.
+
+The UI is optional and non-authoritative. All 11 tools keep the same JSON inputs and
+structured result envelopes when a host does not render MCP Apps. A curation card cannot
+promote an agent proposal to user-confirmed state or invoke RAW execution. A review card
+only displays server-validated session/evidence state; accepted/revise/reject transitions
+still pass through `lumenflow.advance_review` and its existing contract checks.
+
 All tool responses use one envelope:
 
 ```json

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="mcp-app-mime" content="text/html;profile=mcp-app">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lumenflow · Review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: var(--mcp-app-foreground, var(--color-text-primary, #f2f0e8));
+      --muted: var(--mcp-app-muted-foreground, var(--color-text-secondary, #b8b8ab));
+      --dim: #77796f;
+      --canvas: var(--mcp-app-background, var(--color-background-primary, #121615));
+      --panel: var(--mcp-app-surface, var(--color-background-secondary, #1b211e));
+      --panel-2: var(--mcp-app-surface-raised, var(--color-background-tertiary, #222a25));
+      --line: rgba(229,235,218,.13);
+      --mint: #9be2bc;
+      --yellow: #eedb83;
+      --blue: #99c9f1;
+      --coral: #ed927d;
+      --shadow: 0 22px 60px rgba(0,0,0,.3);
+    }
+    :focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body { background: var(--canvas); color: var(--ink); font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .17; background: linear-gradient(112deg, transparent 0 45%, rgba(155,226,188,.08) 45.1% 45.25%, transparent 45.35% 100%); }
+    .shell { width: min(1200px, calc(100% - 40px)); margin: 0 auto; padding: 30px 0 56px; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; }
+    .eyebrow, .mono, .label, .bridge, .chip, .round, .fingerprint, .receipt-key { font-family: "SF Mono", "Cascadia Code", Menlo, monospace; }
+    .eyebrow { color: var(--mint); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 11px 0 12px; font-size: clamp(40px, 8vw, 84px); line-height: .85; font-weight: 400; letter-spacing: -.08em; }
+    .lede { max-width: 690px; color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0; }
+    .mark { color: var(--yellow); font-family: "SF Mono", Menlo, monospace; font-size: 12px; letter-spacing: .08em; }
+    .bridge { min-height: 34px; display: flex; align-items: center; gap: 10px; margin-top: 20px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 11px; }
+    .bridge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 4px rgba(238,219,131,.12); }
+    .bridge.live { color: var(--mint); border-color: rgba(155,226,188,.34); }
+    .bridge.live::before { background: var(--mint); box-shadow: 0 0 0 4px rgba(155,226,188,.12); }
+    .review-strip { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 30px 0 15px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(100deg, rgba(155,226,188,.12), rgba(27,33,30,.92)); box-shadow: var(--shadow); }
+    .strip-title { display: flex; align-items: center; gap: 12px; }
+    .strip-mark { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--mint); border-radius: 50%; color: var(--mint); font-size: 17px; }
+    .strip-title h2 { margin: 0; font-size: 19px; font-weight: 400; }
+    .strip-title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .review-state { display: flex; align-items: center; gap: 8px; color: var(--yellow); font-family: "SF Mono", Menlo, monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .review-state::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--yellow); }
+    .gallery { display: grid; grid-template-columns: 1.3fr .7fr; gap: 13px; }
+    .hero-frame, .small-frame { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+    .hero-frame { min-height: 355px; }
+    .frame-image { min-height: 290px; display: grid; place-items: center; position: relative; overflow: hidden; background: linear-gradient(140deg, #354946, #191e23 45%, #5b4e37); }
+    .frame-image::before { content: ""; position: absolute; width: 76%; height: 140%; left: -19%; top: -38%; border-radius: 50%; background: rgba(155,226,188,.23); transform: rotate(28deg); }
+    .frame-image::after { content: ""; position: absolute; width: 68%; height: 120%; right: -20%; bottom: -57%; border-radius: 50%; background: rgba(238,219,131,.2); transform: rotate(-18deg); }
+    .frame-image img { display: block; width: 100%; height: 100%; min-height: 290px; object-fit: cover; position: relative; z-index: 1; }
+    .frame-placeholder { position: relative; z-index: 1; color: rgba(242,240,232,.75); font-family: "SF Mono", Menlo, monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .frame-copy { padding: 14px 16px 17px; }
+    .frame-copy h3 { margin: 0; font-size: 18px; font-weight: 400; }
+    .frame-copy p { color: var(--muted); line-height: 1.4; font-size: 13px; margin: 6px 0 0; }
+    .small-stack { display: grid; gap: 13px; }
+    .small-frame .frame-image { min-height: 142px; }
+    .small-frame .frame-image img { min-height: 142px; }
+    .small-frame .frame-copy { padding: 11px 13px 13px; }
+    .small-frame .frame-copy h3 { font-size: 15px; }
+    .small-frame .frame-copy p { font-size: 12px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px; margin-top: 14px; }
+    .panel { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: rgba(27,33,30,.9); }
+    .label { color: var(--dim); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; }
+    .metric { margin-top: 16px; color: var(--ink); font-size: 28px; letter-spacing: -.04em; }
+    .metric.mint { color: var(--mint); }
+    .metric.yellow { color: var(--yellow); }
+    .receipt-card { min-height: 130px; }
+    .receipt-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; }
+    .receipt-line strong { color: var(--mint); font-size: 16px; font-weight: 400; }
+    .chip { padding: 5px 8px; border-radius: 99px; color: var(--mint); background: rgba(155,226,188,.11); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .fingerprint { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.45; margin-top: 11px; }
+    .receipt-key { color: var(--dim); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+    .evidence-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-family: "SF Mono", Menlo, monospace; font-size: 10px; line-height: 1.55; }
+    .evidence-note::before { content: "↳"; color: var(--mint); font-size: 15px; line-height: 1; }
+    .timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 28px; }
+    .timeline-step { position: relative; padding: 0 14px 0 0; }
+    .timeline-step:not(:last-child)::after { content: ""; position: absolute; left: 13px; right: 0; top: 8px; height: 1px; background: var(--line); }
+    .timeline-step .dot { position: relative; z-index: 1; width: 16px; height: 16px; margin-bottom: 10px; border: 1px solid var(--dim); border-radius: 50%; background: var(--canvas); }
+    .timeline-step.complete .dot { border-color: var(--mint); background: var(--mint); }
+    .timeline-step.current .dot { border-color: var(--yellow); box-shadow: 0 0 0 5px rgba(238,219,131,.1); }
+    .timeline-step strong { display: block; color: var(--ink); font-size: 14px; font-weight: 400; }
+    .timeline-step span { display: block; color: var(--dim); font-family: "SF Mono", Menlo, monospace; font-size: 9px; line-height: 1.4; margin-top: 5px; }
+    @media (max-width: 800px) { .gallery, .meta-grid { grid-template-columns: 1fr; } .small-stack { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 620px) { .shell { width: min(100% - 26px, 620px); padding-top: 20px; } .topbar, .review-strip { align-items: flex-start; flex-direction: column; } .mark { display: none; } .small-stack { grid-template-columns: 1fr; } .timeline { grid-template-columns: 1fr; gap: 14px; } .timeline-step:not(:last-child)::after { left: 8px; right: auto; top: 16px; width: 1px; height: 25px; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Lumenflow / evidence loop</div>
+        <h1>Review</h1>
+        <p class="lede">A post-render checkpoint for the finished frames, bounded revision rounds, and the receipt that proves what the source did—and did not—change.</p>
+      </div>
+      <div class="mark">LF—REVIEW / 03</div>
+    </header>
+    <div class="bridge" id="bridge-status" role="status">Host bridge unavailable · showing safe demo snapshot</div>
+    <main>
+      <section class="review-strip">
+        <div class="strip-title"><div class="strip-mark" aria-hidden="true">↗</div><div><h2 id="review-title">Review in progress</h2><p id="review-subtitle">Compare the output against the stated visual intent.</p></div></div>
+        <div class="review-state" id="review-state">revise suggested</div>
+      </section>
+      <section class="gallery" aria-label="Rendered output gallery">
+        <article class="hero-frame" id="hero-frame"></article>
+        <div class="small-stack" id="small-stack"></div>
+      </section>
+      <section class="meta-grid">
+        <article class="panel"><div class="label">Revision round</div><div class="metric yellow" id="round">round 1</div><div class="receipt-key" id="revision-count">revisions_used 0 / max_revisions 2</div></article>
+        <article class="panel"><div class="label">Decision</div><div class="metric mint" id="decision">Revise</div><div class="receipt-key">accept / revise</div></article>
+        <article class="panel receipt-card"><div class="label">Evidence receipt</div><div class="receipt-line"><strong id="receipt-status">Receipt bound</strong><span class="chip" id="receipt-chip">verified</span></div><div class="receipt-key" id="binding-summary">plan · receipt · output fingerprint bound</div><div class="fingerprint" id="output-fingerprint">output fingerprint · awaiting host state</div></article>
+      </section>
+      <section class="timeline" aria-label="Review evidence timeline">
+        <div class="timeline-step complete"><div class="dot" aria-hidden="true"></div><strong>Intent</strong><span>visual goal recorded</span></div>
+        <div class="timeline-step complete"><div class="dot" aria-hidden="true"></div><strong>Render</strong><span>output bytes captured</span></div>
+        <div class="timeline-step current"><div class="dot" aria-hidden="true"></div><strong>Review</strong><span>accept or revise deliberately</span></div>
+      </section>
+      <div class="evidence-note" id="evidence-note">Source RAW unchanged · output is bound to the receipt · any revise decision starts a new explicit plan.</div>
+    </main>
+  </div>
+  <script>
+    "use strict";
+    const FALLBACK_STATE = {
+      status: "revise",
+      revisions_used: 0,
+      max_revisions: 2,
+      title: "Review in progress",
+      subtitle: "Compare the output against the stated visual intent.",
+      images: [
+        { label: "Lead frame", detail: "Warm documentary pass", preview: "" },
+        { label: "Detail frame", detail: "Texture and skin-tone check", preview: "" },
+        { label: "Closing frame", detail: "Sequence rhythm check", preview: "" }
+      ],
+      evidence: { decision: "revise", plan_id: "plan_demo", receipt_id: "receipt_demo", source_unchanged: true, output_fingerprint: { sha256: "demo-receipt-bound-output", size_bytes: 0 } }
+    };
+    function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+    function text(value, fallback) { return typeof value === "string" && value.trim() ? value.trim().slice(0, 180) : fallback; }
+    function element(tag, className, value) { const node = document.createElement(tag); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
+    function fingerprintText(value) {
+      if (typeof value === "string") return text(value, "output fingerprint · bound");
+      if (!value || typeof value !== "object") return "output fingerprint · awaiting host state";
+      const digest = typeof value.sha256 === "string" ? value.sha256.slice(0, 20) : "unavailable";
+      const size = Number.isInteger(value.size_bytes) ? " · " + value.size_bytes + " bytes" : "";
+      return "sha256:" + digest + size;
+    }
+    function safeImageSource(value) {
+      if (typeof value !== "string") return "";
+      const source = value.trim();
+      if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,/i.test(source)) return source;
+      if (/^blob:[^\s]+$/i.test(source)) return source;
+      if (/^\.\/[^\s?#]+(?:[?#][^\s]*)?$/i.test(source)) return source;
+      return "";
+    }
+    function setBridge(live) { const banner = document.getElementById("bridge-status"); banner.classList.toggle("live", live); banner.textContent = live ? "Host bridge connected · live review state" : "Host bridge unavailable · showing safe demo snapshot"; }
+    function addFrame(container, frame, large) {
+      frame = frame && typeof frame === "object" ? frame : {};
+      const imageBox = element("div", "frame-image");
+      const safe = safeImageSource(frame.preview);
+      if (safe) { const image = element("img", "", ""); image.src = safe; image.alt = text(frame.label, "rendered output"); imageBox.append(image); }
+      else imageBox.append(element("div", "frame-placeholder", "output preview unavailable"));
+      container.append(imageBox);
+      const copy = element("div", "frame-copy");
+      copy.append(element("h3", "", text(frame.label, large ? "Rendered output" : "Supporting frame")));
+      copy.append(element("p", "", text(frame.detail, "Bound output awaiting host detail.")));
+      container.append(copy);
+    }
+    function render(state) {
+      const data = state && typeof state === "object" ? state : FALLBACK_STATE;
+      const session = data.session && typeof data.session === "object" ? data.session : data;
+      const evidence = data.evidence && typeof data.evidence === "object" ? data.evidence : data.receipt && typeof data.receipt === "object" ? data.receipt : FALLBACK_STATE.evidence;
+      const decision = evidence.decision || data.status || session.status || "pending";
+      const status = decision === "accepted" || decision === "accept" || session.status === "accepted" ? "accepted" : decision === "revise" ? "revise" : "pending";
+      const revisionsUsed = Number.isInteger(session.revisions_used) && session.revisions_used >= 0 ? session.revisions_used : FALLBACK_STATE.revisions_used;
+      const maxRevisions = Number.isInteger(session.max_revisions) && session.max_revisions >= revisionsUsed ? session.max_revisions : FALLBACK_STATE.max_revisions;
+      const round = revisionsUsed + 1;
+      const sourceUnmodified = evidence.source_unchanged === true || evidence.sourceUnmodified === true;
+      const hasPlanBinding = typeof evidence.plan_id === "string" && evidence.plan_id.length > 0;
+      const hasReceiptBinding = typeof evidence.receipt_id === "string" && evidence.receipt_id.length > 0;
+      const hasFingerprint = evidence.output_fingerprint !== undefined && evidence.output_fingerprint !== null;
+      const receiptBound = (evidence.receiptBound === true || (hasPlanBinding && hasReceiptBinding && hasFingerprint));
+      const images = Array.isArray(data.images) && data.images.length ? data.images : FALLBACK_STATE.images;
+      document.getElementById("review-title").textContent = text(data.title, FALLBACK_STATE.title);
+      document.getElementById("review-subtitle").textContent = text(data.subtitle, FALLBACK_STATE.subtitle);
+      document.getElementById("review-state").textContent = status === "accepted" ? "accepted" : status === "revise" ? "revise suggested" : "awaiting decision";
+      document.getElementById("round").textContent = "round " + round;
+      document.getElementById("revision-count").textContent = "revisions_used " + revisionsUsed + " / max_revisions " + maxRevisions;
+      document.getElementById("decision").textContent = status === "accepted" ? "Accept" : status === "revise" ? "Revise" : "Pending";
+      document.getElementById("receipt-status").textContent = receiptBound ? "Receipt bound" : "Receipt pending";
+      document.getElementById("receipt-chip").textContent = receiptBound ? "verified" : "needs evidence";
+      document.getElementById("receipt-chip").classList.toggle("verified", receiptBound);
+      document.getElementById("binding-summary").textContent = receiptBound ? "plan bound · receipt bound · output fingerprint bound" : "plan / receipt / output fingerprint binding pending";
+      document.getElementById("output-fingerprint").textContent = receiptBound ? fingerprintText(evidence.output_fingerprint || evidence.outputFingerprint) : "output fingerprint · awaiting host state";
+      document.getElementById("evidence-note").textContent = sourceUnmodified ? "Source RAW unchanged · output is bound to the receipt · any revise decision starts a new explicit plan." : "Source state is not yet verified · do not accept or revise until the host provides a bound receipt.";
+      const hero = document.getElementById("hero-frame");
+      clear(hero);
+      addFrame(hero, images[0], true);
+      const stack = document.getElementById("small-stack");
+      clear(stack);
+      images.slice(1, 3).forEach((frame) => { const card = element("article", "small-frame"); addFrame(card, frame, false); stack.append(card); });
+    }
+    function unwrap(payload, depth) {
+      if (!payload || typeof payload !== "object" || (depth || 0) > 8) return null;
+      const nextDepth = (depth || 0) + 1;
+      if (payload.structuredContent && typeof payload.structuredContent === "object") return unwrap(payload.structuredContent, nextDepth);
+      if (payload.ok === true && payload.result && typeof payload.result === "object") return unwrap(payload.result, nextDepth);
+      if (payload.payload && typeof payload.payload === "object") return unwrap(payload.payload, nextDepth);
+      if (payload.toolOutput && typeof payload.toolOutput === "object") return unwrap(payload.toolOutput, nextDepth);
+      return payload;
+    }
+    function postBridge(message) { if (window.parent && typeof window.parent.postMessage === "function") window.parent.postMessage(message, "*"); }
+    function bindHostBridge() {
+      let connected = false;
+      let initialized = false;
+      const initializeId = "lumenflow-review-initialize";
+      const handleMessage = (event) => {
+        if (!(event.source === window.parent)) return;
+        const message = event.data;
+        if (!message || typeof message !== "object" || message.jsonrpc !== "2.0") return;
+        if (message.id === initializeId && message.result && !initialized) {
+          initialized = true;
+          postBridge({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} });
+          setBridge(true);
+          return;
+        }
+        if (message.method !== "ui/notifications/tool-result") return;
+        const params = message.params && typeof message.params === "object" ? message.params : {};
+        if (!params.structuredContent || typeof params.structuredContent !== "object") return;
+        render(unwrap(params.structuredContent) || FALLBACK_STATE);
+        connected = true;
+        setBridge(true);
+      };
+      window.addEventListener("message", handleMessage);
+      setBridge(false);
+      postBridge({ jsonrpc: "2.0", id: initializeId, method: "ui/initialize", params: { protocolVersion: "2026-01-26", clientInfo: { name: "lumenflow-review", version: "0.1.0" }, appCapabilities: { availableDisplayModes: ["inline"] } } });
+      const hosts = [];
+      if (typeof window.openai === "object" && window.openai !== null) hosts.push(window.openai);
+      if (typeof window.mcpApps === "object" && window.mcpApps !== null) hosts.push(window.mcpApps);
+      if (typeof window.mcp === "object" && window.mcp !== null) hosts.push(window.mcp);
+      hosts.forEach((host) => {
+        try {
+          if (typeof host.onToolResult === "function") { host.onToolResult((value) => render(unwrap(value) || FALLBACK_STATE)); connected = true; }
+          else if (typeof host.subscribe === "function") { host.subscribe((value) => render(unwrap(value) || FALLBACK_STATE)); connected = true; }
+          else if (typeof host.getState === "function") { Promise.resolve(host.getState()).then((value) => render(unwrap(value) || FALLBACK_STATE)); connected = true; }
+          else if (host.toolOutput && typeof host.toolOutput === "object") { render(unwrap(host.toolOutput) || FALLBACK_STATE); connected = true; }
+        } catch (_) { /* keep the safe fallback visible when a host API is partial */ }
+      });
+      if (connected) setBridge(true);
+    }
+    render(FALLBACK_STATE);
+    bindHostBridge();
+  </script>
+</body>
+</html>

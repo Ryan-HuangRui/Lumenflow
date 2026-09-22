@@ -571,6 +571,15 @@ class LumenflowRuntime:
 
         response = _guard(advance_operation)
         if response["ok"]:
+            response["result"]["evidence"] = {
+                "decision": review_result.get("decision"),
+                "plan_id": plan.get("plan_id"),
+                "receipt_id": receipt.get("receipt_id"),
+                "source_unchanged": receipt.get("source_unchanged"),
+                "output_fingerprint": copy.deepcopy(
+                    receipt.get("output_fingerprint")
+                ),
+            }
             updated_session = response["result"]["session"]
             self._register(
                 f"lumenflow://reviews/{updated_session['session_id']}",

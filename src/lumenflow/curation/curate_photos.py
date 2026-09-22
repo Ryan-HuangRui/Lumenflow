@@ -454,6 +454,7 @@ def finalize_selection(
         "validated_plan": str(normalized_path),
         "report": str(report_path),
         "decision": normalized["status"]["decision"],
+        "selection_plan": normalized,
         "raw_files_modified": False,
     }
 

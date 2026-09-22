@@ -168,6 +168,11 @@ lumenflow-mcp
 暴露任意 shell 执行入口。接入方式、资源 URI、返回结构和安全约束见
 [`docs/mcp_runtime.md`](docs/mcp_runtime.md)。
 
+支持 MCP Apps 的宿主还可显示 Runtime Status、Curation 和 Review 三张可选卡片；不支持 UI
+时 11 个工具保持相同能力。卡片只展示服务端返回的权威状态，不替代用户确认门，也不直接
+触发 RAW 执行。资源 URI、CSP 和 host bridge 约束见
+[`docs/mcp_runtime.md`](docs/mcp_runtime.md#optional-mcp-apps-ui)。
+
 仓库根目录同时提供 portable Agent Plugin 清单：`plugin.json` 和 `mcp.json`。支持该规范的
 宿主会从固定的 `skills/` 目录发现 skills，并通过插件相对启动器
 `./scripts/launch_lumenflow_mcp` 启动本地 MCP。启动器按 `${PLUGIN_DATA}/venv`、仓库

@@ -11,6 +11,15 @@ from mcp.types import ToolAnnotations
 
 from .. import config as lumenflow_config
 from .runtime import LumenflowRuntime
+from .ui_resources import (
+    CURATION_UI_URI,
+    REVIEW_UI_URI,
+    STATUS_UI_URI,
+    UI_MIME_TYPE,
+    UI_RESOURCE_META,
+    load_ui_document,
+    tool_ui_meta,
+)
 
 
 def create_server(
@@ -70,6 +79,7 @@ def create_server(
         name="lumenflow.status",
         description="Inspect local RAW engine availability and declared capabilities.",
         annotations=read_only,
+        meta=tool_ui_meta(STATUS_UI_URI),
     )
     def status() -> dict[str, Any]:
         return runtime.status()
@@ -80,6 +90,7 @@ def create_server(
             "Scan a RAW directory, extract embedded previews, and build contact sheets for visual curation."
         ),
         annotations=workspace_replace,
+        meta=tool_ui_meta(CURATION_UI_URI),
     )
     def prepare_curation(
         source_dir: str,
@@ -104,6 +115,7 @@ def create_server(
             "Validate an agent-authored selection plan and package its ordered preview sequence."
         ),
         annotations=workspace_replace,
+        meta=tool_ui_meta(CURATION_UI_URI),
     )
     def finalize_curation(
         manifest_path: str,
@@ -226,6 +238,7 @@ def create_server(
         name="lumenflow.start_review",
         description="Start a bounded review session for an EditIntent v2 document.",
         annotations=read_only,
+        meta=tool_ui_meta(REVIEW_UI_URI),
     )
     def start_review(
         intent: dict[str, Any], max_revisions: int = 2
@@ -238,6 +251,7 @@ def create_server(
             "Advance review using an exactly bound plan, verified receipt, and ReviewResult."
         ),
         annotations=read_only,
+        meta=tool_ui_meta(REVIEW_UI_URI),
     )
     def advance_review(
         session: dict[str, Any],
@@ -305,6 +319,36 @@ def create_server(
     )
     def backend_resource(backend_id: str) -> dict[str, Any]:
         return runtime.read_resource("backends", backend_id)
+
+    @server.resource(
+        STATUS_UI_URI,
+        name="Lumenflow runtime status UI",
+        description="Optional MCP Apps card for Lite/Full routing and RAW engine status.",
+        mime_type=UI_MIME_TYPE,
+        meta=UI_RESOURCE_META,
+    )
+    def runtime_status_ui() -> str:
+        return load_ui_document("runtime-status.html")
+
+    @server.resource(
+        CURATION_UI_URI,
+        name="Lumenflow curation UI",
+        description="Optional MCP Apps sequence view for candidate and selection data.",
+        mime_type=UI_MIME_TYPE,
+        meta=UI_RESOURCE_META,
+    )
+    def curation_ui() -> str:
+        return load_ui_document("curation.html")
+
+    @server.resource(
+        REVIEW_UI_URI,
+        name="Lumenflow review UI",
+        description="Optional MCP Apps evidence card for bounded render review.",
+        mime_type=UI_MIME_TYPE,
+        meta=UI_RESOURCE_META,
+    )
+    def review_ui() -> str:
+        return load_ui_document("review.html")
 
     return server
 
