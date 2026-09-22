@@ -159,9 +159,10 @@ Codex 可直接从仓库运行这些 skill。
 lumenflow-mcp
 ```
 
-当前最小闭环提供 `status → create_previews → compile_edit → execute_edit → review`
-六个高层工具。工具继续复用现有 `EditIntent v2 → ExecutionPlan → ExecutionReceipt →
-ReviewResult` 合同，不向模型暴露任意 shell 执行入口。接入方式、返回结构和安全约束见
+当前提供 11 个高层工具：运行状态、选片工作台准备/确认、状态绑定预览、风格与个人范例
+检索、接受范例写入，以及 `compile_edit → execute_edit → review` 修图闭环。工具继续复用
+现有 `EditIntent v2 → ExecutionPlan → ExecutionReceipt → ReviewResult` 合同，不向模型
+暴露任意 shell 执行入口。接入方式、资源 URI、返回结构和安全约束见
 [`docs/mcp_runtime.md`](docs/mcp_runtime.md)。
 
 ## 用 agent 完成一次选片

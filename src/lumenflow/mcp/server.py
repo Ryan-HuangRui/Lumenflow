@@ -16,6 +16,7 @@ def create_server(
     *,
     local_config: dict[str, Any] | None = None,
     local_config_path: Path | None = lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH,
+    workspace_root: Path | None = None,
 ) -> MCPServer:
     """Create an MCP server without performing I/O on import."""
 
@@ -24,7 +25,8 @@ def create_server(
             local_config
             if local_config is not None
             else lumenflow_config.read_local_config(local_config_path)
-        )
+        ),
+        workspace_root=workspace_root,
     )
     server = MCPServer(
         name="lumenflow",
@@ -48,6 +50,12 @@ def create_server(
         idempotentHint=False,
         openWorldHint=True,
     )
+    workspace_replace = ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=True,
+        idempotentHint=False,
+        openWorldHint=True,
+    )
 
     @server.tool(
         name="lumenflow.status",
@@ -56,6 +64,48 @@ def create_server(
     )
     def status() -> dict[str, Any]:
         return runtime.status()
+
+    @server.tool(
+        name="lumenflow.prepare_curation",
+        description=(
+            "Scan a RAW directory, extract embedded previews, and build contact sheets for visual curation."
+        ),
+        annotations=workspace_replace,
+    )
+    def prepare_curation(
+        source_dir: str,
+        output_dir: str,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        per_sheet: int = 20,
+        columns: int = 5,
+    ) -> dict[str, Any]:
+        return runtime.prepare_curation(
+            source_dir=source_dir,
+            output_dir=output_dir,
+            date_from=date_from,
+            date_to=date_to,
+            per_sheet=per_sheet,
+            columns=columns,
+        )
+
+    @server.tool(
+        name="lumenflow.finalize_curation",
+        description=(
+            "Validate an agent-authored selection plan and package its ordered preview sequence."
+        ),
+        annotations=workspace_replace,
+    )
+    def finalize_curation(
+        manifest_path: str,
+        plan_path: str,
+        output_dir: str | None = None,
+    ) -> dict[str, Any]:
+        return runtime.finalize_curation(
+            manifest_path=manifest_path,
+            plan_path=plan_path,
+            output_dir=output_dir,
+        )
 
     @server.tool(
         name="lumenflow.create_previews",
@@ -81,6 +131,54 @@ def create_server(
             dry_run=dry_run,
             timeout=timeout,
             selection_reason=selection_reason,
+        )
+
+    @server.tool(
+        name="lumenflow.search_styles",
+        description="Rank local semantic style cards for a visual goal and stated purpose.",
+        annotations=read_only,
+    )
+    def search_styles(
+        query: str, purpose: str = "", limit: int = 5
+    ) -> dict[str, Any]:
+        return runtime.search_styles(query=query, purpose=purpose, limit=limit)
+
+    @server.tool(
+        name="lumenflow.search_examples",
+        description="Search private, user-accepted edit examples without exposing source paths.",
+        annotations=read_only,
+    )
+    def search_examples(
+        purpose: str = "",
+        tags: list[str] | None = None,
+        style_id: str | None = None,
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        return runtime.search_examples(
+            purpose=purpose,
+            tags=tags,
+            style_id=style_id,
+            limit=limit,
+        )
+
+    @server.tool(
+        name="lumenflow.store_example",
+        description=(
+            "Persist one accepted edit only after session, plan, receipt, and output bytes revalidate."
+        ),
+        annotations=workspace_write,
+    )
+    def store_example(
+        session: dict[str, Any],
+        plan: dict[str, Any],
+        receipt: dict[str, Any],
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return runtime.store_example(
+            session=session,
+            plan=plan,
+            receipt=receipt,
+            tags=tags,
         )
 
     @server.tool(
@@ -144,6 +242,60 @@ def create_server(
             receipt=receipt,
             review_result=review_result,
         )
+
+    @server.resource(
+        "lumenflow://styles/{style_id}",
+        name="Lumenflow style card",
+        description="Full local semantic style card by stable style id.",
+        mime_type="application/json",
+    )
+    def style_resource(style_id: str) -> dict[str, Any]:
+        return runtime.read_resource("styles", style_id)
+
+    @server.resource(
+        "lumenflow://workspaces/{workspace_id}",
+        name="Lumenflow curation workspace",
+        description="Curation workspace created during this runtime session.",
+        mime_type="application/json",
+    )
+    def workspace_resource(workspace_id: str) -> dict[str, Any]:
+        return runtime.read_resource("workspaces", workspace_id)
+
+    @server.resource(
+        "lumenflow://previews/{artifact_id}",
+        name="Lumenflow preview artifact",
+        description="State-bound preview evidence created during this runtime session.",
+        mime_type="application/json",
+    )
+    def preview_resource(artifact_id: str) -> dict[str, Any]:
+        return runtime.read_resource("previews", artifact_id)
+
+    @server.resource(
+        "lumenflow://receipts/{receipt_id}",
+        name="Lumenflow execution receipt",
+        description="Verified execution receipt created during this runtime session.",
+        mime_type="application/json",
+    )
+    def receipt_resource(receipt_id: str) -> dict[str, Any]:
+        return runtime.read_resource("receipts", receipt_id)
+
+    @server.resource(
+        "lumenflow://reviews/{session_id}",
+        name="Lumenflow review session",
+        description="Current bounded review state created during this runtime session.",
+        mime_type="application/json",
+    )
+    def review_resource(session_id: str) -> dict[str, Any]:
+        return runtime.read_resource("reviews", session_id)
+
+    @server.resource(
+        "lumenflow://backends/{backend_id}",
+        name="Lumenflow backend capability contract",
+        description="Static capability contract for a named RAW backend.",
+        mime_type="application/json",
+    )
+    def backend_resource(backend_id: str) -> dict[str, Any]:
+        return runtime.read_resource("backends", backend_id)
 
     return server
 
