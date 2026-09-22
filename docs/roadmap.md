@@ -97,7 +97,7 @@ Implemented foundation:
 - Vendor-neutral `EditIntent v2` plus RawTherapee/darktable `ExecutionPlan` and verified `ExecutionReceipt` contracts.
 - RawTherapee and darktable dynamic compilation with isolated, state-bound execution paths.
 - Version-pinned common-module coverage for both engines, including tone, color, optics, detail,
-  geometry, bounded RawTherapee regional effects, and high-quality direct output containers.
+  geometry, bounded RawTherapee regional effects, and receipt-bound high-bit-depth output containers.
 - A versioned darktable real-RAW feasibility probe, state-bound preview provider, strict replay compiler, verified receipt, and opt-in live integration test.
 - Model-authored `ReviewResult` evidence bound to verified output bytes, plus a persisted two-revision refinement loop with replay and cycle protection.
 - Evidence-bound backend benchmark observations, visual rubric reports, and baseline regression gates that cannot hide runtime failures behind aesthetic scores.
@@ -113,8 +113,6 @@ Maintenance work:
 - Add EditIntent v2 compilers only after each backend advertises the required capabilities.
 - Add darktable local mask/blend support only after a 5.4.1 version-pinned fixture, bounded geometry
   contract, and independent real-RAW pixel-delta tests exist.
-- Carry high-bit-depth final export settings through EditIntent, ExecutionPlan, and ExecutionReceipt
-  instead of only the direct renderer.
 - Expand review categories only when benchmark evidence shows the current contract is insufficient.
 - Grow the private benchmark corpus across lighting, skin tone, dynamic-range, color, and composition cases without committing personal RAW files.
 - Evaluate whether semantic embeddings improve personal-example retrieval before adding any embedding dependency; keep deterministic token/tag/style matching as the auditable baseline.

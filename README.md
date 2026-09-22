@@ -185,6 +185,8 @@ python scripts/curate_photos.py finalize \
 - 模型实际查看过的 `PreviewArtifact`；
 - 生成预览时的起始状态哈希。
 
+可选的 `output` 合同把最终容器、位深和后端允许的色彩/压缩选项写进同一意图。例如 RawTherapee 可请求 16-bit TIFF，darktable 可请求 32-bit OpenEXR；编译后的命令、输出路径和收据指纹都会绑定这些设置。不写 `output` 时继续使用兼容的 JPEG 默认值。
+
 编译为 RawTherapee 或 darktable 执行计划：
 
 ```bash
@@ -227,8 +229,8 @@ python scripts/review_loop.py advance \
 
 | 后端 | 当前定位 | 预览 | EditIntent v2 | 真实执行 |
 | --- | --- | --- | --- | --- |
-| RawTherapee | 默认动态后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 vendor-neutral 基础调整和 allowlisted PP3 模块 | 支持隔离执行和验证收据 |
-| darktable | 动态模块后端 | 支持；裸 RAW 自动使用输出目录内的显式最小 XMP | 支持 vendor-neutral 子集和 15 个版本固定模块 | 支持隔离执行和验证收据 |
+| RawTherapee | 默认动态后端 | 支持，绑定 RAW 与起始 profile/sidecar 状态 | 支持 vendor-neutral 基础调整、allowlisted PP3 模块和 JPEG/PNG/TIFF 输出合同 | 支持隔离执行和输出指纹收据 |
+| darktable | 动态模块后端 | 支持；裸 RAW 自动使用输出目录内的显式最小 XMP | 支持 vendor-neutral 子集、15 个版本固定模块和 JPEG/PNG/TIFF/OpenEXR 输出合同 | 支持隔离执行和输出指纹收据 |
 | Lightroom Classic | 交互式兼容路径 | 尚未完成可信状态绑定 | 仍使用旧 `adjustment_plan.v1` 路径 | 默认 fail-closed；当前只应 dry-run |
 
 后端能力由 `lumenflow.backend_capabilities.v1` 明确声明为 `supported`、`unsupported` 或 `unverified`。命令存在不等于能力已经安全可用：
@@ -375,7 +377,7 @@ Lightroom 是有 catalog 和活动照片状态的交互式应用。只验证“�
 - benchmark/回归合同与本地个人编辑范例库。
 - 可公开的语义风格层与私有来源证据分离。
 
-当前重点是补齐安全的局部选择能力、把高位深最终导出纳入 EditIntent 收据合同、完成 clean-clone/host packaging，并继续验证真实 Lightroom 安全边界。详见 [`docs/roadmap.md`](docs/roadmap.md)。
+当前重点是补齐安全的局部选择能力、完成 clean-clone/host packaging，并继续验证真实 Lightroom 安全边界。详见 [`docs/roadmap.md`](docs/roadmap.md)。
 
 ## 参与贡献
 

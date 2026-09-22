@@ -124,6 +124,8 @@ rest before invoking the CLI.  The same contract is exposed by `scripts/render_r
 | TIFF | 8/16/32-bit | `rgb24` / `rgb48le` / `rgbf32le` |
 | OpenEXR | 16/32-bit HALF/FLOAT | `gbrpf16le` / `gbrpf32le` |
 
+The same format/depth and built-in ICC settings are available through the
+optional `EditIntent v2.output` contract and are bound into the execution plan.
 The OpenEXR `bpp` values are source-pinned enum selectors (`16` for HALF and `32` for FLOAT),
 not `256`/`512` byte counts.  Built-in ICC type and rendering intent are allowlisted to the
 stable `--icc-type`/`--icc-intent` CLI values; arbitrary profile paths, display profiles and

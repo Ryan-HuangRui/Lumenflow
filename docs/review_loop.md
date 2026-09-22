@@ -14,9 +14,9 @@ be attempted.
 - categorized visual issues and concrete recommendations;
 - for `revise`, replacements for editable intent fields only.
 
-The model may revise `style`, `global_adjustments`, `composition`, or `local_adjustments`. It cannot
-change the user authorization, source RAW identity/fingerprint, preview basis, purpose, or intent
-identity through a review patch.
+The model may revise `style`, `global_adjustments`, `composition`, `local_adjustments`, or the
+bounded final `output` contract. It cannot change the user authorization, source RAW
+identity/fingerprint, preview basis, purpose, or intent identity through a review patch.
 
 `lumenflow.review_session.v1` persists the bounded loop. The default budget is two revisions and
 the hard contract maximum is five. It records used review ids and semantic intent hashes so a
@@ -30,11 +30,11 @@ A review advances only when all of these remain true:
 1. the plan targets the session's current intent revision and immutable evidence;
 2. the receipt reports success and unchanged RAW bytes;
 3. the receipt contains an output fingerprint;
-4. the current JPEG is a regular file under the declared output root;
+4. the current output is a regular file under the declared output root;
 5. its bytes still match the receipt fingerprint;
 6. ReviewResult references all four identities exactly.
 
-Dry-run and failed receipts are not visually reviewable evidence. If the JPEG changes after the
+Dry-run and failed receipts are not visually reviewable evidence. If the output changes after the
 receipt, the loop stops with `REVIEW_OUTPUT_DRIFT`.
 
 ## Workflow
@@ -47,7 +47,7 @@ python3 scripts/review_loop.py start IMG_001.edit_intent.json \
   --state-output IMG_001.review_session.json
 ```
 
-After the host model inspects the rendered JPEG and writes `IMG_001.review_result.json`, advance:
+After the host model inspects the rendered output and writes `IMG_001.review_result.json`, advance:
 
 ```bash
 python3 scripts/review_loop.py advance \

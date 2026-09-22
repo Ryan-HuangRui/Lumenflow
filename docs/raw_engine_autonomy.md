@@ -19,11 +19,12 @@ collections, asset browsers, and interactive tools remain outside the contract.
    `style.darktable`; unsupported fields fail closed.
 3. Compile to an `ExecutionPlan`, then execute only beneath the explicitly
    allowed output root. The receipt records the input and output fingerprints.
-4. Inspect the exact receipt-bound JPEG, emit `ReviewResult`, and either accept,
+4. Inspect the exact receipt-bound output, emit `ReviewResult`, and either accept,
    reject, or revise. A revision creates a new intent and a new output; existing
    renders are never overwritten.
-5. After acceptance, optionally export a higher-bit-depth derivative with the
-   accepted PP3/XMP through `render_raw.py`.
+5. Put the final container, bit depth, and bounded engine-specific output
+   options in `EditIntent.output`. The execution plan reconstructs the exact
+   CLI argv and the receipt binds the resulting high-quality output fingerprint.
 
 Deterministic tests verify these transitions and byte bindings. They do not
 pretend to perform aesthetic judgment; that remains the host model's job.
@@ -47,6 +48,19 @@ ranges, module versions, and evidence live in
 [`rawtherapee_backend.md`](rawtherapee_backend.md) and
 [`darktable_backend_spike.md`](darktable_backend_spike.md).
 
+An explicit final export is part of `EditIntent v2`, for example:
+
+```json
+{"output":{"format":"tiff","bit_depth":"16","rawtherapee":{"tiff_compression":true}}}
+```
+
+```json
+{"output":{"format":"openexr","bit_depth":"32","darktable":{"icc_type":"LIN_REC2020","icc_intent":"RELATIVE_COLORIMETRIC"}}}
+```
+
+The compiler rejects backend-incompatible formats, depths, options, suffixes,
+or any execution-plan command that no longer matches the declared output.
+
 ## Explicit limits
 
 - RawTherapee Locallab/RT-spots, arbitrary masks, spot removal, Film Simulation
@@ -56,14 +70,13 @@ ranges, module versions, and evidence live in
 - darktable generic pixel crop is not mapped; use the validated native crop
   module only when the model can author normalized engine coordinates safely.
 - Neither backend writes a catalog or claims editable GUI history parity.
-- `EditIntent v2` currently produces a receipt-bound JPEG. High-bit-depth
-  exports are available through the direct renderer with the accepted profile;
-  extending the intent artifact contract is separate work.
 
 ## Live verification
 
-The opt-in integration test runs preview → compile → render → receipt-bound
-review → revise → render → accept for three copied RAW files per backend:
+The opt-in integration test runs preview → compile → JPEG render → receipt-bound
+review → revise → high-bit-depth final render → accept for three copied RAW
+files per backend. RawTherapee finishes with TIFF 16-bit and darktable with
+OpenEXR 32-bit:
 
 ```bash
 LUMENFLOW_RAW_AUTONOMY_LIVE_FIXTURES=/path/to/local/raw-copies \

@@ -333,7 +333,25 @@ class RawEngineAutonomyLiveTests(unittest.TestCase):
                     receipt=receipt,
                     review_id=f"review-{backend}-{index}-r1",
                     decision="revise",
-                    changes={"style": revised_style},
+                    changes={
+                        "style": revised_style,
+                        "output": (
+                            {
+                                "format": "tiff",
+                                "bit_depth": "16",
+                                "rawtherapee": {"tiff_compression": True},
+                            }
+                            if backend == "rawtherapee"
+                            else {
+                                "format": "openexr",
+                                "bit_depth": "32",
+                                "darktable": {
+                                    "icc_type": "LIN_REC2020",
+                                    "icc_intent": "RELATIVE_COLORIMETRIC",
+                                },
+                            }
+                        ),
+                    },
                 )
                 transition = review_loop.advance_review_session(
                     session,

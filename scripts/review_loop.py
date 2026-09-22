@@ -23,6 +23,7 @@ EDITABLE_INTENT_FIELDS = {
     "global_adjustments",
     "composition",
     "local_adjustments",
+    "output",
 }
 ISSUE_CATEGORIES = {
     "exposure",

@@ -30,7 +30,8 @@
         "style": {"$ref": "edit_intent.schema.json#/properties/style"},
         "global_adjustments": {"$ref": "edit_intent.schema.json#/properties/global_adjustments"},
         "composition": {"$ref": "edit_intent.schema.json#/properties/composition"},
-        "local_adjustments": {"$ref": "edit_intent.schema.json#/properties/local_adjustments"}
+        "local_adjustments": {"$ref": "edit_intent.schema.json#/properties/local_adjustments"},
+        "output": {"$ref": "edit_intent.schema.json#/properties/output"}
       }
     }
   },

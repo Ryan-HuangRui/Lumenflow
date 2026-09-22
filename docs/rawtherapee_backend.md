@@ -137,9 +137,10 @@ options:
 - uncompressed or deflate-compressed TIFF;
 - TIFF 8-bit integer, 16-bit integer, 16-bit float, or 32-bit float.
 
-The current `EditIntent v2` default remains JPEG for compatibility.  Final
-export callers can request the other containers through the renderer command
-builder while the same PP3 processing state is used.
+The `EditIntent v2` default remains JPEG for compatibility. Its optional
+`output` contract carries the format, bit depth, JPEG options, or TIFF
+compression through the execution plan and receipt-bound output fingerprint;
+the executor reconstructs and verifies the exact renderer command.
 
 ## Verification
 

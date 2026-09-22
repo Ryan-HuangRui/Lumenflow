@@ -20,7 +20,7 @@ into:
 1. A confirmed selection plan or an explicit user-specified photo set.
 2. JPEG previews that the host agent can inspect visually.
 3. Agent-authored per-photo `EditIntent v2` documents based on reusable style knowledge.
-4. Rendered JPG outputs through RawTherapee CLI by default, or the bounded darktable module compiler when explicitly selected.
+4. Receipt-bound JPEG, PNG, TIFF, or OpenEXR outputs through RawTherapee CLI by default, or the bounded darktable module compiler when explicitly selected.
 5. Agent review of rendered outputs, with revised plans when needed.
 6. A processing report explaining what happened.
 
@@ -55,7 +55,7 @@ into:
    - Record the framing reason in `composition.reason`; crop executions should also include `composition.crop.reason`.
    - Use pixel crop values when the crop should be executed by RawTherapee; otherwise record a recommendation for manual/future implementation.
 11. Decide local adjustments before rendering. Record `local_adjustments.decision` as `none`, `use_masks`, or `manual_recommendation`. If `use_masks`, include requested masks; the compiler must still reject them when the selected backend lacks verified `mask.ai` capability. If no mask is needed, explain why in `local_adjustments.reason`.
-12. Write one vendor-neutral `EditIntent v2` per RAW using `knowledge/schemas/edit_intent.schema.json`. Bind it to the confirmed authorization reference, source fingerprint, preview artifact id, and starting-state hash.
+12. Write one vendor-neutral `EditIntent v2` per RAW using `knowledge/schemas/edit_intent.schema.json`. Bind it to the confirmed authorization reference, source fingerprint, preview artifact id, and starting-state hash. Use the optional bounded `output` contract for an explicit final container/bit depth; a practical loop may review JPEG first and move the accepted revision to a receipt-bound 16-bit TIFF or OpenEXR final.
 13. Compile the intent with `scripts/edit_intent.py compile`. The compiler must produce `lumenflow.execution_plan.v1` without writing a profile or rendered image.
 14. Execute the plan with `scripts/edit_intent.py execute`, passing the exact allowed output directory. Preserve the resulting `lumenflow.execution_receipt.v1` for review. Use `scripts/render_adjustment_plan.py` only for existing `adjustment_plan.v1` compatibility inputs.
 15. Review rendered outputs with the host agent's vision/reasoning capability:
@@ -65,7 +65,7 @@ into:
     - style strength
     - crop quality and whether important context was lost
     - obvious rendering artifacts
-16. Write `lumenflow.review_result.v1`, binding the current intent revision, plan, receipt, and output fingerprint. Use `accept`, `revise`, or `reject`; a revision may replace only style, global adjustments, composition, or local-adjustment intent.
+16. Write `lumenflow.review_result.v1`, binding the current intent revision, plan, receipt, and output fingerprint. Use `accept`, `revise`, or `reject`; a revision may replace only style, global adjustments, composition, local-adjustment intent, or the bounded final-output contract.
 17. Advance the persisted session with `scripts/review_loop.py`. Default to at most two revisions. Do not bypass `revision_limit_reached`, replay a review id, or recreate an earlier semantic intent.
 18. For `revise`, compile and execute the emitted next intent, inspect the new verified output, and repeat. Write final execution receipts, session state, processing report, and review notes when the session reaches a terminal state.
 19. For benchmark runs, write a `lumenflow.visual_assessment.v1` only after inspecting the exact output fingerprint, then use `scripts/benchmark_eval.py record`. Do not assign a visual score to a failed or dry-run execution, and do not omit failed cases from the aggregate report.
