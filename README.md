@@ -267,6 +267,11 @@ Lumenflow/
 └── tests/                  # 标准库 unittest 测试
 ```
 
+可安装包按 RAW 主闭环分层：`lumenflow.core` 保存 EditIntent、预览和复核合同，
+`lumenflow.execution` 保存确定性的外部渲染命令，`lumenflow.backends` 保存
+RawTherapee PP3 与 darktable XMP 编解码器。仓库中的对应 `scripts/*.py` 仍是
+checkout-safe 兼容入口；包内模块不依赖脚本目录或 `sys.path` 修改。
+
 关键合同：
 
 | 合同 | 作用 |

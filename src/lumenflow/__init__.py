@@ -11,8 +11,11 @@ __version__ = "0.1.0"
 
 __all__ = [
     "__version__",
+    "backends",
     "backend_capabilities",
     "config",
+    "core",
     "driver_adapter",
+    "execution",
     "task_store",
 ]
