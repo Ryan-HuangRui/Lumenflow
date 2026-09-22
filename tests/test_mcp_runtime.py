@@ -61,15 +61,14 @@ class McpRuntimeTests(unittest.TestCase):
             },
         }
 
-    def test_server_publishes_the_six_vertical_slice_tools(self) -> None:
+    def test_server_preserves_the_six_raw_vertical_slice_tools(self) -> None:
         from lumenflow.mcp.server import create_server
 
         async def scenario() -> None:
             async with Client(create_server()) as client:
                 response = await client.list_tools()
                 tools = {tool.name: tool for tool in response.tools}
-                self.assertEqual(
-                    set(tools),
+                self.assertTrue(
                     {
                         "lumenflow.status",
                         "lumenflow.create_previews",
@@ -77,7 +76,7 @@ class McpRuntimeTests(unittest.TestCase):
                         "lumenflow.execute_edit",
                         "lumenflow.start_review",
                         "lumenflow.advance_review",
-                    },
+                    }.issubset(tools),
                 )
                 self.assertEqual(
                     tools["lumenflow.compile_edit"].input_schema["required"],

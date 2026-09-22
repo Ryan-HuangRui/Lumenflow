@@ -6,6 +6,11 @@
   "photos": {
     "output_root": "/absolute/path/to/Lumenflow output"
   },
+  "styles": {
+    "roots": [
+      "knowledge/style_cards"
+    ]
+  },
   "bilibili": {
     "cookie_file": "/absolute/path/to/bilibili-cookie.txt"
   },
