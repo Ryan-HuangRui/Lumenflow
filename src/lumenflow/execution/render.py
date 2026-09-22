@@ -8,6 +8,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from .. import config as lumenflow_config
@@ -221,7 +222,7 @@ def executable_for_engine(engine: str, local_config: dict | None = None) -> str:
 
 
 def run_command(command: list[str], *, dry_run: bool = False, timeout: int | None = None) -> int:
-    print(shlex.join(command))
+    print(shlex.join(command), file=sys.stderr)
     if dry_run:
         return 0
     environment = None
