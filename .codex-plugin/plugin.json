@@ -25,7 +25,8 @@
     "category": "Productivity",
     "capabilities": [
       "Read",
-      "Write"
+      "Write",
+      "Interactive"
     ],
     "websiteURL": "https://github.com/Ryan-HuangRui/Lumenflow",
     "defaultPrompt": [

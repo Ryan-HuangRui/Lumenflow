@@ -23,7 +23,7 @@ where = ["src"]
 include = ["lumenflow*"]
 
 [tool.setuptools.package-data]
-lumenflow = ["data/style_cards/*.json"]
+lumenflow = ["data/style_cards/*.json", "ui/*.html"]
 
 [tool.ruff]
 target-version = "py311"

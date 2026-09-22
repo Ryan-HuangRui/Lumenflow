@@ -136,6 +136,10 @@ class CuratePhotosTests(unittest.TestCase):
             )
 
             self.assertEqual(result["selected_count"], 2)
+            self.assertEqual(
+                [item["role"] for item in result["selection_plan"]["selection"]],
+                ["Opening", "Detail"],
+            )
             self.assertTrue((workspace / "selected_previews" / "01_A.jpg").exists())
             self.assertTrue((workspace / "selected_previews" / "02_B.jpg").exists())
             report = (workspace / "selection_report.md").read_text(encoding="utf-8")
