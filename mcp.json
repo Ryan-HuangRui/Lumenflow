@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "lumenflow": {
+      "type": "stdio",
+      "command": "./scripts/launch_lumenflow_mcp",
+      "cwd": "${PLUGIN_ROOT}",
+      "env": {
+        "LUMENFLOW_CONFIG": "${PLUGIN_DATA}/lumenflow.local.json",
+        "LUMENFLOW_DATA_ROOT": "${PLUGIN_DATA}"
+      }
+    }
+  }
+}

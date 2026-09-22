@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
@@ -17,9 +18,16 @@ def create_server(
     local_config: dict[str, Any] | None = None,
     local_config_path: Path | None = lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH,
     workspace_root: Path | None = None,
+    environment: Mapping[str, str] | None = None,
 ) -> MCPServer:
     """Create an MCP server without performing I/O on import."""
 
+    selected_environment = os.environ if environment is None else environment
+    configured_path = selected_environment.get("LUMENFLOW_CONFIG")
+    if configured_path and local_config_path == lumenflow_config.DEFAULT_LOCAL_CONFIG_PATH:
+        local_config_path = Path(configured_path)
+    if workspace_root is None and selected_environment.get("LUMENFLOW_WORKSPACE_ROOT"):
+        workspace_root = Path(selected_environment["LUMENFLOW_WORKSPACE_ROOT"])
     runtime = LumenflowRuntime(
         local_config=(
             local_config
@@ -27,6 +35,7 @@ def create_server(
             else lumenflow_config.read_local_config(local_config_path)
         ),
         workspace_root=workspace_root,
+        environment=selected_environment,
     )
     server = MCPServer(
         name="lumenflow",

@@ -107,9 +107,9 @@ def find_sidecars(raw_path: Path) -> dict[str, Path]:
     sidecars = {}
     darktable_xmp = raw_path.with_name(raw_path.name + ".xmp")
     rawtherapee_pp3 = raw_path.with_name(raw_path.name + ".pp3")
-    if darktable_xmp.exists():
+    if darktable_xmp.is_file() and not darktable_xmp.is_symlink():
         sidecars["darktable_xmp"] = darktable_xmp
-    if rawtherapee_pp3.exists():
+    if rawtherapee_pp3.is_file() and not rawtherapee_pp3.is_symlink():
         sidecars["rawtherapee_pp3"] = rawtherapee_pp3
     return sidecars
 
@@ -158,7 +158,11 @@ def scan_raws(
 ) -> list[dict[str, Any]]:
     raws = []
     for path in sorted(source_dir.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in RAW_EXTENSIONS:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.suffix.lower() not in RAW_EXTENSIONS
+        ):
             continue
         metadata = read_selection_metadata(path)
         selected, reason = is_selected(metadata, min_rating)

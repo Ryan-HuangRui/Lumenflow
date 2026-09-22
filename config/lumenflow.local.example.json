@@ -6,6 +6,14 @@
   "photos": {
     "output_root": "/absolute/path/to/Lumenflow output"
   },
+  "security": {
+    "allowed_source_roots": [
+      "/absolute/path/to/RAW photos"
+    ],
+    "allowed_output_roots": [
+      "/absolute/path/to/Lumenflow output"
+    ]
+  },
   "styles": {
     "roots": [
       "knowledge/style_cards"

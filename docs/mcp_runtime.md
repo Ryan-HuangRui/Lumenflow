@@ -21,7 +21,43 @@ PYTHONPATH=src python -m lumenflow.mcp.server
 ```
 
 The server must own standard output, so diagnostics belong on standard error. It reads
-the existing `config/lumenflow.local.json` configuration when present.
+the existing `config/lumenflow.local.json` configuration when present. A plugin host can
+override that path with `LUMENFLOW_CONFIG`, keep private state under
+`LUMENFLOW_DATA_ROOT`, and set the checkout root with `LUMENFLOW_WORKSPACE_ROOT`.
+
+## Lite and Full routing
+
+`lumenflow.status` reports both the resolved RAW engines and the active path policy.
+The runtime deliberately starts in **Lite Mode** unless both of these conditions hold:
+
+1. `security.allowed_source_roots` and `security.allowed_output_roots` are non-empty,
+   absolute, existing directories.
+2. At least one supported RAW engine command resolves to a local executable.
+
+Lite Mode keeps non-photo operations such as status, style search, and private example
+search available. Tools that would read photos, materialize profiles, or write exports
+fail closed. **Full Mode** enables the RAW editing route, while each requested backend
+is still checked independently before use. Curation can run once its file roots are
+configured; it does not require a RAW rendering backend.
+
+Example local policy:
+
+```json
+{
+  "security": {
+    "allowed_source_roots": ["/absolute/path/to/RAW photos"],
+    "allowed_output_roots": ["/absolute/path/to/Lumenflow output"]
+  },
+  "tools": {
+    "rawtherapee_cli": "rawtherapee-cli",
+    "darktable_cli": "darktable-cli"
+  }
+}
+```
+
+Plugin environments may instead provide path-separated
+`LUMENFLOW_ALLOWED_SOURCE_ROOTS` and `LUMENFLOW_ALLOWED_OUTPUT_ROOTS` values. JSON config
+takes precedence when the corresponding key is present.
 
 ## Tool surface
 
@@ -73,6 +109,11 @@ apparently successful results.
 ## Safety invariants
 
 - File parameters in the MCP surface must be absolute paths.
+- Every photo read resolves through an allowed source root; every artifact read or write
+  resolves through an allowed output root. Real-path containment prevents `..` and
+  symbolic-link escapes.
+- Curation skips symbolic-link RAW entries, and finalization revalidates source and
+  preview paths embedded inside the candidate manifest.
 - A preview call refuses to replace an existing preview.
 - Compilation verifies the source fingerprint carried by `EditIntent v2`.
 - Execution reconstructs and compares the backend command instead of trusting arbitrary
@@ -86,6 +127,33 @@ apparently successful results.
 - Only an accepted, exactly bound review can enter personal memory; stored examples omit
   source and output paths and the SQLite database is created with owner-only permissions.
 
-The portable plugin manifests and host-configured allowed source/output roots are added
-in a later packaging layer. Until then, callers must pass explicit absolute paths and
-the core output-root checks remain authoritative.
+Expected policy failures use stable codes including `ALLOWED_ROOTS_REQUIRED`,
+`PATH_NOT_ALLOWED`, `BACKEND_UNAVAILABLE`, and `ABSOLUTE_PATH_REQUIRED`. The allowlist is
+an MCP boundary in addition to the core execution-plan checks; it does not weaken the
+existing source fingerprint, command reconstruction, or no-overwrite invariants.
+
+## Portable Agent Plugin packaging
+
+The checkout is a portable package with root `plugin.json`, root `mcp.json`, the fixed
+`skills/` directory, and the plugin-relative executable
+`./scripts/launch_lumenflow_mcp`. `.codex-plugin/plugin.json` and `.mcp.json` retain
+compatibility with older Codex plugin loaders.
+
+The launcher never installs dependencies or reads credentials on its own. It chooses the
+first Python 3.11+ interpreter containing `mcp` and Pillow from:
+
+1. `${PLUGIN_DATA}/venv/bin/python`
+2. `${PLUGIN_ROOT}/.venv/bin/python`
+3. `python3` from `PATH`
+
+For an installed local plugin, prepare its private runtime once:
+
+```bash
+python3.11 -m venv /absolute/path/to/lumenflow-plugin-data/venv
+/absolute/path/to/lumenflow-plugin-data/venv/bin/python -m pip install -e /absolute/path/to/Lumenflow
+cp /absolute/path/to/Lumenflow/config/lumenflow.local.example.json \
+  /absolute/path/to/lumenflow-plugin-data/lumenflow.local.json
+```
+
+Edit the copied config with the actual allowed roots before enabling file-facing tools.
+No secret or machine-specific photo path is stored in either plugin manifest.
