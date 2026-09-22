@@ -99,6 +99,8 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+# 安装可复用核心包（开发模式；保留 scripts/ 兼容入口）
+python -m pip install -e .
 ```
 
 教程 ASR 是可选能力；只有需要本地语音识别时才安装：
@@ -135,7 +137,11 @@ python scripts/check_environment.py --fail-on-missing-required
 
 ### 6. 让 agent 使用仓库
 
-当前尚未提供一键安装包。请让支持本地文件和视觉输入的 agent host 读取本仓库的 `skills/`、`knowledge/` 与 `scripts/`。各宿主的适配说明位于 [`adapters/`](adapters/)；Codex 可直接从仓库运行这些 skill。
+核心合同已提供标准 `src/` layout Python 包。`pip install -e .` 安装的是低耦合的
+配置、后端能力、驱动安全和任务状态模块；现有 `scripts/*.py` 命令继续作为兼容入口，
+可从仓库直接运行。请仍让支持本地文件和视觉输入的 agent host 读取本仓库的
+`skills/`、`knowledge/` 与 `scripts/`。各宿主的适配说明位于 [`adapters/`](adapters/)；
+Codex 可直接从仓库运行这些 skill。
 
 可以直接对 agent 说：
 
@@ -248,6 +254,7 @@ python scripts/backend_capabilities.py lightroom --probe
 ```text
 Lumenflow/
 ├── skills/                 # agent 工作流与判断边界
+├── src/lumenflow/          # 可安装的低耦合核心合同包
 ├── scripts/                # 扫描、预览、校验、执行、复核等确定性工具
 ├── knowledge/
 │   ├── schemas/            # 可版本化 JSON 合同
