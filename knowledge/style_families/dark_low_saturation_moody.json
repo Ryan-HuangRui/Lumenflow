@@ -54,9 +54,9 @@
     "饱和度降低后要检查肤色是否灰绿。"
   ],
   "source_evidence": {
-    "tutorial_count": 6,
+    "tutorial_count": 7,
     "category_counts": {
-      "basic_tone": 93,
+      "basic_tone": 95,
       "color_grading": 7,
       "hsl_color": 88,
       "mask_local": 8,

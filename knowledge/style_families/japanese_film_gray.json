@@ -54,14 +54,14 @@
     "阴影可以抬起，但主体边界仍要清楚。"
   ],
   "source_evidence": {
-    "tutorial_count": 15,
+    "tutorial_count": 16,
     "category_counts": {
-      "basic_tone": 276,
-      "color_grading": 18,
-      "hsl_color": 130,
+      "basic_tone": 300,
+      "color_grading": 19,
+      "hsl_color": 136,
       "mask_local": 10,
-      "presence_detail": 15,
-      "tone_curve": 151
+      "presence_detail": 19,
+      "tone_curve": 156
     }
   },
   "raw_profile_role": "none",

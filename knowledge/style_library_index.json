@@ -7,7 +7,7 @@
       "style_name": "黑白街头颗粒",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 2,
+      "tutorial_count": 3,
       "path": "knowledge/style_families/black_white_street_grain.json"
     },
     {
@@ -31,7 +31,7 @@
       "style_name": "低饱暗调质感",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 6,
+      "tutorial_count": 7,
       "path": "knowledge/style_families/dark_low_saturation_moody.json"
     },
     {
@@ -63,7 +63,7 @@
       "style_name": "日系干净人像",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 13,
+      "tutorial_count": 14,
       "path": "knowledge/style_families/japanese_clean_portrait.json"
     },
     {
@@ -71,7 +71,7 @@
       "style_name": "日系胶片灰",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 15,
+      "tutorial_count": 16,
       "path": "knowledge/style_families/japanese_film_gray.json"
     },
     {
@@ -119,7 +119,7 @@
       "style_name": "摄影师仿色质感",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 30,
+      "tutorial_count": 32,
       "path": "knowledge/style_families/photographer_reference_texture.json"
     },
     {
@@ -151,7 +151,7 @@
       "style_name": "街头光影电影感",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 21,
+      "tutorial_count": 23,
       "path": "knowledge/style_families/street_light_shadow_cinematic.json"
     },
     {
@@ -187,7 +187,7 @@
   ],
   "counts": {
     "reusable_knowledge_cards": 22,
-    "source_tutorials_merged": 162,
+    "source_tutorials_merged": 170,
     "active_styles": 18,
     "inactive_styles": 4,
     "by_role": {

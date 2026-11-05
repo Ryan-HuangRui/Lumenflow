@@ -54,14 +54,14 @@
     "肤色和白色物体优先保持可信，绿色只做清理不做过度风格化。"
   ],
   "source_evidence": {
-    "tutorial_count": 13,
+    "tutorial_count": 14,
     "category_counts": {
-      "basic_tone": 177,
-      "color_grading": 22,
-      "hsl_color": 170,
+      "basic_tone": 196,
+      "color_grading": 23,
+      "hsl_color": 177,
       "mask_local": 4,
-      "presence_detail": 11,
-      "tone_curve": 131
+      "presence_detail": 12,
+      "tone_curve": 143
     }
   },
   "raw_profile_role": "none",

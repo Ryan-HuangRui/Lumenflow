@@ -53,14 +53,14 @@
     "街拍质感来自明暗关系，不要只靠降曝光制造电影感。"
   ],
   "source_evidence": {
-    "tutorial_count": 21,
+    "tutorial_count": 23,
     "category_counts": {
-      "basic_tone": 351,
-      "color_grading": 28,
-      "hsl_color": 187,
+      "basic_tone": 385,
+      "color_grading": 33,
+      "hsl_color": 193,
       "mask_local": 18,
-      "presence_detail": 35,
-      "tone_curve": 221
+      "presence_detail": 36,
+      "tone_curve": 225
     }
   },
   "raw_profile_role": "none",

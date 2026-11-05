@@ -37,9 +37,9 @@
     "exposure_and_basic_tone",
     "hsl_color_cleanup",
     "tone_curve",
-    "detail_and_texture",
-    "local_adjustments",
     "color_grading",
+    "local_adjustments",
+    "detail_and_texture",
     "final_review"
   ],
   "parameter_strategy": "agent_infers_per_photo",
@@ -53,14 +53,14 @@
     "这类知识只定义参考分析方法，具体参数必须根据目标照片与参考图重新推理。"
   ],
   "source_evidence": {
-    "tutorial_count": 30,
+    "tutorial_count": 32,
     "category_counts": {
-      "basic_tone": 479,
-      "color_grading": 31,
-      "hsl_color": 344,
-      "mask_local": 34,
-      "presence_detail": 36,
-      "tone_curve": 275
+      "basic_tone": 512,
+      "color_grading": 42,
+      "hsl_color": 356,
+      "mask_local": 40,
+      "presence_detail": 37,
+      "tone_curve": 292
     }
   },
   "raw_profile_role": "none",

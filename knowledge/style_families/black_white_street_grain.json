@@ -36,9 +36,9 @@
   "operation_order": [
     "exposure_and_basic_tone",
     "tone_curve",
+    "hsl_color_cleanup",
     "detail_and_texture",
     "color_grading",
-    "hsl_color_cleanup",
     "local_adjustments",
     "final_review"
   ],
@@ -53,14 +53,14 @@
     "如果照片的核心是色彩关系，不要强转黑白。"
   ],
   "source_evidence": {
-    "tutorial_count": 2,
+    "tutorial_count": 3,
     "category_counts": {
-      "basic_tone": 40,
+      "basic_tone": 65,
       "color_grading": 3,
-      "hsl_color": 3,
-      "mask_local": 1,
-      "presence_detail": 4,
-      "tone_curve": 21
+      "hsl_color": 6,
+      "mask_local": 3,
+      "presence_detail": 6,
+      "tone_curve": 29
     }
   },
   "raw_profile_role": "none",
