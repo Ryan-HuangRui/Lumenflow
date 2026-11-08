@@ -53,14 +53,14 @@
     "这类知识只定义参考分析方法，具体参数必须根据目标照片与参考图重新推理。"
   ],
   "source_evidence": {
-    "tutorial_count": 32,
+    "tutorial_count": 33,
     "category_counts": {
-      "basic_tone": 512,
-      "color_grading": 42,
-      "hsl_color": 356,
-      "mask_local": 40,
-      "presence_detail": 37,
-      "tone_curve": 292
+      "basic_tone": 526,
+      "color_grading": 44,
+      "hsl_color": 373,
+      "mask_local": 41,
+      "presence_detail": 38,
+      "tone_curve": 297
     }
   },
   "raw_profile_role": "none",

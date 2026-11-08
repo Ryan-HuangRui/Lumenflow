@@ -119,7 +119,7 @@
       "style_name": "摄影师仿色质感",
       "role": "visual_style",
       "active_for_photo_matching": true,
-      "tutorial_count": 32,
+      "tutorial_count": 33,
       "path": "knowledge/style_families/photographer_reference_texture.json"
     },
     {
@@ -187,7 +187,7 @@
   ],
   "counts": {
     "reusable_knowledge_cards": 22,
-    "source_tutorials_merged": 170,
+    "source_tutorials_merged": 171,
     "active_styles": 18,
     "inactive_styles": 4,
     "by_role": {
